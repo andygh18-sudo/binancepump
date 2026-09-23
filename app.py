@@ -1,8 +1,12 @@
 import streamlit as st,json,os,pandas as pd
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Binance Pump Scanner v7.6 Option B",layout="wide")
 st.title("⚡ Binance Pump Scanner v7.6 — GitHub + Streamlit")
 st.caption("GitHub Actions periodic scanner • synchronized local order book • Telegram alerts")
+
+# Automatically refresh the dashboard every 15 seconds so newly published scan data appears without a manual reload.
+st_autorefresh(interval=15_000, key="pump_scanner_auto_refresh")
 
 path="data/latest.json"
 if not os.path.exists(path):
