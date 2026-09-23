@@ -112,6 +112,18 @@ def acceleration_for(symbol):
     lookback = points[-7]["score"] if len(points) >= 7 else points[0]["score"]
     return current - previous, current - lookback, len(points)
 
+# Human-readable order-book status
+if "book_ready" in df.columns:
+    def book_status(row):
+        ready = bool(row.get("book_ready", False))
+        gaps = int(row.get("book_gaps", 0) or 0)
+        if ready and gaps == 0:
+            return "🟢 READY"
+        if ready and gaps > 0:
+            return "🟡 RESYNCING"
+        return "🟡 SYNCING"
+    df["book_status"] = df.apply(book_status, axis=1)
+
 if show_acceleration and "symbol" in df.columns:
     accel = df["symbol"].map(lambda s: acceleration_for(s)[0])
     accel5 = df["symbol"].map(lambda s: acceleration_for(s)[1])
@@ -141,6 +153,11 @@ c4.metric("🏗️ Building", len(building))
 c5.metric("🏆 Top Score", f"{df['score'].max():.0f}")
 c6.metric("🕒 Last Scan", last_scan)
 
+if "book_status" in df.columns:
+    ready_count = int((df["book_status"] == "🟢 READY").sum())
+    syncing_count = int((df["book_status"] != "🟢 READY").sum())
+    st.caption(f"📚 Order books: **{ready_count} ready** • **{syncing_count} syncing/resyncing**")
+
 st.divider()
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -149,10 +166,10 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 
 def format_signal_table(frame):
     cols = [
-        "symbol", "price", "score", "stage", "entry", "sell",
+        "symbol", "price", "score", "stage", "book_status", "entry", "sell",
         "price_1m", "price_10s", "volume_ratio", "trade_accel",
         "buy_pressure", "book_imbalance", "spread_bps", "book_ready",
-        "score_delta", "score_delta_5", "acceleration"
+        "score_delta", "score_delta_5", "acceleration", "book_status"
     ]
     cols = [c for c in cols if c in frame.columns]
     x = frame[cols].copy()
@@ -182,6 +199,7 @@ with tab1:
                 "book_imbalance": st.column_config.NumberColumn("Book Imb", format="%.2f"),
                 "score_delta": st.column_config.NumberColumn("Δ Score", format="%+.0f"),
                 "score_delta_5": st.column_config.NumberColumn("5-Scan Δ", format="%+.0f"),
+                "book_status": st.column_config.TextColumn("Order Book"),
             },
         )
 
@@ -302,6 +320,15 @@ with tab4:
         "Status": ["● CURRENT" if i == current_idx else ("✓ PASSED" if i < current_idx else "○ NEXT") for i in range(len(lifecycle))]
     })
     st.dataframe(lifecycle_df, use_container_width=True, hide_index=True)
+
+    st.subheader("📚 Order Book Status")
+    selected_book_status = str(coin.get("book_status", "🟡 SYNCING"))
+    if selected_book_status == "🟢 READY":
+        st.success("🟢 Order book is synchronized and its imbalance/spread metrics can be used confidently.")
+    elif selected_book_status == "🟡 RESYNCING":
+        st.warning("🟡 Order book detected a synchronization gap and is being rebuilt. Treat order-book metrics cautiously.")
+    else:
+        st.info("🟡 Order book is still synchronizing. Price/volume/trade signals may be available before book confirmation.")
 
     st.subheader("📊 Momentum Evidence")
     evidence = {
