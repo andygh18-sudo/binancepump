@@ -68,6 +68,7 @@ stages = ["BUILDING", "PRE-PUMP", "EARLY MOMENTUM", "BREAKOUT", "CONFIRMED PUMP"
 selected_stages = st.sidebar.multiselect("Stages", stages, default=stages)
 min_volume_ratio = st.sidebar.number_input("Minimum volume ratio", min_value=0.0, value=1.0, step=0.1)
 only_book_ready = st.sidebar.checkbox("Order book ready only", value=False)
+show_acceleration = st.sidebar.checkbox("Show score acceleration", value=True)
 
 view = df[df["score"] >= min_score].copy()
 if "stage" in view.columns and selected_stages:
@@ -76,6 +77,49 @@ if "volume_ratio" in view.columns:
     view = view[view["volume_ratio"].fillna(0) >= min_volume_ratio]
 if only_book_ready and "book_ready" in view.columns:
     view = view[view["book_ready"] == True]
+
+# Historical score acceleration
+history_path = "data/history.jsonl"
+history_records = []
+if os.path.exists(history_path):
+    with open(history_path, errors="ignore") as hf:
+        for line in hf:
+            try:
+                item = json.loads(line)
+                if isinstance(item, dict) and item.get("rows"):
+                    history_records.append(item)
+            except Exception:
+                continue
+
+score_history = {}
+for item in history_records[-120:]:
+    ts = item.get("ts")
+    for r in item.get("rows", []):
+        sym = str(r.get("symbol", ""))
+        if sym:
+            score_history.setdefault(sym, []).append({
+                "ts": ts,
+                "score": float(r.get("score", 0) or 0),
+                "stage": r.get("stage", "")
+            })
+
+def acceleration_for(symbol):
+    points = score_history.get(str(symbol), [])
+    if len(points) < 2:
+        return 0.0, 0.0, 0
+    current = points[-1]["score"]
+    previous = points[-2]["score"]
+    lookback = points[-7]["score"] if len(points) >= 7 else points[0]["score"]
+    return current - previous, current - lookback, len(points)
+
+if show_acceleration and "symbol" in df.columns:
+    accel = df["symbol"].map(lambda s: acceleration_for(s)[0])
+    accel5 = df["symbol"].map(lambda s: acceleration_for(s)[1])
+    df["score_delta"] = accel
+    df["score_delta_5"] = accel5
+    df["acceleration"] = df["score_delta"].map(
+        lambda x: "🔥 SURGING" if x >= 5 else "🟢 RISING" if x > 0 else "🟡 STABLE" if x == 0 else "🔴 FALLING"
+    )
 
 # Header metrics
 updated = d.get("updated", 0)
@@ -107,7 +151,8 @@ def format_signal_table(frame):
     cols = [
         "symbol", "price", "score", "stage", "entry", "sell",
         "price_1m", "price_10s", "volume_ratio", "trade_accel",
-        "buy_pressure", "book_imbalance", "spread_bps", "book_ready"
+        "buy_pressure", "book_imbalance", "spread_bps", "book_ready",
+        "score_delta", "score_delta_5", "acceleration"
     ]
     cols = [c for c in cols if c in frame.columns]
     x = frame[cols].copy()
@@ -135,8 +180,26 @@ with tab1:
                 "price_1m": st.column_config.NumberColumn("1m %", format="%.2f"),
                 "price_10s": st.column_config.NumberColumn("10s %", format="%.2f"),
                 "book_imbalance": st.column_config.NumberColumn("Book Imb", format="%.2f"),
+                "score_delta": st.column_config.NumberColumn("Δ Score", format="%+.0f"),
+                "score_delta_5": st.column_config.NumberColumn("5-Scan Δ", format="%+.0f"),
             },
         )
+
+    if show_acceleration and "score_delta_5" in radar.columns:
+        st.subheader("🔥 Fastest Score Acceleration")
+        accelerating = radar.sort_values("score_delta_5", ascending=False).head(10)
+        if not accelerating.empty:
+            st.dataframe(
+                accelerating[[c for c in ["symbol", "score", "score_delta", "score_delta_5", "stage", "volume_ratio"] if c in accelerating.columns]],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100, format="%d"),
+                    "score_delta": st.column_config.NumberColumn("Δ Scan", format="%+.0f"),
+                    "score_delta_5": st.column_config.NumberColumn("Δ 5 Scans", format="%+.0f"),
+                    "volume_ratio": st.column_config.NumberColumn("Volume", format="%.2fx"),
+                },
+            )
 
     st.subheader("📈 Strongest Momentum")
     momentum = view.head(8).copy()
@@ -207,6 +270,23 @@ with tab4:
 
     st.progress(min(max(int(score), 0), 100), text=f"Pump Score {score:.0f}/100")
 
+    delta_now, delta_lookback, history_count = acceleration_for(selected)
+    ac1, ac2, ac3 = st.columns(3)
+    ac1.metric("Score Change", f"{delta_now:+.0f}")
+    ac2.metric("5-Scan Change", f"{delta_lookback:+.0f}")
+    ac3.metric("History Points", history_count)
+
+    if history_count >= 2:
+        st.subheader("📈 Score Acceleration")
+        points = score_history[selected]
+        chart = pd.DataFrame({
+            "Time": [pd.to_datetime(p["ts"], unit="s") for p in points[-30:]],
+            "Score": [p["score"] for p in points[-30:]],
+        }).set_index("Time")
+        st.line_chart(chart, height=260)
+        trajectory = "🔥 SURGING" if delta_now >= 5 else "🟢 RISING" if delta_now > 0 else "🟡 STABLE" if delta_now == 0 else "🔴 FALLING"
+        st.info(f"Current score trajectory: **{trajectory}**. A rising score means momentum is strengthening; a falling score means momentum is weakening.")
+
     m1, m2, m3, m4 = st.columns(4)
     bp = coin.get("buy_pressure", np.nan)
     m1.metric("Buy Pressure", f"{bp*100:.1f}%" if pd.notna(bp) else "—")
@@ -265,4 +345,4 @@ with tab5:
         st.info("No history file has been published yet.")
 
 st.divider()
-st.caption(f"Dashboard refreshes automatically every 15 seconds • Showing {len(df)} scanned symbols • Last scan: {last_scan}")
+st.caption(f"Dashboard refreshes automatically every 15 seconds • Showing {len(df)} scanned symbols • Historical acceleration uses the latest published scan records • Last scan: {last_scan}")
