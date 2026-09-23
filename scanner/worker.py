@@ -97,6 +97,7 @@ async def resync_unready_books(http):
 
 async def main():
     global symbols,books
+    os.makedirs("data", exist_ok=True)
     start=time.time()
     timeout=aiohttp.ClientTimeout(total=20)
     async with aiohttp.ClientSession(timeout=timeout) as http:
