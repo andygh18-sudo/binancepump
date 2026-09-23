@@ -12,7 +12,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Refresh every 15 seconds so newly published scanner data appears automatically.
 st_autorefresh(interval=15_000, key="pump_scanner_auto_refresh")
 
 st.markdown("""
@@ -53,7 +52,6 @@ if "score" not in df.columns:
 df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0)
 df = df.sort_values("score", ascending=False).reset_index(drop=True)
 
-# Numeric normalization
 numeric_cols = [
     "price", "price_1m", "price_10s", "volume_ratio", "trade_accel",
     "buy_pressure", "book_imbalance", "spread_bps", "score"
@@ -78,7 +76,6 @@ if "volume_ratio" in view.columns:
 if only_book_ready and "book_ready" in view.columns:
     view = view[view["book_ready"] == True]
 
-# Historical score acceleration
 history_path = "data/history.jsonl"
 history_records = []
 if os.path.exists(history_path):
@@ -112,7 +109,6 @@ def acceleration_for(symbol):
     lookback = points[-7]["score"] if len(points) >= 7 else points[0]["score"]
     return current - previous, current - lookback, len(points)
 
-# Human-readable order-book status
 if "book_ready" in df.columns:
     def book_status(row):
         ready = bool(row.get("book_ready", False))
@@ -133,7 +129,6 @@ if show_acceleration and "symbol" in df.columns:
         lambda x: "🔥 SURGING" if x >= 5 else "🟢 RISING" if x > 0 else "🟡 STABLE" if x == 0 else "🔴 FALLING"
     )
 
-# Header metrics
 updated = d.get("updated", 0)
 try:
     last_scan = pd.to_datetime(updated, unit="s").strftime("%H:%M:%S UTC")
@@ -171,12 +166,10 @@ def format_signal_table(frame):
         "buy_pressure", "book_imbalance", "spread_bps", "book_ready",
         "score_delta", "score_delta_5", "acceleration"
     ]
-    # Keep only columns that exist and de-duplicate defensively.
     cols = list(dict.fromkeys(c for c in cols if c in frame.columns))
     x = frame.loc[:, cols].copy()
     if "buy_pressure" in x.columns:
         x["buy_pressure"] = x["buy_pressure"] * 100
-    # PyArrow used by st.dataframe requires unique column names.
     if x.columns.duplicated().any():
         x = x.loc[:, ~x.columns.duplicated()].copy()
     return x
@@ -223,11 +216,75 @@ with tab1:
                 },
             )
 
+    # True momentum ranking, independent of the score ordering.
     st.subheader("📈 Strongest Momentum")
-    momentum = view.head(8).copy()
-    if not momentum.empty:
-        chart_cols = [c for c in ["symbol", "score", "volume_ratio"] if c in momentum.columns]
-        st.bar_chart(momentum.set_index("symbol")[chart_cols[1:]] if len(chart_cols) > 1 else momentum.set_index("symbol")[["score"]])
+    st.caption("Composite momentum ranking using price acceleration, volume expansion, trade acceleration, buying pressure, order-book imbalance and score acceleration.")
+
+    momentum = df.copy()
+
+    # Use bounded components so one extreme metric cannot dominate the ranking.
+    def bounded(series, low=None, high=None):
+        s = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        if low is None:
+            low = float(s.quantile(0.05)) if len(s) else 0.0
+        if high is None:
+            high = float(s.quantile(0.95)) if len(s) else 1.0
+        if high <= low:
+            high = low + 1.0
+        return ((s.clip(low, high) - low) / (high - low) * 100).clip(0, 100)
+
+    momentum["m_score"] = bounded(momentum["score"], 0, 100)
+    momentum["m_1m"] = bounded(momentum.get("price_1m", pd.Series(0, index=momentum.index)))
+    momentum["m_10s"] = bounded(momentum.get("price_10s", pd.Series(0, index=momentum.index)))
+    momentum["m_vol"] = bounded(momentum.get("volume_ratio", pd.Series(0, index=momentum.index)), 0, max(2.0, float(pd.to_numeric(momentum.get("volume_ratio", pd.Series(0)), errors="coerce").quantile(0.95) if len(momentum) else 2.0)))
+    momentum["m_trade"] = bounded(momentum.get("trade_accel", pd.Series(0, index=momentum.index)))
+    momentum["m_buy"] = bounded(momentum.get("buy_pressure", pd.Series(0.5, index=momentum.index)), 0, 1)
+    momentum["m_book"] = bounded(momentum.get("book_imbalance", pd.Series(0, index=momentum.index)), -1, 1)
+    momentum["m_accel"] = bounded(momentum.get("score_delta_5", pd.Series(0, index=momentum.index)))
+
+    momentum["momentum_score"] = (
+        momentum["m_score"] * 0.25 +
+        momentum["m_1m"] * 0.15 +
+        momentum["m_10s"] * 0.10 +
+        momentum["m_vol"] * 0.15 +
+        momentum["m_trade"] * 0.10 +
+        momentum["m_buy"] * 0.10 +
+        momentum["m_book"] * 0.05 +
+        momentum["m_accel"] * 0.10
+    )
+
+    # Keep only coins with at least some meaningful pump score, while avoiding
+    # the sidebar minimum-score filter so this section remains a true market scan.
+    momentum = momentum[momentum["score"] >= 20].sort_values("momentum_score", ascending=False).head(10)
+
+    if momentum.empty:
+        st.info("No sufficient momentum data is available yet.")
+    else:
+        momentum_display = momentum[[
+            "symbol", "momentum_score", "score", "stage",
+            "price_1m", "price_10s", "volume_ratio", "trade_accel",
+            "buy_pressure", "book_imbalance", "score_delta_5"
+        ]].copy()
+
+        st.dataframe(
+            momentum_display,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "momentum_score": st.column_config.ProgressColumn("Momentum", min_value=0, max_value=100, format="%.0f"),
+                "score": st.column_config.ProgressColumn("Pump Score", min_value=0, max_value=100, format="%d"),
+                "price_1m": st.column_config.NumberColumn("1m %", format="%.2f"),
+                "price_10s": st.column_config.NumberColumn("10s %", format="%.2f"),
+                "volume_ratio": st.column_config.NumberColumn("Volume", format="%.2fx"),
+                "trade_accel": st.column_config.NumberColumn("Trade Accel", format="%.2fx"),
+                "buy_pressure": st.column_config.NumberColumn("Buy %", format="%.1f%%"),
+                "book_imbalance": st.column_config.NumberColumn("Book Imb", format="%.2f"),
+                "score_delta_5": st.column_config.NumberColumn("5-Scan Δ", format="%+.0f"),
+            },
+        )
+
+        chart = momentum.set_index("symbol")[["momentum_score"]].sort_values("momentum_score")
+        st.bar_chart(chart, height=320)
 
 with tab2:
     st.subheader("⚡ Early Pump Opportunities")
