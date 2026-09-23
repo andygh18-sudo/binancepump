@@ -9,7 +9,8 @@ REST=os.getenv("BINANCE_REST_BASE","https://data-api.binance.vision")
 MAX=int(os.getenv("MAX_SYMBOLS","40"));MINVOL=float(os.getenv("MIN_QUOTE_VOLUME","1000000"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"))
-symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0})
+TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","45"))
+symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None})
 
 async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
@@ -17,17 +18,13 @@ async def get_json(s,url,params=None):
 
 async def discover(s):
     info=await get_json(s,REST+"/api/v3/exchangeInfo")
-    # Scan only USDT-quoted crypto assets. Exclude stablecoins and fiat/currency bases.
     stable_bases={
         "USDT","USDC","FDUSD","TUSD","USDP","DAI","BUSD","PYUSD","USDD",
         "EUR","GBP","TRY","BRL","ARS","AUD","RUB","UAH","PLN","RON","ZAR","NGN","JPY"
     }
-    trad={
-        x["symbol"] for x in info["symbols"]
-        if x["status"]=="TRADING"
-        and x["quoteAsset"]=="USDT"
-        and x.get("baseAsset") not in stable_bases
-    }
+    trad={x["symbol"] for x in info["symbols"]
+          if x["status"]=="TRADING" and x["quoteAsset"]=="USDT"
+          and x.get("baseAsset") not in stable_bases}
     ticks=await get_json(s,REST+"/api/v3/ticker/24hr")
     rows=[x for x in ticks if x["symbol"] in trad and float(x.get("quoteVolume",0))>=MINVOL]
     rows.sort(key=lambda x:float(x.get("quoteVolume",0)),reverse=True)
@@ -90,24 +87,16 @@ async def telegram(msg):
         pass
 
 async def resync_books(http):
-    results=await asyncio.gather(
-        *(b.resync(http) for b in books.values()),
-        return_exceptions=True,
-    )
-    return results
+    return await asyncio.gather(*(b.resync(http) for b in books.values()),return_exceptions=True)
 
 async def resync_unready_books(http):
     bad=[b for b in books.values() if not b.ready]
-    if not bad:
-        return None
-    return await asyncio.gather(
-        *(b.resync(http) for b in bad),
-        return_exceptions=True,
-    )
+    if not bad:return None
+    return await asyncio.gather(*(b.resync(http) for b in bad),return_exceptions=True)
 
 async def main():
     global symbols,books
-    os.makedirs("data", exist_ok=True)
+    os.makedirs("data",exist_ok=True)
     start=time.time()
     timeout=aiohttp.ClientTimeout(total=20)
     async with aiohttp.ClientSession(timeout=timeout) as http:
@@ -119,27 +108,18 @@ async def main():
             streams += [f"{q}@aggTrade",f"{q}@bookTicker",f"{q}@depth@100ms",f"{q}@kline_1m"]
         url=WS+"?streams="+"/".join(streams)
 
-        async with http.ws_connect(
-            url,
-            heartbeat=20,
-            autoping=True,
-            max_msg_size=16*1024*1024,
-        ) as ws:
-            # FIX: gather() returns a Future; create_task() expects a coroutine.
+        async with http.ws_connect(url,heartbeat=20,autoping=True,max_msg_size=16*1024*1024) as ws:
             sync=asyncio.create_task(resync_books(http))
-
             try:
                 while time.time()-start<RUN_SECONDS:
                     try:
                         m=await asyncio.wait_for(ws.receive(),timeout=1)
                         if m.type==aiohttp.WSMsgType.TEXT:
-                            z=json.loads(m.data)
-                            event(z.get("stream",""),z.get("data",{}))
+                            z=json.loads(m.data);event(z.get("stream",""),z.get("data",{}))
                     except asyncio.TimeoutError:
                         pass
 
                     if sync.done() and any(not b.ready for b in books.values()):
-                        # FIX: wrap gather() in a coroutine before passing to create_task().
                         async def _resync_pending():
                             return await resync_unready_books(http)
                         sync=asyncio.create_task(_resync_pending())
@@ -148,50 +128,53 @@ async def main():
                         rows=[]
                         for s in symbols:
                             r=score(s)
-                            if not r:
-                                continue
-                            old=state[s]
-                            alert=(
-                                r["stage"]=="PRE-PUMP"
-                                or r["entry"] in ("EARLY ENTRY","CONFIRMATION ENTRY")
-                                or r["sell"] in ("TAKE PROFIT","MOMENTUM EXIT","DISTRIBUTION","PANIC EXIT")
-                            )
-                            changed=(
-                                old.get("last_stage")!=r["stage"]
-                                or old.get("last_entry")!=r["entry"]
-                                or old.get("last_sell")!=r["sell"]
-                            )
+                            if r: rows.append(r)
+
+                        rows.sort(key=lambda z:z["score"],reverse=True)
+
+                        # Telegram is deliberately restricted to the TOP qualifying
+                        # PRE-PUMP/momentum candidates only. No sell/exit alerts.
+                        candidates=[
+                            r for r in rows
+                            if r["score"]>=MIN_ALERT_SCORE
+                            and r["stage"] in ("PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")
+                        ][:TOP_ALERTS]
+
+                        top_symbols={r["symbol"]:i+1 for i,r in enumerate(candidates)}
+                        for r in candidates:
+                            s=r["symbol"];old=state[s];rank=top_symbols[s]
+                            changed=(old.get("last_stage")!=r["stage"]
+                                     or old.get("last_entry")!=r["entry"]
+                                     or old.get("last_alert_rank")!=rank)
                             now=time.time()
-                            if changed and alert and now-old["last_alert"]>=COOLDOWN:
+                            if changed and now-old["last_alert"]>=COOLDOWN:
                                 await telegram(
-                                    f"⚡ {s} | {r['stage']} | {r['score']}/100\\n"
-                                    f"Entry: {r['entry']} | Sell: {r['sell']}\\n"
-                                    f"1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\\n"
+                                    f"⚡ TOP {rank} PRE-PUMP/MOMENTUM | {s} | {r['stage']} | {r['score']}/100\n"
+                                    f"Entry: {r['entry']}\n"
+                                    f"1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\n"
                                     f"Buy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | "
-                                    f"Spread: {r['spread_bps']:.2f} bps\\nPrice: {r['price']}"
+                                    f"Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}"
                                 )
                                 old["last_alert"]=now
+                                old["last_alert_rank"]=rank
+
                             old["last_stage"]=r["stage"]
                             old["last_entry"]=r["entry"]
-                            old["last_sell"]=r["sell"]
-                            rows.append(r)
 
                         rows.sort(key=lambda z:z["score"],reverse=True)
                         with open("data/latest.json","w") as f:
                             json.dump({"updated":time.time(),"rows":rows},f,indent=2)
                         with open("data/history.jsonl","a") as f:
-                            f.write(json.dumps({"ts":time.time(),"rows":rows})+"\\n")
+                            f.write(json.dumps({"ts":time.time(),"rows":rows})+"\n")
                         await asyncio.sleep(1)
 
             finally:
                 if not sync.done():
                     sync.cancel()
-                    try:
-                        await sync
-                    except asyncio.CancelledError:
-                        pass
+                    try: await sync
+                    except asyncio.CancelledError: pass
 
-            rows=[score(s) for s in symbols if score(s)]
+            rows=[r for s in symbols if (r:=score(s))]
             rows.sort(key=lambda z:z["score"],reverse=True)
             with open("data/latest.json","w") as f:
                 json.dump({"updated":time.time(),"rows":rows},f,indent=2)
