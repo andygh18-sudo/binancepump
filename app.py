@@ -109,6 +109,27 @@ def acceleration_for(symbol):
     lookback = points[-7]["score"] if len(points) >= 7 else points[0]["score"]
     return current - previous, current - lookback, len(points)
 
+def velocity_for(symbol):
+    points = score_history.get(str(symbol), [])
+    if len(points) < 2:
+        return 0.0
+    p0, p1 = points[-2], points[-1]
+    try:
+        hours = max((float(p1["ts"]) - float(p0["ts"])) / 3600.0, 1/60)
+    except Exception:
+        hours = 0.25
+    return (p1["score"] - p0["score"]) / hours
+
+def recent_signal_info(symbol):
+    points = score_history.get(str(symbol), [])
+    if len(points) < 2:
+        return 0.0, "", ""
+    prev, curr = points[-2], points[-1]
+    delta = curr["score"] - prev["score"]
+    prev_stage = str(prev.get("stage", ""))
+    curr_stage = str(curr.get("stage", ""))
+    return delta, prev_stage, curr_stage
+
 if "book_ready" in df.columns:
     def book_status(row):
         ready = bool(row.get("book_ready", False))
@@ -120,14 +141,28 @@ if "book_ready" in df.columns:
         return "🟡 SYNCING"
     df["book_status"] = df.apply(book_status, axis=1)
 
-if show_acceleration and "symbol" in df.columns:
+if "symbol" in df.columns:
     accel = df["symbol"].map(lambda s: acceleration_for(s)[0])
     accel5 = df["symbol"].map(lambda s: acceleration_for(s)[1])
     df["score_delta"] = accel
     df["score_delta_5"] = accel5
+    df["score_velocity"] = df["symbol"].map(velocity_for)
     df["acceleration"] = df["score_delta"].map(
         lambda x: "🔥 SURGING" if x >= 5 else "🟢 RISING" if x > 0 else "🟡 STABLE" if x == 0 else "🔴 FALLING"
     )
+    # Compare current volume ratio with the previous published scan.
+    volume_lookup = {}
+    for item in history_records[-120:]:
+        for r in item.get("rows", []):
+            sym = str(r.get("symbol", ""))
+            if sym:
+                volume_lookup.setdefault(sym, []).append(float(r.get("volume_ratio", 0) or 0))
+    def volume_accel(symbol):
+        vals = volume_lookup.get(str(symbol), [])
+        if len(vals) < 2:
+            return 0.0
+        return vals[-1] - vals[-2]
+    df["volume_accel"] = df["symbol"].map(volume_accel)
 
 updated = d.get("updated", 0)
 try:
@@ -164,7 +199,7 @@ def format_signal_table(frame):
         "symbol", "price", "score", "stage", "book_status", "entry", "sell",
         "price_1m", "price_10s", "volume_ratio", "trade_accel",
         "buy_pressure", "book_imbalance", "spread_bps", "book_ready",
-        "score_delta", "score_delta_5", "acceleration"
+        "score_delta", "score_delta_5", "score_velocity", "volume_accel", "acceleration", "chase_risk"
     ]
     cols = list(dict.fromkeys(c for c in cols if c in frame.columns))
     x = frame.loc[:, cols].copy()
@@ -196,6 +231,9 @@ with tab1:
                 "book_imbalance": st.column_config.NumberColumn("Book Imb", format="%.2f"),
                 "score_delta": st.column_config.NumberColumn("Δ Score", format="%+.0f"),
                 "score_delta_5": st.column_config.NumberColumn("5-Scan Δ", format="%+.0f"),
+                "score_velocity": st.column_config.NumberColumn("Score/hr", format="%+.1f"),
+                "volume_accel": st.column_config.NumberColumn("Vol Δ", format="%+.2fx"),
+                "chase_risk": st.column_config.TextColumn("Entry Risk"),
                 "book_status": st.column_config.TextColumn("Order Book"),
             },
         )
@@ -217,31 +255,136 @@ with tab1:
             )
 
     # True momentum ranking, independent of the score ordering.
-    st.subheader("📈 Strongest Momentum")
-    st.caption("Composite momentum ranking using price acceleration, volume expansion, trade acceleration, buying pressure, order-book imbalance and score acceleration.")
+    st.subheader("🚨 Newly Detected Signals")
+    st.caption("Signals that have accelerated since the previous published scan. These are shown independently of the sidebar minimum-score filter.")
 
-    momentum = df.copy()
+    new_rows = []
+    for _, row in df.iterrows():
+        delta, prev_stage, curr_stage = recent_signal_info(row.get("symbol", ""))
+        if delta >= 5 or (prev_stage != curr_stage and curr_stage in ["PRE-PUMP", "EARLY MOMENTUM", "BREAKOUT", "CONFIRMED PUMP"]):
+            new_rows.append({
+                "symbol": row.get("symbol", ""),
+                "score": row.get("score", 0),
+                "score_delta": delta,
+                "score_velocity": row.get("score_velocity", 0),
+                "stage": row.get("stage", ""),
+                "previous_stage": prev_stage,
+                "volume_ratio": row.get("volume_ratio", 0),
+                "volume_accel": row.get("volume_accel", 0),
+            })
+    new_signals = pd.DataFrame(new_rows).sort_values(["score_delta", "score"], ascending=False).head(10) if new_rows else pd.DataFrame()
 
-    # Use bounded components so one extreme metric cannot dominate the ranking.
-    def bounded(series, low=None, high=None):
-        s = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    if new_signals.empty:
+        st.info("No newly accelerated signals detected in the latest scan interval.")
+    else:
+        st.dataframe(
+            new_signals,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100, format="%d"),
+                "score_delta": st.column_config.NumberColumn("Δ Score", format="%+.0f"),
+                "score_velocity": st.column_config.NumberColumn("Score/hr", format="%+.1f"),
+                "volume_ratio": st.column_config.NumberColumn("Volume", format="%.2fx"),
+                "volume_accel": st.column_config.NumberColumn("Vol Δ", format="%+.2fx"),
+            },
+        )
+
+    st.subheader("🎯 Best Early Pump Setups")
+    st.caption("Developing signals with strengthening momentum, volume and buying pressure while penalising already-extended moves.")
+
+    early = df.copy()
+    def bounded_series(series, low=None, high=None):
+        x = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
         if low is None:
-            low = float(s.quantile(0.05)) if len(s) else 0.0
+            low = float(x.quantile(0.05)) if len(x) else 0.0
         if high is None:
-            high = float(s.quantile(0.95)) if len(s) else 1.0
+            high = float(x.quantile(0.95)) if len(x) else 1.0
         if high <= low:
             high = low + 1.0
-        return ((s.clip(low, high) - low) / (high - low) * 100).clip(0, 100)
+        return ((x.clip(low, high) - low) / (high - low) * 100).clip(0, 100)
 
-    momentum["m_score"] = bounded(momentum["score"], 0, 100)
-    momentum["m_1m"] = bounded(momentum.get("price_1m", pd.Series(0, index=momentum.index)))
-    momentum["m_10s"] = bounded(momentum.get("price_10s", pd.Series(0, index=momentum.index)))
-    momentum["m_vol"] = bounded(momentum.get("volume_ratio", pd.Series(0, index=momentum.index)), 0, max(2.0, float(pd.to_numeric(momentum.get("volume_ratio", pd.Series(0)), errors="coerce").quantile(0.95) if len(momentum) else 2.0)))
-    momentum["m_trade"] = bounded(momentum.get("trade_accel", pd.Series(0, index=momentum.index)))
-    momentum["m_buy"] = bounded(momentum.get("buy_pressure", pd.Series(0.5, index=momentum.index)), 0, 1)
-    momentum["m_book"] = bounded(momentum.get("book_imbalance", pd.Series(0, index=momentum.index)), -1, 1)
-    momentum["m_accel"] = bounded(momentum.get("score_delta_5", pd.Series(0, index=momentum.index)))
+    early["e_score_accel"] = bounded_series(early.get("score_delta_5", pd.Series(0, index=early.index)), 0, max(5.0, float(early.get("score_delta_5", pd.Series(0)).quantile(0.95) if len(early) else 5.0)))
+    early["e_volume_accel"] = bounded_series(early.get("volume_accel", pd.Series(0, index=early.index)), 0, max(1.0, float(early.get("volume_accel", pd.Series(0)).quantile(0.95) if len(early) else 1.0)))
+    early["e_buy"] = bounded_series(early.get("buy_pressure", pd.Series(0.5, index=early.index)), 0, 1)
+    early["e_trade"] = bounded_series(early.get("trade_accel", pd.Series(0, index=early.index)))
+    early["e_book"] = bounded_series(early.get("book_imbalance", pd.Series(0, index=early.index)), -1, 1)
+    early["e_1m"] = bounded_series(early.get("price_1m", pd.Series(0, index=early.index)))
+    early["e_10s"] = bounded_series(early.get("price_10s", pd.Series(0, index=early.index)))
 
+    extension = (
+        (pd.to_numeric(early.get("price_1m", pd.Series(0, index=early.index)), errors="coerce").fillna(0).clip(lower=0) / 5 * 100)
+        .clip(0, 100)
+    )
+    early["early_entry_quality"] = (
+        early["e_score_accel"] * 0.20 +
+        early["e_volume_accel"] * 0.20 +
+        early["e_buy"] * 0.15 +
+        early["e_trade"] * 0.15 +
+        early["e_book"] * 0.10 +
+        early["e_1m"] * 0.10 +
+        early["e_10s"] * 0.05 +
+        (100 - extension) * 0.05
+    )
+    early["chase_risk"] = np.where(
+        (pd.to_numeric(early.get("price_1m", pd.Series(0, index=early.index)), errors="coerce").fillna(0) >= 5) |
+        (pd.to_numeric(early.get("score", 0), errors="coerce").fillna(0) >= 92),
+        "🔴 CHASING",
+        np.where(
+            (pd.to_numeric(early.get("price_1m", pd.Series(0, index=early.index)), errors="coerce").fillna(0) >= 3) |
+            (pd.to_numeric(early.get("score", 0), errors="coerce").fillna(0) >= 82),
+            "🟡 EXTENDED",
+            "🟢 EARLY"
+        )
+    )
+
+    early = early[
+        (pd.to_numeric(early.get("score", 0), errors="coerce").fillna(0) >= 20) &
+        (early.get("stage", pd.Series("", index=early.index)).isin(["BUILDING", "PRE-PUMP", "EARLY MOMENTUM", "BREAKOUT"]))
+    ].sort_values(["early_entry_quality", "score_delta_5"], ascending=False).head(10)
+
+    if early.empty:
+        st.info("No developing early-pump setups are available yet.")
+    else:
+        early_display = early[[
+            "symbol", "early_entry_quality", "score", "stage", "chase_risk",
+            "score_delta", "score_delta_5", "score_velocity",
+            "price_1m", "volume_ratio", "volume_accel", "buy_pressure",
+            "trade_accel", "book_imbalance"
+        ]].copy()
+        early_display["buy_pressure"] = early_display["buy_pressure"] * 100
+
+        st.dataframe(
+            early_display,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "early_entry_quality": st.column_config.ProgressColumn("Entry Quality", min_value=0, max_value=100, format="%.0f"),
+                "score": st.column_config.ProgressColumn("Pump Score", min_value=0, max_value=100, format="%d"),
+                "score_delta": st.column_config.NumberColumn("Δ Score", format="%+.0f"),
+                "score_delta_5": st.column_config.NumberColumn("5-Scan Δ", format="%+.0f"),
+                "score_velocity": st.column_config.NumberColumn("Score/hr", format="%+.1f"),
+                "price_1m": st.column_config.NumberColumn("1m %", format="%.2f"),
+                "volume_ratio": st.column_config.NumberColumn("Volume", format="%.2fx"),
+                "volume_accel": st.column_config.NumberColumn("Vol Δ", format="%+.2fx"),
+                "buy_pressure": st.column_config.NumberColumn("Buy %", format="%.1f%%"),
+                "trade_accel": st.column_config.NumberColumn("Trade Accel", format="%.2fx"),
+                "book_imbalance": st.column_config.NumberColumn("Book Imb", format="%.2f"),
+            },
+        )
+
+    st.subheader("📈 Strongest Momentum")
+    st.caption("Market-wide ranking of current momentum, independent of the sidebar minimum-score filter.")
+
+    momentum = df.copy()
+    momentum["m_score"] = bounded_series(momentum["score"], 0, 100)
+    momentum["m_1m"] = bounded_series(momentum.get("price_1m", pd.Series(0, index=momentum.index)))
+    momentum["m_10s"] = bounded_series(momentum.get("price_10s", pd.Series(0, index=momentum.index)))
+    momentum["m_vol"] = bounded_series(momentum.get("volume_ratio", pd.Series(0, index=momentum.index)), 0, max(2.0, float(momentum.get("volume_ratio", pd.Series(0)).quantile(0.95) if len(momentum) else 2.0)))
+    momentum["m_trade"] = bounded_series(momentum.get("trade_accel", pd.Series(0, index=momentum.index)))
+    momentum["m_buy"] = bounded_series(momentum.get("buy_pressure", pd.Series(0.5, index=momentum.index)), 0, 1)
+    momentum["m_book"] = bounded_series(momentum.get("book_imbalance", pd.Series(0, index=momentum.index)), -1, 1)
+    momentum["m_accel"] = bounded_series(momentum.get("score_delta_5", pd.Series(0, index=momentum.index)))
     momentum["momentum_score"] = (
         momentum["m_score"] * 0.25 +
         momentum["m_1m"] * 0.15 +
@@ -252,10 +395,7 @@ with tab1:
         momentum["m_book"] * 0.05 +
         momentum["m_accel"] * 0.10
     )
-
-    # Keep only coins with at least some meaningful pump score, while avoiding
-    # the sidebar minimum-score filter so this section remains a true market scan.
-    momentum = momentum[momentum["score"] >= 20].sort_values("momentum_score", ascending=False).head(10)
+    momentum = momentum[pd.to_numeric(momentum["score"], errors="coerce").fillna(0) >= 20].sort_values("momentum_score", ascending=False).head(10)
 
     if momentum.empty:
         st.info("No sufficient momentum data is available yet.")
@@ -265,6 +405,7 @@ with tab1:
             "price_1m", "price_10s", "volume_ratio", "trade_accel",
             "buy_pressure", "book_imbalance", "score_delta_5"
         ]].copy()
+        momentum_display["buy_pressure"] = momentum_display["buy_pressure"] * 100
 
         st.dataframe(
             momentum_display,
@@ -310,25 +451,41 @@ with tab2:
 
 with tab3:
     st.subheader("🗺️ Binance Pump Heatmap")
-    st.caption("A market-wide view of the scanner's current stages and scores.")
+    st.caption("Visual intensity view across score, short-term momentum, volume expansion, buying pressure and score acceleration.")
 
-    heat = df.copy()
-    heat["stage"] = heat.get("stage", "QUIET")
-    heat = heat.head(60)
+    heat = df.copy().head(60)
+    heat["price_1m"] = pd.to_numeric(heat.get("price_1m", 0), errors="coerce").fillna(0)
+    heat["volume_ratio"] = pd.to_numeric(heat.get("volume_ratio", 0), errors="coerce").fillna(0)
+    heat["buy_pressure"] = pd.to_numeric(heat.get("buy_pressure", 0), errors="coerce").fillna(0)
+    heat["score_delta_5"] = pd.to_numeric(heat.get("score_delta_5", 0), errors="coerce").fillna(0)
+
+    heat["Momentum"] = bounded_series(heat["price_1m"])
+    heat["Volume Intensity"] = bounded_series(heat["volume_ratio"], 0, max(2.0, float(heat["volume_ratio"].quantile(0.95) if len(heat) else 2.0)))
+    heat["Buy Intensity"] = heat["buy_pressure"].clip(0, 1) * 100
+    heat["Score Accel"] = bounded_series(heat["score_delta_5"], 0, max(5.0, float(heat["score_delta_5"].quantile(0.95) if len(heat) else 5.0)))
 
     if not heat.empty:
-        display_cols = [c for c in ["symbol", "score", "stage", "volume_ratio", "price_1m"] if c in heat.columns]
+        heat_display = heat[[
+            "symbol", "score", "stage", "Momentum",
+            "Volume Intensity", "Buy Intensity", "Score Accel", "price_1m", "volume_ratio"
+        ]].copy()
+
         st.dataframe(
-            heat[display_cols],
+            heat_display,
             use_container_width=True,
             height=700,
             hide_index=True,
             column_config={
                 "score": st.column_config.ProgressColumn("Pump Score", min_value=0, max_value=100, format="%d"),
+                "Momentum": st.column_config.ProgressColumn("Price Momentum", min_value=0, max_value=100, format="%.0f"),
+                "Volume Intensity": st.column_config.ProgressColumn("Volume Intensity", min_value=0, max_value=100, format="%.0f"),
+                "Buy Intensity": st.column_config.ProgressColumn("Buy Pressure", min_value=0, max_value=100, format="%.0f%%"),
+                "Score Accel": st.column_config.ProgressColumn("Score Accel", min_value=0, max_value=100, format="%.0f"),
+                "price_1m": st.column_config.NumberColumn("1m %", format="%.2f"),
                 "volume_ratio": st.column_config.NumberColumn("Volume", format="%.2fx"),
-                "price_1m": st.column_config.NumberColumn("1m Change", format="%.2f%%"),
             },
         )
+
 
 with tab4:
     st.subheader("🔎 Coin Analysis")
