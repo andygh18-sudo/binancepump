@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: binance-pump-scanner
+  cancel-in-progress: false
+
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -31,12 +35,12 @@ jobs:
         env:
           BINANCE_WS_BASE: wss://data-stream.binance.vision/stream
           BINANCE_REST_BASE: https://data-api.binance.vision
-          MAX_SYMBOLS: "40"
-          MIN_QUOTE_VOLUME: "1000000"
+          MAX_SYMBOLS: "80"
+          MIN_QUOTE_VOLUME: "250000"
           RUN_SECONDS: "250"
           DECISION_INTERVAL: "5"
           ALERT_COOLDOWN: "60"
-          ORDERBOOK_LIMIT: "1000"
+          ORDERBOOK_LIMIT: "500"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python run_scanner.py
