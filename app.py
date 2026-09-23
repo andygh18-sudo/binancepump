@@ -169,12 +169,16 @@ def format_signal_table(frame):
         "symbol", "price", "score", "stage", "book_status", "entry", "sell",
         "price_1m", "price_10s", "volume_ratio", "trade_accel",
         "buy_pressure", "book_imbalance", "spread_bps", "book_ready",
-        "score_delta", "score_delta_5", "acceleration", "book_status"
+        "score_delta", "score_delta_5", "acceleration"
     ]
-    cols = [c for c in cols if c in frame.columns]
-    x = frame[cols].copy()
+    # Keep only columns that exist and de-duplicate defensively.
+    cols = list(dict.fromkeys(c for c in cols if c in frame.columns))
+    x = frame.loc[:, cols].copy()
     if "buy_pressure" in x.columns:
         x["buy_pressure"] = x["buy_pressure"] * 100
+    # PyArrow used by st.dataframe requires unique column names.
+    if x.columns.duplicated().any():
+        x = x.loc[:, ~x.columns.duplicated()].copy()
     return x
 
 with tab1:
