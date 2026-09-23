@@ -17,12 +17,22 @@ async def get_json(s,url,params=None):
 
 async def discover(s):
     info=await get_json(s,REST+"/api/v3/exchangeInfo")
-    trad={x["symbol"] for x in info["symbols"] if x["status"]=="TRADING" and x["quoteAsset"]=="USDT"}
+    # Scan only USDT-quoted crypto assets. Exclude stablecoins and fiat/currency bases.
+    stable_bases={
+        "USDT","USDC","FDUSD","TUSD","USDP","DAI","BUSD","PYUSD","USDD",
+        "EUR","GBP","TRY","BRL","ARS","AUD","RUB","UAH","PLN","RON","ZAR","NGN","JPY"
+    }
+    trad={
+        x["symbol"] for x in info["symbols"]
+        if x["status"]=="TRADING"
+        and x["quoteAsset"]=="USDT"
+        and x.get("baseAsset") not in stable_bases
+    }
     ticks=await get_json(s,REST+"/api/v3/ticker/24hr")
     rows=[x for x in ticks if x["symbol"] in trad and float(x.get("quoteVolume",0))>=MINVOL]
     rows.sort(key=lambda x:float(x.get("quoteVolume",0)),reverse=True)
     out=[x["symbol"] for x in rows[:MAX]]
-    if "BTCUSDT" not in out:out.append("BTCUSDT")
+    if "BTCUSDT" not in out and "BTCUSDT" in trad:out.append("BTCUSDT")
     return out
 
 def event(stream,d):
