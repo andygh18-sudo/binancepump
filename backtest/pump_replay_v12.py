@@ -58,7 +58,11 @@ def evaluate(df,btc,symbol,calibration=None):
         z=calc(x.iloc[i],br)
         if z["v4_alert_quality"]=="REJECT":continue
         entry=float(x.iloc[i].close);f=x.iloc[i+1:i+241];g={f"{m}m":round((float(f.iloc[:m].high.max())/entry-1)*100,2) if len(f.iloc[:m]) else None for m in (15,30,60,240)}
-        raw.append({"time":t.isoformat(),"price":entry,**z,"future_max_gain":g})
+        dd={f"{m}m":round(min((float(f.iloc[:m].low.min())/entry-1)*100,0),2) if len(f.iloc[:m]) else None for m in (15,30,60,240)}
+        t5=next((m for m in range(1,min(240,len(f))+1) if float(f.iloc[:m].high.max())/entry-1>=0.05),None)
+        t10=next((m for m in range(1,min(240,len(f))+1) if float(f.iloc[:m].high.max())/entry-1>=0.10),None)
+        t20=next((m for m in range(1,min(240,len(f))+1) if float(f.iloc[:m].high.max())/entry-1>=0.20),None)
+        raw.append({"time":t.isoformat(),"price":entry,**z,"future_max_gain":g,"mae":dd,"time_to_5pct_min":t5,"time_to_10pct_min":t10,"time_to_20pct_min":t20})
     # Persistence: consecutive qualified observations inside a 10-minute window.
     for i,z in enumerate(raw):
         j=i
@@ -169,7 +173,7 @@ def evaluate(df,btc,symbol,calibration=None):
             "v12_reliability_modifier":round(reliability_modifier,2),
             "v12_grade":grade,"v12_path":path,"v12_alert":bool(alert),
             "v12_confirmation":bool(confirmation),"v12_a_plus":bool(a_plus),
-            "v12_follow_strength":follow_strength,"v12_mae_60m_pct":round(min((float(f.low.min())/entry-1)*100,0),2) if len(f) else None,"v12_mae_240m_pct":round(min((float(f.low.min())/entry-1)*100,0),2) if len(f) else None,"v12_follow_ok":bool(v12_follow_ok),
+            "v12_follow_strength":follow_strength,"v12_follow_ok":bool(v12_follow_ok),
             "v12_efficiency":round(efficiency,4),
             "v12_adverse_extension":round(adverse_extension,4),
             "v12_score":score,"v12_persistence":persistence,
