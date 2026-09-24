@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-09-24T11:10:24.155763+00:00",
+  "engine": "Pump Replay / Backtest v12",
+  "data_source": "https://data-api.binance.vision",
+  "method": "Binance 1m Spot klines with V10 features plus efficiency-weighted scoring, multi-candle follow-through and structural confirmation, volume-to-price efficiency, adverse-extension veto and soft walk-forward reliability modifier",
+  "v12_design": {
+    "v11_base": true,
+    "v4_weight": 0.55,
+    "persistence_weight": 0.1,
+    "follow_through_weight": 0.1,
+    "efficiency_weight": 0.15,
+    "relative_strength_weight": 0.05,
+    "second_candle_confirmation": true,
+    "efficiency_filter": true,
+    "adverse_extension_veto": true,
+    "multi_candle_follow_through": true,
+    "historical_hard_gate": false,
+    "early_min_score": 62,
+    "confirmed_min_score": 70,
+    "a_plus_setup": true,
+    "a_plus_bonus": 5,
+    "mae_mfe_tracking": true,
+    "targets": [
+      "10% in 60m",
+      "10% in 240m",
+      "20% in 240m"
+    ]
+  },
+  "v9_design": {
+    "v4_weight": 0.72,
+    "persistence_weight": 0.1,
+    "follow_through_weight": 0.13,
+    "historical_risk_modifier": true,
+    "historical_hard_gate": false,
+    "smoothed_prior_hit_rate_pct": 10,
+    "early_v4_min_score": 60,
+    "early_min_follow_through": 65,
+    "early_min_persistence": 2,
+    "confirmed_v4_min_score": 72,
+    "confirmed_min_persistence": 3,
+    "confirmed_min_follow_through": 75,
+    "avoid_filter": true,
+    "targets": [
+      "10% in 60m",
+      "10% in 240m",
+      "20% in 240m"
+    ]
+  },
+  "calibration": {},
+  "results": [
+    {
+      "symbol": "NOMUSDT",
+      "status": "error",
+      "error": "name 'a_plus' is not defined"
+    },
+    {
+      "symbol": "NILUSDT",
+      "status": "error",
+      "error": "name 'a_plus' is not defined"
+    },
+    {
+      "symbol": "STXUSDT",
+      "status": "error",
+      "error": "name 'a_plus' is not defined"
+    },
+    {
+      "symbol": "RAYUSDT",
+      "status": "error",
+      "error": "name 'a_plus' is not defined"
+    },
+    {
+      "symbol": "SEIUSDT",
+      "status": "error",
+      "error": "name 'a_plus' is not defined"
+    },
+    {
+      "symbol": "SUIUSDT",
+      "status": "error",
+      "error": "name 'a_plus' is not defined"
+    },
+    {
+      "symbol": "INJUSDT",
+      "status": "error",
+      "error": "name 'a_plus' is not defined"
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "status": "error",
+      "error": "name 'a_plus' is not defined"
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "status": "error",
+      "error": "name 'a_plus' is not defined"
+    }
+  ]
+}
