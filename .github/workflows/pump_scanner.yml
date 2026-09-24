@@ -81,10 +81,25 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python run_scanner.py
 
+      - name: Prepare bounded scan history
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("data/history.jsonl")
+          if p.exists():
+              lines = p.read_text().splitlines()
+              keep = 200
+              if len(lines) > keep:
+                  p.write_text("\n".join(lines[-keep:]) + "\n")
+                  print(f"Trimmed history.jsonl from {len(lines)} to {keep} entries")
+          PY
+
       - name: Publish scan data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main
 
           git add -A data/
           if git diff --cached --quiet; then
@@ -93,11 +108,9 @@ jobs:
           fi
 
           git commit -m "Update scanner data"
-
-          git fetch origin main
-          git reset --soft origin/main
-          git commit -m "Update scanner data"
+          git pull --rebase --autostash origin main
           git push origin HEAD:main
+
 
       - name: Start next scan
         if: success()
