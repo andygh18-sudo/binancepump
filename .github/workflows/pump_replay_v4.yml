@@ -1,0 +1,49 @@
+name: Pump Replay Backtest v4
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated Binance Spot symbols"
+        required: false
+        default: "NOMUSDT,NILUSDT,STXUSDT,RAYUSDT,SEIUSDT,SUIUSDT,INJUSDT,AVAXUSDT,PUMPUSDT"
+      start:
+        description: "UTC start"
+        required: false
+        default: "2026-09-20T00:00:00Z"
+      end:
+        description: "UTC end"
+        required: false
+        default: "2026-09-25T00:00:00Z"
+
+permissions:
+  contents: write
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install pandas requests
+      - name: Run v4 replay
+        env:
+          BINANCE_REST_BASE: https://data-api.binance.vision
+        run: |
+          python backtest/pump_replay_v4.py --symbols "${{ inputs.symbols }}" --start "${{ inputs.start }}" --end "${{ inputs.end }}"
+      - name: Publish v4 results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/backtest_results_v4.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Update pump replay v4 results"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
