@@ -35,7 +35,8 @@ def event(stream,d):
         p=float(d["p"]);n=p*float(d["q"]);buy=not bool(d.get("m",False));x["trades"].append((now,p,n,buy));x["price"]=p
     elif stream.endswith("@bookTicker"):x["price"]=float(d["a"])
     elif "@kline_1m" in stream:
-        k=d["k"];new_c={"open":float(k["o"]),"high":float(k["h"]),"close":float(k["c"])};x["candle"]=new_c;x["price"]=float(k["c"]);\n        if k.get("x"):x["prev_candle"]=new_c
+        k=d["k"];new_c={"open":float(k["o"]),"high":float(k["h"]),"close":float(k["c"])};x["candle"]=new_c;x["price"]=float(k["c"]);
+        if k.get("x"):x["prev_candle"]=new_c
     elif stream.endswith("@depth@100ms") and s in books:books[s].buffer_event(d)
 
 def stats(s,sec):
