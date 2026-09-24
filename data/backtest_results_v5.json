@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-09-24T08:33:08.131301+00:00",
+  "engine": "Pump Replay / Backtest v5",
+  "data_source": "https://data-api.binance.vision",
+  "method": "Binance 1m Spot klines with BTC-relative strength, persistent confirmation and walk-forward historical calibration",
+  "v5_design": {
+    "v4_weight": 0.7,
+    "persistence_weight": 0.15,
+    "historical_weight": 0.15,
+    "action_min_score": 65,
+    "min_persistence": 2,
+    "min_historical_samples": 5,
+    "min_historical_hit_rate_pct": 8,
+    "targets": [
+      "10% in 60m",
+      "10% in 240m",
+      "20% in 240m"
+    ]
+  },
+  "calibration": {},
+  "results": [
+    {
+      "symbol": "NOMUSDT",
+      "status": "error",
+      "error": "'240'"
+    },
+    {
+      "symbol": "NILUSDT",
+      "status": "error",
+      "error": "'240'"
+    },
+    {
+      "symbol": "STXUSDT",
+      "status": "error",
+      "error": "'240'"
+    },
+    {
+      "symbol": "RAYUSDT",
+      "status": "error",
+      "error": "'240'"
+    },
+    {
+      "symbol": "SEIUSDT",
+      "status": "error",
+      "error": "'240'"
+    },
+    {
+      "symbol": "SUIUSDT",
+      "status": "error",
+      "error": "'240'"
+    },
+    {
+      "symbol": "INJUSDT",
+      "status": "error",
+      "error": "'240'"
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "status": "error",
+      "error": "'240'"
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "status": "error",
+      "error": "'240'"
+    }
+  ]
+}
