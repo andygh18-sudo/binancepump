@@ -73,18 +73,39 @@ def early_pump_score(s, ac):
     vr=v60/max(v300/5,1); accel=acceleration_ratio(v10,v60)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
-    buy=max(0,min((b10-.50)/.25,1))*15
-    vol=max(0,min((vr-1)/2,1))*15
-    trade=max(0,min((accel-1)/2,1))*15
-    pressure=max(0,min((p10+.5)/2.5,1))*10
-    compression=5 if abs(p60)<2 and vr<1.5 else 0
-    structure=10 if p10>0 and p60>0 else 5 if p10>=-0.25 else 0
-    book=max(0,min((imb+.20)/.60,1))*10
+
+    btc5=0.0; btc15=0.0
+    if s!="BTCUSDT" and state.get("BTCUSDT",{}).get("price"):
+        _,_,_,btc5=stats("BTCUSDT",5)
+        _,_,_,btc15=stats("BTCUSDT",15)
+    rs5=p10-btc5
+    rs15=p60-btc15
+
+    buy=max(0,min((b10-.50)/.25,1))*14
+    vol=max(0,min((vr-1)/2,1))*13
+    trade=max(0,min((accel-1)/2,1))*13
+    pressure=max(0,min((p10+.5)/2.5,1))*8
+    compression=7 if abs(p60)<2 and vr<1.5 else 0
+    structure=8 if p10>0 and p60>0 else 4 if p10>=-0.25 else 0
+    book=max(0,min((imb+.20)/.60,1))*8
     activity=5 if stats(s,10)[0]>=4 and stats(s,60)[0]>=12 else 0
-    score=max(0,min(round(buy+vol+trade+pressure+compression+structure+book+activity),100))
-    quality=score>=50 and b10>=.55 and accel>=1.25 and p10<4
+    relative=max(0,min((rs5+.25)/1.5,1))*7
+    volatility=5 if abs(p10)>0.35 and vr>1.3 else 0
+    resistance=5 if -0.5 <= p1 <= 1.5 else 1
+
+    penalty=0
+    if p1>3: penalty+=6
+    if b10<.52: penalty+=5
+    if accel<1.15: penalty+=4
+    if vr<.8: penalty+=5
+    if rs15 < -1: penalty+=4
+
+    score=max(0,min(round(buy+vol+trade+pressure+compression+structure+book+activity+relative+volatility+resistance-penalty),100))
+    quality=score>=50 and b10>=.55 and accel>=1.25 and p10<4 and rs5>-1
     stage="EARLY PUMP" if score>=80 and quality else "PRE-PUMP" if score>=65 and quality else "BUILDING" if score>=50 and quality else "MONITOR"
-    return {"early_pump_score":score,"early_pump_stage":stage,"early_pump_quality":quality}
+    return {"early_pump_score":score,"early_pump_stage":stage,"early_pump_quality":quality,
+            "relative_strength_5m":rs5,"relative_strength_15m":rs15,"btc_ret_5m":btc5,"btc_ret_15m":btc15,
+            "false_positive_penalty":penalty}
 
 def score(s):
     x=state[s];c=x["candle"]
@@ -105,7 +126,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],"updated":time.time()}
+    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],"updated":time.time()}
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
