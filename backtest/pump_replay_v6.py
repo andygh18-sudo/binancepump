@@ -75,9 +75,9 @@ def evaluate(df,btc,symbol,calibration=None):
         if samples>=20 and rate>=8 and z["persistence"]>=3 and v6>=72 and z["v4_alert_quality"]=="A":grade="A"
         elif samples>=20 and rate>=8 and z["persistence"]>=2 and v6>=65 and z["v4_alert_quality"] in ("A","B"):grade="B"
         elif early_exception:grade="EARLY"
-        elif v5>=55 and z["persistence"]>=1:grade="WATCH"
+        elif v6>=55 and z["persistence"]>=1:grade="WATCH"
         else:grade="REJECT"
-        z.update({"v6_score":max(0,min(v6,100)),"v6_persistence":z["persistence"],"v6_hist_samples":samples,"v6_hist_hit_rate_240m":round(rate,2),"v6_grade":grade,"v6_alert":grade in ("A","B","EARLY") and ((grade=="EARLY" and v6>=60) or (grade in ("A","B") and v5>=65 and z["persistence"]>=2 and samples>=20 and rate>=8))})
+        z.update({"v6_score":max(0,min(v6,100)),"v6_persistence":z["persistence"],"v6_hist_samples":samples,"v6_hist_hit_rate_240m":round(rate,2),"v6_grade":grade,"v6_alert":grade in ("A","B","EARLY") and ((grade=="EARLY" and v6>=60) or (grade in ("A","B") and v6>=65 and z["persistence"]>=2 and samples>=20 and rate>=8))})
         if not episodes or (pd.Timestamp(z["time"])-pd.Timestamp(episodes[-1]["time"])).total_seconds()>=1800:
             episodes.append(z)
         elif z["v6_score"]>episodes[-1]["v6_score"]:episodes[-1]=z
