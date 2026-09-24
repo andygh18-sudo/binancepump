@@ -36,10 +36,7 @@ jobs:
         env:
           BINANCE_REST_BASE: https://data-api.binance.vision
         run: |
-          python backtest/pump_replay.py \\
-            --symbols "${{ inputs.symbols }}" \\
-            --start "${{ inputs.start }}" \\
-            --end "${{ inputs.end }}"
+          python backtest/pump_replay.py --symbols "${{ inputs.symbols }}" --start "${{ inputs.start }}" --end "${{ inputs.end }}"
       - name: Publish results
         run: |
           git config user.name "github-actions[bot]"
