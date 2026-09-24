@@ -273,7 +273,8 @@ def score(s):
     v4=v4_confluence(s,eps,ac)
     v5=v5_signal(s,v4)
     v6=v6_signal(s,v4)
-    v7=v7_signal(s,v4)\n    v8=v8_signal(s,v4,eps)
+    v7=v7_signal(s,v4)
+    v8=v8_signal(s,v4,eps)
     base=max(v300/30,1);vr=v60/max(v300/5,1);acc=v10/max(v60/6,1)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
