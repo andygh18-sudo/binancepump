@@ -67,7 +67,7 @@ def evaluate(df,btc,symbol):
     hist=[];episodes=[];calibration=[]
     for z in raw:
         prior=[q for q in episodes if pd.Timestamp(q["time"])<pd.Timestamp(z["time"])]
-        samples=len(prior);hits=sum((q["future_max_gain"]["240"] or 0)>=10 for q in prior)
+        samples=len(prior);hits=sum((q["future_max_gain"]["240m"] or 0)>=10 for q in prior)
         rate=hits/samples*100 if samples else 0
         hist_quality=min(rate/25,1)*100 if samples>=5 else 50
         persistence_quality=min(z["persistence"]/3,1)*100
@@ -83,9 +83,9 @@ def evaluate(df,btc,symbol):
     a=[z for z in episodes if z["v5_alert"]]
     bands={}
     for lo,hi in ((50,59),(60,69),(70,79),(80,89),(90,100)):
-        q=[z for z in episodes if lo<=z["v5_score"]<=hi];h60=[z for z in q if (z["future_max_gain"]["60"] or 0)>=10];h240=[z for z in q if (z["future_max_gain"]["240"] or 0)>=10];h20=[z for z in q if (z["future_max_gain"]["240"] or 0)>=20]
+        q=[z for z in episodes if lo<=z["v5_score"]<=hi];h60=[z for z in q if (z["future_max_gain"]["60m"] or 0)>=10];h240=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=10];h20=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=20]
         bands[f"{lo}-{hi}"]={"signals":len(q),"hit_60m_ge10":len(h60),"hit_240m_ge10":len(h240),"hit_240m_ge20":len(h20),"precision_240m_ge10_pct":round(len(h240)/len(q)*100,2) if q else 0,"precision_240m_ge20_pct":round(len(h20)/len(q)*100,2) if q else 0}
-    return {"symbol":symbol,"status":"ok","bars":len(x),"start":x.time.iloc[0].isoformat(),"end":x.time.iloc[-1].isoformat(),"detections":len(episodes),"v5_alerts":len(a),"hit_60m_ge10":sum((z["future_max_gain"]["60"] or 0)>=10 for z in a),"hit_240m_ge10":sum((z["future_max_gain"]["240"] or 0)>=10 for z in a),"hit_240m_ge20":sum((z["future_max_gain"]["240"] or 0)>=20 for z in a),"v5_alert_precision_240m_ge10_pct":round(sum((z["future_max_gain"]["240"] or 0)>=10 for z in a)/len(a)*100,2) if a else 0,"v5_alert_precision_240m_ge20_pct":round(sum((z["future_max_gain"]["240"] or 0)>=20 for z in a)/len(a)*100,2) if a else 0,"score_band_precision":bands,"v5_alert_episodes":a[:150],"episodes":episodes[:150]}
+    return {"symbol":symbol,"status":"ok","bars":len(x),"start":x.time.iloc[0].isoformat(),"end":x.time.iloc[-1].isoformat(),"detections":len(episodes),"v5_alerts":len(a),"hit_60m_ge10":sum((z["future_max_gain"]["60m"] or 0)>=10 for z in a),"hit_240m_ge10":sum((z["future_max_gain"]["240m"] or 0)>=10 for z in a),"hit_240m_ge20":sum((z["future_max_gain"]["240m"] or 0)>=20 for z in a),"v5_alert_precision_240m_ge10_pct":round(sum((z["future_max_gain"]["240m"] or 0)>=10 for z in a)/len(a)*100,2) if a else 0,"v5_alert_precision_240m_ge20_pct":round(sum((z["future_max_gain"]["240m"] or 0)>=20 for z in a)/len(a)*100,2) if a else 0,"score_band_precision":bands,"v5_alert_episodes":a[:150],"episodes":episodes[:150]}
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--symbols",default="NOMUSDT,NILUSDT,STXUSDT,RAYUSDT,SEIUSDT,SUIUSDT,INJUSDT,AVAXUSDT,PUMPUSDT");ap.add_argument("--start",default="2026-09-20T00:00:00Z");ap.add_argument("--end",default="2026-09-25T00:00:00Z");ap.add_argument("--output",default="data/backtest_results_v5.json");a=ap.parse_args()
