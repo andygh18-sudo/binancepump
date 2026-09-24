@@ -32,20 +32,22 @@ RAW_BASE = "https://raw.githubusercontent.com/andygh18-sudo/binancepump/main/dat
 
 def load_json_data(filename):
     local_path = os.path.join("data", filename)
-    # Prefer the local checkout, but fall back to GitHub raw data. This is
-    # important for Streamlit deployments whose filesystem is not refreshed
-    # when GitHub Actions commits new scan data.
-    if os.path.exists(local_path):
-        try:
-            with open(local_path) as f:
-                return json.load(f), "local"
-        except Exception:
-            pass
+    # GitHub Actions publishes fresh scan data after each scan. Streamlit
+    # deployments can keep an older checked-out copy, so GitHub is the
+    # authoritative source and the local file is only a fallback.
     try:
-        with urllib.request.urlopen(RAW_BASE + filename + "?t=" + str(int(pd.Timestamp.utcnow().timestamp())), timeout=10) as resp:
+        url = RAW_BASE + filename + "?t=" + str(int(pd.Timestamp.utcnow().timestamp()))
+        req = urllib.request.Request(url, headers={"Cache-Control": "no-cache", "User-Agent": "Binance-Pump-Radar"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8")), "github"
-    except Exception as e:
-        return None, str(e)
+    except Exception as github_error:
+        if os.path.exists(local_path):
+            try:
+                with open(local_path) as f:
+                    return json.load(f), "local fallback"
+            except Exception:
+                pass
+        return None, f"GitHub data unavailable: {github_error}"
 
 d, data_source = load_json_data("latest.json")
 if d is None:
