@@ -55,7 +55,7 @@ def accumulation(s):
     ob=books[s].metrics(20);imb=ob["imbalance"]
     buy_component=max(0,min((b10-.50)/.25,1))*30
     trade_component=max(0,min((acceleration_ratio(v10,v60)-1)/2.0,1))*25
-    volume_ratio=max(v60/max(v300/30*60,1),0)
+    volume_ratio=max(v60/max(v300/5,1),0)
     volume_component=max(0,min(volume_ratio/2.0,1))*20
     book_component=max(0,min((imb+.20)/.60,1))*15
     price_component=max(0,min((p10+0.5)/3.0,1))*10
@@ -71,7 +71,7 @@ def score(s):
     if not x["price"] or not c or s not in books:return None
     _,v10,b10,p10=stats(s,10);_,v60,b60,p60=stats(s,60);_,v300,_,_=stats(s,300)
     ac=accumulation(s)
-    base=max(v300/30,1);vr=v60/max(base*60,1);acc=v10/max(v60/6,1)
+    base=max(v300/30,1);vr=v60/max(v300/5,1);acc=v10/max(v60/6,1)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
     raw=min(max(p10,0)*10,20)+min(max(vr-1,0)*14,28)+min(max(acc-1,0)*12,18)
