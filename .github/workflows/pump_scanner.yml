@@ -44,6 +44,7 @@ jobs:
           ORDERBOOK_LIMIT: "500"
           TOP_ALERTS: "5"
           MIN_ALERT_SCORE: "45"
+          ACCUM_ALERT_SCORE: "60"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python run_scanner.py
