@@ -32,6 +32,9 @@ jobs:
       - name: Prepare data directory
         run: mkdir -p data
 
+      - name: Validate scanner
+        run: python -m py_compile scanner/worker.py run_scanner.py
+
       - name: Run live scan
         env:
           BINANCE_WS_BASE: wss://data-stream.binance.vision/stream
@@ -44,15 +47,19 @@ jobs:
           ORDERBOOK_LIMIT: "500"
           TOP_ALERTS: "5"
           MIN_ALERT_SCORE: "45"
-          ACCUM_ALERT_SCORE: "60"\n          V8_ALERT_SCORE: "58"
+          ACCUM_ALERT_SCORE: "60"
+          V8_ALERT_SCORE: "58"
           V9_ALERT_SCORE: "58"
-          V9_MIN_PERSISTENCE: "2"\n          V10_ALERT_SCORE: "60"\n          V10_MIN_PERSISTENCE: "2"
+          V9_MIN_PERSISTENCE: "2"
+          V10_ALERT_SCORE: "60"
+          V10_MIN_PERSISTENCE: "2"
           V11_ALERT_SCORE: "65"
           V11_CONFIRMED_SCORE: "72"
+          V11_MIN_PERSISTENCE: "2"
           V12_ALERT_SCORE: "62"
           V12_CONFIRMED_SCORE: "70"
           V12_MIN_PERSISTENCE: "2"
-          V11_MIN_PERSISTENCE: "2"\n          V8_MIN_PERSISTENCE: "2"
+          V8_MIN_PERSISTENCE: "2"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python run_scanner.py
