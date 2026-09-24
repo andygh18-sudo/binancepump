@@ -527,7 +527,7 @@ async def main():
                                 await telegram(f"🚨 {r['alert_tier']} | HYBRID TOP {rank} | {s} | {r['stage']} | HYBRID {r['hybrid_score']}/100 | {r['hybrid_path']} | {r['hybrid_grade']} | V11 {r['v11_score']}/100 | V12 {r['v12_score']}/100\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
                                 old["last_alert"]=now;old["last_alert_rank"]=rank
                             old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
-                        accum_candidates=[r for r in rows if r.get("accumulation_score",0)>=ACCUM_ALERT_SCORE and r.get("accumulation_quality") and r.get("accumulation_stage") in ("ACCUMULATION WATCH","ACCUMULATION ALERT") and r.get("score",0)<70]
+                        accum_candidates=[r for r in rows if r.get("accumulation_score",0)>=ACCUM_ALERT_SCORE and r.get("accumulation_quality") and r.get("accumulation_stage") in ("ACCUMULATION WATCH","ACCUMULATION ALERT") and r.get("score",0)>=70]
                         accum_candidates=sorted(accum_candidates,key=lambda r:(r.get("accumulation_score",0),r.get("score",0)),reverse=True)[:TOP_ALERTS]
                         for r in accum_candidates:
                             s=r["symbol"];old=state[s];now=time.time();prev=float(old.get("last_accum_score",0))
