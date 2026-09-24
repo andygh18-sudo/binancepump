@@ -191,7 +191,7 @@ if "book_status" in df.columns:
 st.divider()
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🔥 Live Radar", "⚡ Pre-Pump", "🗺️ Heatmap", "🔎 Coin Analysis", "📜 History"
+    "🔥 Live Radar", "🟣 Accumulation", "⚡ Pre-Pump", "🗺️ Heatmap", "🔎 Coin Analysis", "📜 History"
 ])
 
 def format_signal_table(frame):
@@ -199,6 +199,7 @@ def format_signal_table(frame):
         "symbol", "price", "score", "stage", "book_status", "entry", "sell",
         "price_1m", "price_10s", "volume_ratio", "trade_accel",
         "buy_pressure", "book_imbalance", "spread_bps", "book_ready",
+        "accumulation_score", "accumulation_stage", "accum_buy_pressure", "accum_trade_accel", "accum_volume_ratio", "accum_book_imbalance",
         "score_delta", "score_delta_5", "score_velocity", "volume_accel", "acceleration", "chase_risk"
     ]
     cols = list(dict.fromkeys(c for c in cols if c in frame.columns))
@@ -428,6 +429,35 @@ with tab1:
         st.bar_chart(chart, height=320)
 
 with tab2:
+    st.subheader("🟣 Accumulation / Pre-Pump Detector")
+    st.caption("Designed to detect participation building before the normal Pump Score reaches 45. It emphasizes buying pressure, trade acceleration, rising activity and limited price extension.")
+
+    accum = df.copy()
+    if "accumulation_score" in accum.columns:
+        accum["accumulation_score"] = pd.to_numeric(accum["accumulation_score"], errors="coerce").fillna(0)
+        accum = accum[accum.get("accumulation_quality", False) == True].sort_values(["accumulation_score","score"], ascending=False).head(20)
+    else:
+        accum = pd.DataFrame()
+
+    if accum.empty:
+        st.info("No high-quality accumulation setups detected in the latest scan.")
+    else:
+        ad = accum[[c for c in ["symbol","accumulation_score","accumulation_stage","score","stage","price_1m","accum_buy_pressure","accum_trade_accel","accum_volume_ratio","accum_book_imbalance","accum_trades_10s"] if c in accum.columns]].copy()
+        if "accum_buy_pressure" in ad.columns:
+            ad["accum_buy_pressure"] = ad["accum_buy_pressure"] * 100
+        st.dataframe(ad, use_container_width=True, hide_index=True, column_config={
+            "accumulation_score": st.column_config.ProgressColumn("Accumulation", min_value=0, max_value=100, format="%d"),
+            "score": st.column_config.ProgressColumn("Pump Score", min_value=0, max_value=100, format="%d"),
+            "price_1m": st.column_config.NumberColumn("1m %", format="%.2f"),
+            "accum_buy_pressure": st.column_config.NumberColumn("Buy %", format="%.1f%%"),
+            "accum_trade_accel": st.column_config.NumberColumn("Trade Accel", format="%.2fx"),
+            "accum_volume_ratio": st.column_config.NumberColumn("Vol Ratio", format="%.2fx"),
+            "accum_book_imbalance": st.column_config.NumberColumn("Book Imb", format="%+.2f"),
+        })
+
+    st.info("🟣 **How to read it:** ACCUMULATION WATCH = participation is building; ACCUMULATION ALERT = stronger pre-pump structure. It is an early-warning signal, not confirmation of a pump.")
+
+with tab3:
     st.subheader("⚡ Early Pump Opportunities")
     st.caption("Coins that have entered PRE-PUMP or EARLY MOMENTUM, before the scanner classifies them as a confirmed breakout.")
 
@@ -449,7 +479,7 @@ with tab2:
             },
         )
 
-with tab3:
+with tab4:
     st.subheader("🗺️ Binance Pump Heatmap")
     st.caption("Visual intensity view across score, short-term momentum, volume expansion, buying pressure and score acceleration.")
 
@@ -487,7 +517,7 @@ with tab3:
         )
 
 
-with tab4:
+with tab5:
     st.subheader("🔎 Coin Analysis")
     symbols = df["symbol"].astype(str).tolist()
     selected = st.selectbox("Select coin", symbols)
@@ -503,6 +533,10 @@ with tab4:
     b.metric("Stage", stage)
     c.metric("Price", f"{price:g}" if pd.notna(price) else "—")
     e.metric("Volume Ratio", f"{float(coin.get('volume_ratio', 0)):.2f}x")
+
+    if "accumulation_score" in coin.index:
+        st.metric("🟣 Accumulation Score", f"{float(coin.get('accumulation_score', 0)):.0f}/100")
+        st.caption(f"Accumulation status: **{coin.get('accumulation_stage', 'MONITOR')}**")
 
     st.progress(min(max(int(score), 0), 100), text=f"Pump Score {score:.0f}/100")
 
@@ -561,7 +595,7 @@ with tab4:
     edf = pd.DataFrame({"Metric": list(evidence.keys()), "Value": list(evidence.values())})
     st.dataframe(edf, use_container_width=True, hide_index=True)
 
-with tab5:
+with tab6:
     st.subheader("📜 Signal History")
     history_path = "data/history.jsonl"
 
