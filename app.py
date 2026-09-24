@@ -223,6 +223,57 @@ st.success(f"Scanner data loaded: {len(df)} symbols • source: {data_source} �
 st.subheader("📡 Live Scanner Snapshot")
 st.dataframe(df.head(20), use_container_width=True, hide_index=True)
 
+st.subheader("🎯 Entry Signal Monitor")
+st.caption("A candidate is shown as an ENTRY ZONE only when the scanner's stage, pump score, hybrid confirmation and extension filters agree.")
+
+entry_df = df.copy()
+for c in ["hybrid_score","v11_score","v12_score","v12_efficiency","price_1m","volume_ratio","buy_pressure"]:
+    if c in entry_df.columns:
+        entry_df[c] = pd.to_numeric(entry_df[c], errors="coerce").fillna(0)
+
+entry_df["entry_signal"] = "WATCH"
+entry_df.loc[
+    (entry_df.get("stage", pd.Series("", index=entry_df.index)).isin(["BUILDING"])) &
+    (entry_df["score"] >= 20),
+    "entry_signal"
+] = "🟡 WATCH"
+entry_df.loc[
+    (entry_df.get("stage", pd.Series("", index=entry_df.index)).isin(["PRE-PUMP"])) &
+    (entry_df["score"] >= 70) &
+    (entry_df.get("hybrid_score", pd.Series(0, index=entry_df.index)) >= 70) &
+    (entry_df.get("v12_confirmation", pd.Series(False, index=entry_df.index)).astype(bool)) &
+    (entry_df.get("v12_efficiency", pd.Series(0, index=entry_df.index)) >= 0.35) &
+    (entry_df["price_1m"] < 5),
+    "🟢 ENTRY ZONE"
+] = "🟢 ENTRY ZONE"
+entry_df.loc[
+    (entry_df.get("stage", pd.Series("", index=entry_df.index)).isin(["EARLY MOMENTUM"])) &
+    (entry_df["score"] >= 70) &
+    (entry_df.get("hybrid_score", pd.Series(0, index=entry_df.index)) >= 70) &
+    (entry_df.get("v12_confirmation", pd.Series(False, index=entry_df.index)).astype(bool)) &
+    (entry_df.get("v12_efficiency", pd.Series(0, index=entry_df.index)) >= 0.35) &
+    (entry_df["price_1m"] < 5),
+    "🟢 CONFIRMATION ENTRY"
+] = "🟢 CONFIRMATION ENTRY"
+entry_df.loc[
+    (entry_df["price_1m"] >= 5) | (entry_df["score"] >= 92),
+    "entry_signal"
+] = "🔴 CHASE / WAIT"
+
+entry_view = entry_df[entry_df["entry_signal"].isin(["🟢 ENTRY ZONE","🟢 CONFIRMATION ENTRY","🟡 WATCH"])].copy()
+entry_view = entry_view.sort_values(["entry_signal","hybrid_score","score"], ascending=[True,False,False]).head(20)
+entry_cols = [c for c in ["symbol","entry_signal","score","hybrid_score","stage","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
+st.dataframe(entry_view[entry_cols], use_container_width=True, hide_index=True, column_config={
+    "score": st.column_config.ProgressColumn("Pump Score", min_value=0, max_value=100, format="%d"),
+    "hybrid_score": st.column_config.ProgressColumn("Hybrid Score", min_value=0, max_value=100, format="%d"),
+    "v11_score": st.column_config.NumberColumn("V11", format="%.0f"),
+    "v12_score": st.column_config.NumberColumn("V12", format="%.0f"),
+    "v12_efficiency": st.column_config.NumberColumn("Efficiency", format="%.2f"),
+    "price_1m": st.column_config.NumberColumn("1m %", format="%.2f"),
+    "volume_ratio": st.column_config.NumberColumn("Volume", format="%.2fx"),
+    "buy_pressure": st.column_config.NumberColumn("Buy %", format="%.1f%%"),
+})
+
 st.divider()
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
