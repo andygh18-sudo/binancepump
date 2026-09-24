@@ -1,6 +1,10 @@
 name: Pump Replay Backtest v11
 
 on:
+  push:
+    paths:
+      - "backtest/pump_replay_v11.py"
+      - ".github/workflows/pump_replay_v11.yml"
   workflow_dispatch:
     inputs:
       symbols:
