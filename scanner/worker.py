@@ -9,7 +9,7 @@ REST=os.getenv("BINANCE_REST_BASE","https://data-api.binance.vision")
 MAX=int(os.getenv("MAX_SYMBOLS","40"));MINVOL=float(os.getenv("MIN_QUOTE_VOLUME","1000000"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"))
-TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"))
+TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"))
 symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0})
 
 async def get_json(s,url,params=None):
@@ -242,6 +242,35 @@ def v8_signal(s,v4,eps):
             "v8_grade":grade,"v8_path":path,"v8_early_path":early,"v8_confirmed_path":confirmed,
             "v8_avoid":avoid,"v8_btc_risk_off":btc_risk,"v8_alert":alert}
 
+def v9_signal(s,v4,eps):
+    if not v4 or not eps:return None
+    x=state[s];bucket=int(time.time()/max(INTERVAL,1));prev=int(x.get("v9_last_bucket",-1))
+    _,v10,b10,p10=stats(s,10);_,v60,_,p60=stats(s,60);_,v300,_,_=stats(s,300)
+    vr=v60/max(v300/5,1);acc=acceleration_ratio(v10,v60)
+    rs5=float(eps.get("relative_strength_5m",0) or 0);rs15=float(eps.get("relative_strength_15m",0) or 0)
+    btc5=float(eps.get("btc_ret_5m",0) or 0);btc15=float(eps.get("btc_ret_15m",0) or 0)
+    qualifying=v4.get("v4_score",0)>=55 and v4.get("v4_alert_quality") in ("A","B","C")
+    if qualifying:
+        if bucket==prev+1:x["v9_streak"]=int(x.get("v9_streak",0))+1
+        elif bucket!=prev:x["v9_streak"]=1
+    elif bucket!=prev:x["v9_streak"]=0
+    x["v9_last_bucket"]=bucket;streak=int(x.get("v9_streak",0))
+    momentum_ok=(p60>0 and (p60>=p10*0.75 or rs5>0.5))
+    stall=(vr>=3 and acc>=3 and p60<0.75)
+    follow=100-(25 if stall else 0)-(15 if not momentum_ok else 0)-(10 if vr<1.2 else 0)-(10 if acc<1.2 else 0)
+    follow=max(0,follow)
+    btc_risk=(btc5<-1 or btc15<-2)
+    early=(v4.get("v4_score",0)>=60 and streak>=V9_MIN_PERSISTENCE and b10>=.55 and vr>=1.5 and acc>=1.5 and rs5>0 and momentum_ok and p10<2.5 and not btc_risk and follow>=65 and not stall)
+    confirmed=(v4.get("v4_score",0)>=72 and v4.get("v4_confirmations",0)>=7 and streak>=3 and b10>=.60 and vr>=2 and acc>=2 and rs5>.25 and momentum_ok and p10<2.5 and not btc_risk and follow>=75)
+    avoid=(p10>=4 or p60>=8 or rs15<-1.5 or (vr<1 and p60>1) or btc_risk)
+    score=max(0,min(round(.72*v4.get("v4_score",0)+.10*min(streak/3,1)*100+.13*follow+.05),100))
+    if avoid:path="AVOID";grade="REJECT";alert=False
+    elif confirmed and score>=68:path="CONFIRMED";grade="A";alert=True
+    elif early and score>=V9_ALERT_SCORE:path="EARLY";grade="B";alert=True
+    elif score>=52 and streak>=1:path="WATCH";grade="WATCH";alert=False
+    else:path="REJECT";grade="REJECT";alert=False
+    return {"v9_score":score,"v9_persistence":streak,"v9_follow_through":follow,"v9_stall":stall,"v9_momentum_ok":momentum_ok,"v9_grade":grade,"v9_path":path,"v9_avoid":avoid,"v9_btc_risk_off":btc_risk,"v9_alert":alert}
+
 def v5_signal(s,v4):
     if not v4:return None
     x=state[s];bucket=int(time.time()/max(INTERVAL,1));prev=int(x.get("v5_last_bucket",-1))
@@ -275,6 +304,7 @@ def score(s):
     v6=v6_signal(s,v4)
     v7=v7_signal(s,v4)
     v8=v8_signal(s,v4,eps)
+    v9=v9_signal(s,v4,eps)
     base=max(v300/30,1);vr=v60/max(v300/5,1);acc=v10/max(v60/6,1)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
@@ -288,7 +318,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,"updated":time.time()}
+    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,"updated":time.time()}
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
@@ -327,15 +357,15 @@ async def main():
                         sync=asyncio.create_task(_resync_pending())
                     if int(time.time()/max(INTERVAL,1)) != int((time.time()-1)/max(INTERVAL,1)):
                         rows=[r for s in symbols if (r:=score(s))]
-                        rows.sort(key=lambda z:z.get("v8_score",z.get("v7_score",z.get("v6_score",z.get("v5_score",z.get("v4_score",0))))),reverse=True)
-                        candidates=[r for r in rows if r.get("v8_alert",False) and r.get("v8_score",0)>=max(MIN_ALERT_SCORE,V8_ALERT_SCORE) and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
+                        rows.sort(key=lambda z:z.get("v9_score",z.get("v8_score",z.get("v7_score",z.get("v6_score",z.get("v5_score",z.get("v4_score",0))))),reverse=True)
+                        candidates=[r for r in rows if r.get("v9_alert",False) and r.get("v9_score",0)>=max(MIN_ALERT_SCORE,V9_ALERT_SCORE) and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
                         top_symbols={r["symbol"]:i+1 for i,r in enumerate(candidates)}
                         for r in candidates:
                             s=r["symbol"];old=state[s];rank=top_symbols[s]
                             changed=(old.get("last_stage")!=r["stage"] or old.get("last_entry")!=r["entry"] or old.get("last_alert_rank")!=rank)
                             now=time.time()
                             if changed and now-old["last_alert"]>=COOLDOWN:
-                                await telegram(f"⚡ V8 TOP {rank} ACTION ALERT | {s} | {r['stage']} | V8 {r['v8_score']}/100 | {r['v8_path']} | {r['v8_grade']}\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
+                                await telegram(f"⚡ V9 TOP {rank} ACTION ALERT | {s} | {r['stage']} | V8 {r['v9_score']}/100 | {r['v9_path']} | {r['v9_grade']}\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
                                 old["last_alert"]=now;old["last_alert_rank"]=rank
                             old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
                         accum_candidates=[r for r in rows if r.get("accumulation_score",0)>=ACCUM_ALERT_SCORE and r.get("accumulation_quality") and r.get("accumulation_stage") in ("ACCUMULATION WATCH","ACCUMULATION ALERT") and r.get("score",0)<70]
