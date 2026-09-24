@@ -66,11 +66,32 @@ def accumulation(s):
     quality=(acc>=50 and n10>=4 and n60>=12 and b10>=.55 and acceleration_ratio(v10,v60)>=1.25 and p10<4)
     stage="ACCUMULATION ALERT" if acc>=70 and quality else "ACCUMULATION WATCH" if acc>=50 and quality else "MONITOR"
     return {"accumulation_score":acc,"accumulation_stage":stage,"accumulation_quality":quality,"accum_buy_pressure":b10,"accum_trade_accel":acceleration_ratio(v10,v60),"accum_volume_ratio":volume_ratio,"accum_book_imbalance":imb,"accum_price_10s":p10,"accum_trades_10s":n10}
+def early_pump_score(s, ac):
+    x=state[s];c=x["candle"]
+    if not c or not ac:return None
+    _,v10,b10,p10=stats(s,10);_,v60,b60,p60=stats(s,60);_,v300,_,_=stats(s,300)
+    vr=v60/max(v300/5,1); accel=acceleration_ratio(v10,v60)
+    p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
+    ob=books[s].metrics(20);imb=ob["imbalance"]
+    buy=max(0,min((b10-.50)/.25,1))*15
+    vol=max(0,min((vr-1)/2,1))*15
+    trade=max(0,min((accel-1)/2,1))*15
+    pressure=max(0,min((p10+.5)/2.5,1))*10
+    compression=5 if abs(p60)<2 and vr<1.5 else 0
+    structure=10 if p10>0 and p60>0 else 5 if p10>=-0.25 else 0
+    book=max(0,min((imb+.20)/.60,1))*10
+    activity=5 if stats(s,10)[0]>=4 and stats(s,60)[0]>=12 else 0
+    score=max(0,min(round(buy+vol+trade+pressure+compression+structure+book+activity),100))
+    quality=score>=50 and b10>=.55 and accel>=1.25 and p10<4
+    stage="EARLY PUMP" if score>=80 and quality else "PRE-PUMP" if score>=65 and quality else "BUILDING" if score>=50 and quality else "MONITOR"
+    return {"early_pump_score":score,"early_pump_stage":stage,"early_pump_quality":quality}
+
 def score(s):
     x=state[s];c=x["candle"]
     if not x["price"] or not c or s not in books:return None
     _,v10,b10,p10=stats(s,10);_,v60,b60,p60=stats(s,60);_,v300,_,_=stats(s,300)
     ac=accumulation(s)
+    eps=early_pump_score(s,ac)
     base=max(v300/30,1);vr=v60/max(v300/5,1);acc=v10/max(v60/6,1)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
@@ -84,7 +105,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],"updated":time.time()}
+    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],"updated":time.time()}
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
@@ -123,8 +144,8 @@ async def main():
                         sync=asyncio.create_task(_resync_pending())
                     if int(time.time()-start)%int(INTERVAL)==0:
                         rows=[r for s in symbols if (r:=score(s))]
-                        rows.sort(key=lambda z:z["score"],reverse=True)
-                        candidates=[r for r in rows if r["score"]>=MIN_ALERT_SCORE and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
+                        rows.sort(key=lambda z:z.get("early_pump_score",0),reverse=True)
+                        candidates=[r for r in rows if r.get("early_pump_score",0)>=MIN_ALERT_SCORE and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
                         top_symbols={r["symbol"]:i+1 for i,r in enumerate(candidates)}
                         for r in candidates:
                             s=r["symbol"];old=state[s];rank=top_symbols[s]
