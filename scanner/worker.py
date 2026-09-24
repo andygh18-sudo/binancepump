@@ -357,7 +357,7 @@ async def main():
                         sync=asyncio.create_task(_resync_pending())
                     if int(time.time()/max(INTERVAL,1)) != int((time.time()-1)/max(INTERVAL,1)):
                         rows=[r for s in symbols if (r:=score(s))]
-                        rows.sort(key=lambda z:z.get("v9_score",z.get("v8_score",z.get("v7_score",z.get("v6_score",z.get("v5_score",z.get("v4_score",0))))),reverse=True)
+                        rows.sort(key=lambda z: z.get("v9_score", z.get("v8_score", z.get("v7_score", z.get("v6_score", z.get("v5_score", z.get("v4_score", 0)))))), reverse=True)
                         candidates=[r for r in rows if r.get("v9_alert",False) and r.get("v9_score",0)>=max(MIN_ALERT_SCORE,V9_ALERT_SCORE) and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
                         top_symbols={r["symbol"]:i+1 for i,r in enumerate(candidates)}
                         for r in candidates:
@@ -365,7 +365,7 @@ async def main():
                             changed=(old.get("last_stage")!=r["stage"] or old.get("last_entry")!=r["entry"] or old.get("last_alert_rank")!=rank)
                             now=time.time()
                             if changed and now-old["last_alert"]>=COOLDOWN:
-                                await telegram(f"⚡ V9 TOP {rank} ACTION ALERT | {s} | {r['stage']} | V8 {r['v9_score']}/100 | {r['v9_path']} | {r['v9_grade']}\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
+                                await telegram(f"⚡ V9 TOP {rank} ACTION ALERT | {s} | {r['stage']} | V9 {r['v9_score']}/100 | {r['v9_path']} | {r['v9_grade']}\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
                                 old["last_alert"]=now;old["last_alert_rank"]=rank
                             old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
                         accum_candidates=[r for r in rows if r.get("accumulation_score",0)>=ACCUM_ALERT_SCORE and r.get("accumulation_quality") and r.get("accumulation_stage") in ("ACCUMULATION WATCH","ACCUMULATION ALERT") and r.get("score",0)<70]
