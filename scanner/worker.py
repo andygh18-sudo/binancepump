@@ -462,7 +462,7 @@ def score(s):
     v11=v11_signal(s,v4,eps)
     v12=v12_signal(s,v4,eps)
     hybrid=v11_v12_hybrid(v11,v12)
-    base=max(v300/30,1);vr=v60/max(v300/5,1);acc=v10/max(v60/6,1)
+    base=max(v300/30,1);vr=v60/max(v300/5,1);acc=acceleration_ratio(v10,v60)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
     raw=min(max(p10,0)*10,20)+min(max(vr-1,0)*14,28)+min(max(acc-1,0)*12,18)
