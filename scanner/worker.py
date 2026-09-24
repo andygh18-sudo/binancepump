@@ -9,8 +9,8 @@ REST=os.getenv("BINANCE_REST_BASE","https://data-api.binance.vision")
 MAX=int(os.getenv("MAX_SYMBOLS","40"));MINVOL=float(os.getenv("MIN_QUOTE_VOLUME","1000000"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"))
-TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"))
-symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0})
+TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"))
+symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0})
 
 async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
@@ -103,7 +103,7 @@ def early_pump_score(s, ac):
     score=max(0,min(round(buy+vol+trade+pressure+compression+structure+book+activity+relative+volatility+resistance-penalty),100))
     quality=score>=50 and b10>=.55 and accel>=1.25 and p10<4 and rs5>-1
     stage="EARLY PUMP" if score>=80 and quality else "PRE-PUMP" if score>=65 and quality else "BUILDING" if score>=50 and quality else "MONITOR"
-    return {"v11_score":v11.get("v11_score",0) if v11 else 0,"v11_path":v11.get("v11_path","") if v11 else "","v11_grade":v11.get("v11_grade","") if v11 else "","v11_alert":v11.get("v11_alert",False) if v11 else False,"v11_efficiency":v11.get("v11_efficiency",0) if v11 else 0,"v11_persistence":v11.get("v11_persistence",0) if v11 else 0,"v11_confirmation":v11.get("v11_confirmation",False) if v11 else False,"early_pump_score":score,"early_pump_stage":stage,"early_pump_quality":quality,
+    return {"v11_score":v11.get("v11_score",0) if v11 else 0, "v12_score":v12.get("v12_score",0) if v12 else 0, "v12_path":v12.get("v12_path","") if v12 else "", "v12_grade":v12.get("v12_grade","") if v12 else "", "v12_alert":v12.get("v12_alert",False) if v12 else False, "v12_a_plus":v12.get("v12_a_plus",False) if v12 else False, "v12_efficiency":v12.get("v12_efficiency",0) if v12 else 0, "v12_persistence":v12.get("v12_persistence",0) if v12 else 0, "v12_confirmation":v12.get("v12_confirmation",False) if v12 else False,"v11_path":v11.get("v11_path","") if v11 else "","v11_grade":v11.get("v11_grade","") if v11 else "","v11_alert":v11.get("v11_alert",False) if v11 else False,"v11_efficiency":v11.get("v11_efficiency",0) if v11 else 0,"v11_persistence":v11.get("v11_persistence",0) if v11 else 0,"v11_confirmation":v11.get("v11_confirmation",False) if v11 else False,"early_pump_score":score,"early_pump_stage":stage,"early_pump_quality":quality,
             "relative_strength_5m":rs5,"relative_strength_15m":rs15,"btc_ret_5m":btc5,"btc_ret_15m":btc15,
             "false_positive_penalty":penalty}
 
@@ -372,6 +372,43 @@ def v11_signal(s,v4,eps):
     else:path="REJECT";grade="REJECT";alert=False
     return {"v11_score":score,"v11_persistence":streak,"v11_reliability":round(reliability,2),"v11_reliability_modifier":round(rel_mod,2),"v11_second_candle_confirm":second_confirm,"v11_second_candle_hold":second_hold,"v11_confirmation":confirmation,"v11_efficiency":round(efficiency,4),"v11_adverse_extension":round(extension,4),"v11_follow_ok":follow_ok,"v11_grade":grade,"v11_path":path,"v11_avoid":avoid,"v11_alert":alert}
 
+def v12_signal(s,v4,eps):
+    if not v4 or not eps:return None
+    x=state[s];bucket=int(time.time()/max(INTERVAL,1));prev=int(x.get("v12_last_bucket",-1))
+    _,v10,b10,p10=stats(s,10);_,v60,_,p60=stats(s,60);_,v300,_,_=stats(s,300)
+    vr=v60/max(v300/5,1);acc=acceleration_ratio(v10,v60)
+    rs5=float(eps.get("relative_strength_5m",0) or 0);rs15=float(eps.get("relative_strength_15m",0) or 0)
+    btc5=float(eps.get("btc_ret_5m",0) or 0);btc15=float(eps.get("btc_ret_15m",0) or 0)
+    qualifying=v4.get("v4_score",0)>=55 and v4.get("v4_alert_quality") in ("A","B","C")
+    if qualifying:
+        if bucket==prev+1:x["v12_streak"]=int(x.get("v12_streak",0))+1
+        elif bucket!=prev:x["v12_streak"]=1
+    elif bucket!=prev:x["v12_streak"]=0
+    x["v12_last_bucket"]=bucket;streak=int(x.get("v12_streak",0))
+    prev_c=x.get("prev_candle");cur_c=x.get("candle")
+    confirmation=bool(prev_c and cur_c and cur_c["close"]>prev_c["close"] and cur_c["low"]>=prev_c["low"]*.995 and prev_c["close"]>=prev_c["open"])
+    efficiency=(p60/max(vr,1.0)) if vr>0 else 0.0
+    stall=(vr>=3 and acc>=3 and p60<0.75)
+    momentum_ok=(p60>0 and (p60>=p10*.75 or rs5>0.5))
+    extension=max(0.0,p10-2.5)+max(0.0,p60-6.0)*.35
+    btc_risk=(btc5<-1 or btc15<-2)
+    controlled=(p10<2.5 and p60<6)
+    structure=bool(eps.get("BOS",False) or eps.get("CHoCH",False))
+    a_plus=bool(confirmation and efficiency>=.60 and rs5>=1.0 and eps.get("BOS",False) and eps.get("CHoCH",False) and streak>=2 and b10>=.60 and not stall and extension<3)
+    persist=min(streak/3,1)*100
+    eff_component=min(max(efficiency,0)/.75*100,100)
+    rs_component=min(max(rs5,0)/2*100,100)
+    score=max(0,min(round(.55*v4.get("v4_score",0)+.10*persist+.10*(100 if momentum_ok else 50)+.15*eff_component+.05*rs_component+.05*(100 if confirmation else 0)+(5 if a_plus else 0)),100))
+    avoid=(p10>=4 or p60>=8 or rs15<-1.5 or btc_risk or extension>=4 or stall or efficiency<.15)
+    early=(a_plus and score>=V12_ALERT_SCORE) or (v4.get("v4_score",0)>=60 and streak>=V12_MIN_PERSISTENCE and b10>=.58 and vr>=1.5 and acc>=1.5 and rs5>0 and momentum_ok and controlled and not btc_risk and confirmation and efficiency>=.35 and extension<3 and not stall)
+    confirmed=((a_plus and score>=V12_CONFIRMED_SCORE) or (v4.get("v4_score",0)>=72 and v4.get("v4_confirmations",0)>=7 and streak>=3 and b10>=.60 and vr>=2 and acc>=2 and rs5>.25 and momentum_ok and controlled and not btc_risk and confirmation and efficiency>=.50 and extension<3 and not stall))
+    if avoid:path="AVOID";grade="REJECT";alert=False
+    elif confirmed and score>=V12_CONFIRMED_SCORE:path="CONFIRMED";grade="A+" if a_plus else "A";alert=True
+    elif early and score>=V12_ALERT_SCORE:path="EARLY";grade="A+" if a_plus else "B";alert=True
+    elif score>=55 and streak>=1:path="WATCH";grade="WATCH";alert=False
+    else:path="REJECT";grade="REJECT";alert=False
+    return {"v12_score":score,"v12_persistence":streak,"v12_efficiency":round(efficiency,4),"v12_a_plus":a_plus,"v12_confirmation":confirmation,"v12_grade":grade,"v12_path":path,"v12_alert":alert,"v12_avoid":avoid}
+
 def v5_signal(s,v4):
     if not v4:return None
     x=state[s];bucket=int(time.time()/max(INTERVAL,1));prev=int(x.get("v5_last_bucket",-1))
@@ -407,6 +444,7 @@ def score(s):
     v8=v8_signal(s,v4,eps)
     v9=v9_signal(s,v4,eps)\n    v10=v10_signal(s,v4,eps)
     v11=v11_signal(s,v4,eps)
+    v12=v12_signal(s,v4,eps)
     base=max(v300/30,1);vr=v60/max(v300/5,1);acc=v10/max(v60/6,1)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
