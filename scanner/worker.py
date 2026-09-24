@@ -9,8 +9,8 @@ REST=os.getenv("BINANCE_REST_BASE","https://data-api.binance.vision")
 MAX=int(os.getenv("MAX_SYMBOLS","40"));MINVOL=float(os.getenv("MIN_QUOTE_VOLUME","1000000"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"))
-TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"))
-symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None})
+TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"))
+symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0})
 
 async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
@@ -44,10 +44,33 @@ def stats(s,sec):
     n=sum(z[2] for z in r);b=sum(z[2] for z in r if z[3])
     return len(r),n,b/n if n else 0,(r[-1][1]/r[0][1]-1)*100 if len(r)>1 else 0
 
+
+def acceleration_ratio(v10,v60):
+    return v10/max(v60/6,1)
+
+def accumulation(s):
+    x=state[s];c=x["candle"]
+    if not x["price"] or not c or s not in books:return None
+    n10,v10,b10,p10=stats(s,10);n60,v60,b60,p60=stats(s,60);_,v300,_,_=stats(s,300)
+    ob=books[s].metrics(20);imb=ob["imbalance"]
+    buy_component=max(0,min((b10-.50)/.25,1))*30
+    trade_component=max(0,min((acceleration_ratio(v10,v60)-1)/2.0,1))*25
+    volume_ratio=max(v60/max(v300/30*60,1),0)
+    volume_component=max(0,min(volume_ratio/2.0,1))*20
+    book_component=max(0,min((imb+.20)/.60,1))*15
+    price_component=max(0,min((p10+0.5)/3.0,1))*10
+    activity_bonus=5 if n10>=4 and n60>=12 else 0
+    raw=buy_component+trade_component+volume_component+book_component+price_component+activity_bonus
+    extension_penalty=max(0,min((p10-2.0)*8,20))
+    acc=max(0,min(round(raw-extension_penalty),100))
+    quality=(acc>=50 and n10>=4 and n60>=12 and b10>=.55 and acceleration_ratio(v10,v60)>=1.25 and p10<4)
+    stage="ACCUMULATION ALERT" if acc>=70 and quality else "ACCUMULATION WATCH" if acc>=50 and quality else "MONITOR"
+    return {"accumulation_score":acc,"accumulation_stage":stage,"accumulation_quality":quality,"accum_buy_pressure":b10,"accum_trade_accel":acceleration_ratio(v10,v60),"accum_volume_ratio":volume_ratio,"accum_book_imbalance":imb,"accum_price_10s":p10,"accum_trades_10s":n10}
 def score(s):
     x=state[s];c=x["candle"]
     if not x["price"] or not c or s not in books:return None
     _,v10,b10,p10=stats(s,10);_,v60,b60,p60=stats(s,60);_,v300,_,_=stats(s,300)
+    ac=accumulation(s)
     base=max(v300/30,1);vr=v60/max(base*60,1);acc=v10/max(v60/6,1)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
@@ -61,7 +84,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"updated":time.time()}
+    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],"updated":time.time()}
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
@@ -111,6 +134,15 @@ async def main():
                                 await telegram(f"⚡ TOP {rank} EARLY PUMP/MOMENTUM | {s} | {r['stage']} | {r['score']}/100\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
                                 old["last_alert"]=now;old["last_alert_rank"]=rank
                             old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
+                        accum_candidates=[r for r in rows if r.get("accumulation_score",0)>=ACCUM_ALERT_SCORE and r.get("accumulation_quality") and r.get("accumulation_stage") in ("ACCUMULATION WATCH","ACCUMULATION ALERT") and r.get("score",0)<70]
+                        accum_candidates=sorted(accum_candidates,key=lambda r:(r.get("accumulation_score",0),r.get("score",0)),reverse=True)[:TOP_ALERTS]
+                        for r in accum_candidates:
+                            s=r["symbol"];old=state[s];now=time.time();prev=float(old.get("last_accum_score",0))
+                            changed=(r["accumulation_score"]-prev>=5 or old.get("last_accum_stage")!=r["accumulation_stage"])
+                            if changed and now-old["last_accum_alert"]>=COOLDOWN:
+                                await telegram(f"🟣 ACCUMULATION / PRE-PUMP | {s} | {r['accumulation_stage']} | Accum {r['accumulation_score']}/100\nPump score: {r['score']}/100 | 1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}%\nBuy pressure: {r['accum_buy_pressure']*100:.1f}% | Trade accel: {r['accum_trade_accel']:.2f}x | Vol ratio: {r['accum_volume_ratio']:.2f}x\nBook imbalance: {r['accum_book_imbalance']:+.2f} | Trades/10s: {r['accum_trades_10s']}\nPrice: {r['price']}\n⚠️ Early signal — confirmation still required.")
+                                old["last_accum_alert"]=now
+                            old["last_accum_score"]=r["accumulation_score"];old["last_accum_stage"]=r["accumulation_stage"]
                         with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
                         with open("data/history.jsonl","a") as f:f.write(json.dumps({"ts":time.time(),"rows":rows})+"\n")
                         await asyncio.sleep(1)
