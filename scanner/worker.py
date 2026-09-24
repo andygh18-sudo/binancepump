@@ -103,7 +103,7 @@ def early_pump_score(s, ac):
     score=max(0,min(round(buy+vol+trade+pressure+compression+structure+book+activity+relative+volatility+resistance-penalty),100))
     quality=score>=50 and b10>=.55 and accel>=1.25 and p10<4 and rs5>-1
     stage="EARLY PUMP" if score>=80 and quality else "PRE-PUMP" if score>=65 and quality else "BUILDING" if score>=50 and quality else "MONITOR"
-    return {"early_pump_score":score,"early_pump_stage":stage,"early_pump_quality":quality,
+    return {"v11_score":v11.get("v11_score",0) if v11 else 0,"v11_path":v11.get("v11_path","") if v11 else "","v11_grade":v11.get("v11_grade","") if v11 else "","v11_alert":v11.get("v11_alert",False) if v11 else False,"v11_efficiency":v11.get("v11_efficiency",0) if v11 else 0,"v11_persistence":v11.get("v11_persistence",0) if v11 else 0,"v11_confirmation":v11.get("v11_confirmation",False) if v11 else False,"early_pump_score":score,"early_pump_stage":stage,"early_pump_quality":quality,
             "relative_strength_5m":rs5,"relative_strength_15m":rs15,"btc_ret_5m":btc5,"btc_ret_15m":btc15,
             "false_positive_penalty":penalty}
 
@@ -420,74 +420,4 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,"updated":time.time()}
-
-async def telegram(msg):
-    token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
-    if not token or not chat:return
-    try:
-        async with aiohttp.ClientSession() as s:
-            await s.post(f"https://api.telegram.org/bot{token}/sendMessage",json={"chat_id":chat,"text":msg},timeout=8)
-    except Exception:pass
-
-async def resync_books(http):return await asyncio.gather(*(b.resync(http) for b in books.values()),return_exceptions=True)
-
-async def resync_unready_books(http):
-    bad=[b for b in books.values() if not b.ready]
-    if not bad:return None
-    return await asyncio.gather(*(b.resync(http) for b in bad),return_exceptions=True)
-
-async def main():
-    global symbols,books
-    os.makedirs("data",exist_ok=True);start=time.time();timeout=aiohttp.ClientTimeout(total=20)
-    async with aiohttp.ClientSession(timeout=timeout) as http:
-        symbols=await discover(http);books={s:LocalOrderBook(s,REST,LIMIT) for s in symbols};streams=[]
-        for s in symbols:
-            q=s.lower();streams += [f"{q}@aggTrade",f"{q}@bookTicker",f"{q}@depth@100ms",f"{q}@kline_1m"]
-        url=WS+"?streams="+"/".join(streams)
-        async with http.ws_connect(url,heartbeat=20,autoping=True,max_msg_size=16*1024*1024) as ws:
-            sync=asyncio.create_task(resync_books(http))
-            try:
-                while time.time()-start<RUN_SECONDS:
-                    try:
-                        m=await asyncio.wait_for(ws.receive(),timeout=1)
-                        if m.type==aiohttp.WSMsgType.TEXT:
-                            z=json.loads(m.data);event(z.get("stream",""),z.get("data",{}))
-                    except asyncio.TimeoutError:pass
-                    if sync.done() and any(not b.ready for b in books.values()):
-                        async def _resync_pending():return await resync_unready_books(http)
-                        sync=asyncio.create_task(_resync_pending())
-                    if int(time.time()/max(INTERVAL,1)) != int((time.time()-1)/max(INTERVAL,1)):
-                        rows=[r for s in symbols if (r:=score(s))]
-                        rows.sort(key=lambda z: z.get("v11_score", z.get("v10_score", z.get("v9_score", z.get("v8_score", z.get("v7_score", z.get("v6_score", z.get("v5_score", z.get("v4_score", 0)))))))), reverse=True)
-                        candidates=[r for r in rows if r.get("v11_alert",False) and r.get("v11_score",0)>=max(MIN_ALERT_SCORE,V11_ALERT_SCORE,V11_ALERT_SCORE) and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
-                        top_symbols={r["symbol"]:i+1 for i,r in enumerate(candidates)}
-                        for r in candidates:
-                            s=r["symbol"];old=state[s];rank=top_symbols[s]
-                            changed=(old.get("last_stage")!=r["stage"] or old.get("last_entry")!=r["entry"] or old.get("last_alert_rank")!=rank)
-                            now=time.time()
-                            if changed and now-old["last_alert"]>=COOLDOWN:
-                                await telegram(f"⚡ V11 TOP {rank} ACTION ALERT | {s} | {r['stage']} | V10 {r['v11_score']}/100 | {r['v11_path']} | {r['v11_grade']}\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
-                                old["last_alert"]=now;old["last_alert_rank"]=rank
-                            old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
-                        accum_candidates=[r for r in rows if r.get("accumulation_score",0)>=ACCUM_ALERT_SCORE and r.get("accumulation_quality") and r.get("accumulation_stage") in ("ACCUMULATION WATCH","ACCUMULATION ALERT") and r.get("score",0)<70]
-                        accum_candidates=sorted(accum_candidates,key=lambda r:(r.get("accumulation_score",0),r.get("score",0)),reverse=True)[:TOP_ALERTS]
-                        for r in accum_candidates:
-                            s=r["symbol"];old=state[s];now=time.time();prev=float(old.get("last_accum_score",0))
-                            changed=(r["accumulation_score"]-prev>=5 or old.get("last_accum_stage")!=r["accumulation_stage"])
-                            if changed and now-old["last_accum_alert"]>=COOLDOWN:
-                                await telegram(f"🟣 ACCUMULATION / PRE-PUMP | {s} | {r['accumulation_stage']} | Accum {r['accumulation_score']}/100\nPump score: {r['score']}/100 | 1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}%\nBuy pressure: {r['accum_buy_pressure']*100:.1f}% | Trade accel: {r['accum_trade_accel']:.2f}x | Vol ratio: {r['accum_volume_ratio']:.2f}x\nBook imbalance: {r['accum_book_imbalance']:+.2f} | Trades/10s: {r['accum_trades_10s']}\nPrice: {r['price']}\n⚠️ Early signal — confirmation still required.")
-                                old["last_accum_alert"]=now
-                            old["last_accum_score"]=r["accumulation_score"];old["last_accum_stage"]=r["accumulation_stage"]
-                        with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
-                        with open("data/history.jsonl","a") as f:f.write(json.dumps({"ts":time.time(),"rows":rows})+"\n")
-                        await asyncio.sleep(1)
-            finally:
-                if not sync.done():
-                    sync.cancel()
-                    try:await sync
-                    except asyncio.CancelledError:pass
-            rows=[r for s in symbols if (r:=score(s))];rows.sort(key=lambda z:z["score"],reverse=True)
-            with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
-
-if __name__=="__main__":asyncio.run(main())
+    
