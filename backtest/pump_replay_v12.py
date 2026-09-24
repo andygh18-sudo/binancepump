@@ -130,6 +130,19 @@ def evaluate(df,btc,symbol,calibration=None):
         follow_3m=bool(len(follow_window)>=2 and sum(1 for q in follow_window[-2:] if q.get("ret_5m",0)>0)>=2)
         follow_strength=(20 if follow_2m else 0)+(20 if follow_3m else 0)
         v12_follow_ok=follow_strength>=20
+
+        # V12 A+ confluence setup: structural break + efficient price displacement +
+        # relative strength + persistence + second-candle confirmation.
+        a_plus=bool(
+            confirmation and efficiency>=0.60 and
+            z["relative_strength_5m"]>=1.0 and
+            z.get("BOS",False) and z.get("CHoCH",False) and
+            persistence>=2 and z["buy_pressure"]>=0.60 and
+            not stall and extension_ok
+        )
+        # A+ setups receive a small bonus; this must be calculated before scoring.
+        a_plus_bonus=5 if a_plus else 0
+
         # Path 1: earlier PRE-PUMP signal. Designed to recover NIL-type moves without
         # allowing historical calibration to veto a strong current setup.
         early_path=(
@@ -154,13 +167,13 @@ def evaluate(df,btc,symbol,calibration=None):
         score=round(.55*z["v4_score"]+.10*persistence_quality+.10*follow_through+
                      .15*min(max(efficiency,0)/0.75*100,100)+
                      .05*min(max(z["relative_strength_5m"],0)/2.0*100,100)+
-                     .05*follow_strength + reliability_modifier)
+                     .05*follow_strength + reliability_modifier + a_plus_bonus)
         score=max(0,min(score,100))
         if avoid:
             path="AVOID"; alert=False; grade="REJECT"
-        elif confirmed_path and score>=68:
+        elif confirmed_path and score>=70:
             path="CONFIRMED"; alert=True; grade="A"
-        elif early_path and score>=60:
+        elif early_path and score>=62:
             path="EARLY"; alert=True; grade="B"
         elif score>=52 and persistence>=1:
             path="WATCH"; alert=False; grade="WATCH"
