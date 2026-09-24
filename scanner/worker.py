@@ -9,7 +9,7 @@ REST=os.getenv("BINANCE_REST_BASE","https://data-api.binance.vision")
 MAX=int(os.getenv("MAX_SYMBOLS","40"));MINVOL=float(os.getenv("MIN_QUOTE_VOLUME","1000000"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"))
-TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"))
+TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"))
 symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0})
 
 async def get_json(s,url,params=None):
@@ -107,12 +107,33 @@ def early_pump_score(s, ac):
             "relative_strength_5m":rs5,"relative_strength_15m":rs15,"btc_ret_5m":btc5,"btc_ret_15m":btc15,
             "false_positive_penalty":penalty}
 
+def v4_confluence(s, eps, ac):
+    if not eps or not ac:return None
+    _,v10,b10,p10=stats(s,10);_,v60,_,p60=stats(s,60);_,v300,_,_=stats(s,300)
+    vr=v60/max(v300/5,1);acc=acceleration_ratio(v10,v60)
+    rs5=eps.get("relative_strength_5m",0);rs15=eps.get("relative_strength_15m",0)
+    ob=books[s].metrics(20);imb=ob["imbalance"]
+    confirmations=sum([b10>=.60,vr>=1.5,acc>=1.5,rs5>0,p10>0 and p60>0,imb>=0,p10<3,p60<4])
+    penalties=0
+    if p10>=3: penalties+=2
+    if rs15<-1: penalties+=2
+    if vr<1: penalties+=2
+    if b10<.55: penalties+=2
+    conf=max(0,min(confirmations*12-penalties,100))
+    v4=max(0,min(round(eps["early_pump_score"]*.80+conf*.20),100))
+    if v4>=70 and confirmations>=6 and penalties<=2: grade="A"
+    elif v4>=60 and confirmations>=5 and penalties<=3: grade="B"
+    elif v4>=50 and confirmations>=4: grade="C"
+    else: grade="REJECT"
+    return {"v4_score":v4,"v4_confluence_score":conf,"v4_confirmations":confirmations,"v4_penalties":penalties,"v4_alert_quality":grade,"v4_alert":grade in ("A","B") and v4>=V4_ALERT_SCORE}
+
 def score(s):
     x=state[s];c=x["candle"]
     if not x["price"] or not c or s not in books:return None
     _,v10,b10,p10=stats(s,10);_,v60,b60,p60=stats(s,60);_,v300,_,_=stats(s,300)
     ac=accumulation(s)
     eps=early_pump_score(s,ac)
+    v4=v4_confluence(s,eps,ac)
     base=max(v300/30,1);vr=v60/max(v300/5,1);acc=v10/max(v60/6,1)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
@@ -126,7 +147,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],"updated":time.time()}
+    return {"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,"updated":time.time()}
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
@@ -165,8 +186,8 @@ async def main():
                         sync=asyncio.create_task(_resync_pending())
                     if int(time.time()-start)%int(INTERVAL)==0:
                         rows=[r for s in symbols if (r:=score(s))]
-                        rows.sort(key=lambda z:z.get("early_pump_score",0),reverse=True)
-                        candidates=[r for r in rows if r.get("early_pump_score",0)>=MIN_ALERT_SCORE and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
+                        rows.sort(key=lambda z:z.get("v4_score",z.get("early_pump_score",0)),reverse=True)
+                        candidates=[r for r in rows if r.get("v4_alert",False) and r.get("v4_score",0)>=max(MIN_ALERT_SCORE,V4_ALERT_SCORE) and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
                         top_symbols={r["symbol"]:i+1 for i,r in enumerate(candidates)}
                         for r in candidates:
                             s=r["symbol"];old=state[s];rank=top_symbols[s]
