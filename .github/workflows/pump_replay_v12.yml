@@ -38,10 +38,10 @@ jobs:
         env:
           PYTHONUNBUFFERED: "1"
         run: |
-          python backtest/pump_replay_v12.py \\
-            --symbols "${{ inputs.symbols || 'NOMUSDT,NILUSDT,STXUSDT,RAYUSDT,SEIUSDT,SUIUSDT,INJUSDT,AVAXUSDT,PUMPUSDT' }}" \\
-            --train-start "${{ inputs.train_start || '2026-09-13T00:00:00Z' }}" \\
-            --start "${{ inputs.start || '2026-09-20T00:00:00Z' }}" \\
+          python backtest/pump_replay_v12.py \
+            --symbols "${{ inputs.symbols || 'NOMUSDT,NILUSDT,STXUSDT,RAYUSDT,SEIUSDT,SUIUSDT,INJUSDT,AVAXUSDT,PUMPUSDT' }}" \
+            --train-start "${{ inputs.train_start || '2026-09-13T00:00:00Z' }}" \
+            --start "${{ inputs.start || '2026-09-20T00:00:00Z' }}" \
             --end "${{ inputs.end || '2026-09-25T00:00:00Z' }}"
       - name: Publish results
         run: |
