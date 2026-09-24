@@ -79,10 +79,10 @@ for c in numeric_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
 st.sidebar.header("⚙️ Radar Filters")
-min_score = st.sidebar.slider("Minimum score", 0, 100, 20)
+min_score = st.sidebar.slider("Minimum score", 0, 100, 0)
 stages = ["BUILDING", "PRE-PUMP", "EARLY MOMENTUM", "BREAKOUT", "CONFIRMED PUMP"]
 selected_stages = st.sidebar.multiselect("Stages", stages, default=stages)
-min_volume_ratio = st.sidebar.number_input("Minimum volume ratio", min_value=0.0, value=1.0, step=0.1)
+min_volume_ratio = st.sidebar.number_input("Minimum volume ratio", min_value=0.0, value=0.0, step=0.1)
 only_book_ready = st.sidebar.checkbox("Order book ready only", value=False)
 show_acceleration = st.sidebar.checkbox("Show score acceleration", value=True)
 
@@ -217,6 +217,11 @@ if "book_status" in df.columns:
     ready_count = int((df["book_status"] == "🟢 READY").sum())
     syncing_count = int((df["book_status"] != "🟢 READY").sum())
     st.caption(f"📚 Order books: **{ready_count} ready** • **{syncing_count} syncing/resyncing**")
+
+st.success(f"Scanner data loaded: {len(df)} symbols • source: {data_source} • top score: {df['score'].max():.0f}")
+
+st.subheader("📡 Live Scanner Snapshot")
+st.dataframe(df.head(20), use_container_width=True, hide_index=True)
 
 st.divider()
 
