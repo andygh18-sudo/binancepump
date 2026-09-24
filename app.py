@@ -190,7 +190,7 @@ if "book_status" in df.columns:
 
 st.divider()
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "🔥 Live Radar", "🟣 Accumulation", "⚡ Pre-Pump", "🗺️ Heatmap", "🔎 Coin Analysis", "📜 History"
 ])
 
