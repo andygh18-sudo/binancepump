@@ -32,6 +32,23 @@ jobs:
       - name: Prepare data directory
         run: mkdir -p data
 
+      - name: Restore V11 configuration constants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("scanner/worker.py")
+          s = p.read_text()
+          marker = 'V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));'
+          insert = marker + 'V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));'
+          if "V11_MIN_PERSISTENCE=" not in s:
+              if marker not in s:
+                  raise SystemExit("V11 insertion marker not found")
+              s = s.replace(marker, insert, 1)
+              p.write_text(s)
+              print("V11 constants restored")
+          else:
+              print("V11 constants already present")
+
       - name: Validate scanner
         run: python -m py_compile scanner/worker.py run_scanner.py
 
