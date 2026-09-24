@@ -61,7 +61,7 @@ for c in numeric_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
 st.sidebar.header("⚙️ Radar Filters")
-min_score = st.sidebar.slider("Minimum score", 0, 100, 38)
+min_score = st.sidebar.slider("Minimum score", 0, 100, 20)
 stages = ["BUILDING", "PRE-PUMP", "EARLY MOMENTUM", "BREAKOUT", "CONFIRMED PUMP"]
 selected_stages = st.sidebar.multiselect("Stages", stages, default=stages)
 min_volume_ratio = st.sidebar.number_input("Minimum volume ratio", min_value=0.0, value=1.0, step=0.1)
@@ -216,8 +216,11 @@ with tab1:
 
     radar = view.head(20).copy()
     if radar.empty:
-        st.info("No symbols match the current filters.")
-    else:
+        # Keep the Live Pump Radar populated even when the sidebar filters are too strict.
+        # The filtered count remains visible in Active Signals above.
+        radar = df.head(20).copy()
+        st.warning("No symbols match the current filters — showing the top 20 live symbols instead. Adjust the sidebar filters to narrow the radar.")
+    if not radar.empty:
         st.dataframe(
             format_signal_table(radar),
             use_container_width=True,
