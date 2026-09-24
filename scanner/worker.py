@@ -514,7 +514,7 @@ async def main():
                         sync=asyncio.create_task(_resync_pending())
                     if int(time.time()/max(INTERVAL,1)) != int((time.time()-1)/max(INTERVAL,1)):
                         rows=[r for s in symbols if (r:=score(s))]
-                        rows.sort(key=lambda z: z.get("hybrid_score", z.get("v11_score", z.get("v10_score", z.get("v9_score", z.get("v8_score", z.get("v7_score", z.get("v6_score", z.get("v5_score", z.get("v4_score", 0)))))))), reverse=True)
+                        rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
                         candidates=[r for r in rows if r.get("hybrid_alert",False) and r.get("hybrid_score",0)>=max(MIN_ALERT_SCORE,70) and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
                         top_symbols={r["symbol"]:i+1 for i,r in enumerate(candidates)}
                         for r in candidates:
