@@ -70,23 +70,23 @@ def evaluate(df,btc,symbol,calibration=None):
     for z in raw:
         hist_quality=min(rate/25,1)*100 if samples>=20 else 50
         persistence_quality=min(z["persistence"]/3,1)*100
-        v5=round(.70*z["v4_score"]+.15*persistence_quality+.15*hist_quality)
+        v6=round(.70*z["v4_score"]+.15*persistence_quality+.15*hist_quality)
         early_exception=(z["v4_alert_quality"] in ("A","B") and z["v4_score"]>=68 and z["v4_confirmations"]>=7 and z["buy_pressure"]>=.60 and z["volume_ratio"]>=2.0 and z["trade_accel"]>=2.0 and z["relative_strength_5m"]>0 and z["ret_5m"]>0 and z["ret_1m"]<2.5)
-        if samples>=20 and rate>=8 and z["persistence"]>=3 and v5>=72 and z["v4_alert_quality"]=="A":grade="A"
-        elif samples>=20 and rate>=8 and z["persistence"]>=2 and v5>=65 and z["v4_alert_quality"] in ("A","B"):grade="B"
+        if samples>=20 and rate>=8 and z["persistence"]>=3 and v6>=72 and z["v4_alert_quality"]=="A":grade="A"
+        elif samples>=20 and rate>=8 and z["persistence"]>=2 and v6>=65 and z["v4_alert_quality"] in ("A","B"):grade="B"
         elif early_exception:grade="EARLY"
         elif v5>=55 and z["persistence"]>=1:grade="WATCH"
         else:grade="REJECT"
-        z.update({"v5_score":max(0,min(v5,100)),"v5_persistence":z["persistence"],"v5_hist_samples":samples,"v5_hist_hit_rate_240m":round(rate,2),"v5_grade":grade,"v5_alert":grade in ("A","B","EARLY") and ((grade=="EARLY" and v5>=60) or (grade in ("A","B") and v5>=65 and z["persistence"]>=2 and samples>=20 and rate>=8))})
+        z.update({"v6_score":max(0,min(v6,100)),"v6_persistence":z["persistence"],"v6_hist_samples":samples,"v6_hist_hit_rate_240m":round(rate,2),"v6_grade":grade,"v6_alert":grade in ("A","B","EARLY") and ((grade=="EARLY" and v6>=60) or (grade in ("A","B") and v5>=65 and z["persistence"]>=2 and samples>=20 and rate>=8))})
         if not episodes or (pd.Timestamp(z["time"])-pd.Timestamp(episodes[-1]["time"])).total_seconds()>=1800:
             episodes.append(z)
-        elif z["v5_score"]>episodes[-1]["v5_score"]:episodes[-1]=z
-    a=[z for z in episodes if z["v5_alert"]]
+        elif z["v6_score"]>episodes[-1]["v6_score"]:episodes[-1]=z
+    a=[z for z in episodes if z["v6_alert"]]
     bands={}
     for lo,hi in ((50,59),(60,69),(70,79),(80,89),(90,100)):
-        q=[z for z in episodes if lo<=z["v5_score"]<=hi];h60=[z for z in q if (z["future_max_gain"]["60m"] or 0)>=10];h240=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=10];h20=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=20]
+        q=[z for z in episodes if lo<=z["v6_score"]<=hi];h60=[z for z in q if (z["future_max_gain"]["60m"] or 0)>=10];h240=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=10];h20=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=20]
         bands[f"{lo}-{hi}"]={"signals":len(q),"hit_60m_ge10":len(h60),"hit_240m_ge10":len(h240),"hit_240m_ge20":len(h20),"precision_240m_ge10_pct":round(len(h240)/len(q)*100,2) if q else 0,"precision_240m_ge20_pct":round(len(h20)/len(q)*100,2) if q else 0}
-    return {"symbol":symbol,"status":"ok","bars":len(x),"start":x.time.iloc[0].isoformat(),"end":x.time.iloc[-1].isoformat(),"detections":len(episodes),"v5_alerts":len(a),"hit_60m_ge10":sum((z["future_max_gain"]["60m"] or 0)>=10 for z in a),"hit_240m_ge10":sum((z["future_max_gain"]["240m"] or 0)>=10 for z in a),"hit_240m_ge20":sum((z["future_max_gain"]["240m"] or 0)>=20 for z in a),"v5_alert_precision_240m_ge10_pct":round(sum((z["future_max_gain"]["240m"] or 0)>=10 for z in a)/len(a)*100,2) if a else 0,"v5_alert_precision_240m_ge20_pct":round(sum((z["future_max_gain"]["240m"] or 0)>=20 for z in a)/len(a)*100,2) if a else 0,"score_band_precision":bands,"v6_alert_episodes":a[:150],"episodes":episodes[:150]}
+    return {"symbol":symbol,"status":"ok","bars":len(x),"start":x.time.iloc[0].isoformat(),"end":x.time.iloc[-1].isoformat(),"detections":len(episodes),"v6_alerts":len(a),"hit_60m_ge10":sum((z["future_max_gain"]["60m"] or 0)>=10 for z in a),"hit_240m_ge10":sum((z["future_max_gain"]["240m"] or 0)>=10 for z in a),"hit_240m_ge20":sum((z["future_max_gain"]["240m"] or 0)>=20 for z in a),"v6_alert_precision_240m_ge10_pct":round(sum((z["future_max_gain"]["240m"] or 0)>=10 for z in a)/len(a)*100,2) if a else 0,"v6_alert_precision_240m_ge20_pct":round(sum((z["future_max_gain"]["240m"] or 0)>=20 for z in a)/len(a)*100,2) if a else 0,"score_band_precision":bands,"v6_alert_episodes":a[:150],"episodes":episodes[:150]}
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--symbols",default="NOMUSDT,NILUSDT,STXUSDT,RAYUSDT,SEIUSDT,SUIUSDT,INJUSDT,AVAXUSDT,PUMPUSDT");ap.add_argument("--start",default="2026-09-20T00:00:00Z");ap.add_argument("--end",default="2026-09-25T00:00:00Z");ap.add_argument("--train-start",default="2026-09-13T00:00:00Z");ap.add_argument("--output",default="data/backtest_results_v6.json");a=ap.parse_args()
@@ -104,5 +104,5 @@ def main():
         except Exception as e:out.append({"symbol":s,"status":"error","error":str(e)})
 
     payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v6","data_source":BASE,"method":"Binance 1m Spot klines with BTC-relative strength, independent pre-test calibration, persistent confirmation and early-entry exception","v6_design":{"v4_weight":0.70,"persistence_weight":0.15,"historical_weight":0.15,"action_min_score":65,"min_persistence":2,"min_historical_samples":20,"min_historical_hit_rate_pct":8,"early_entry_exception":true,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
-    os.makedirs(os.path.dirname(a.output) or ".",exist_ok=True);json.dump(payload,open(a.output,"w"),indent=2);json.dump(cal,open("data/v5_calibration.json","w"),indent=2);print(json.dumps(payload,indent=2))
+    os.makedirs(os.path.dirname(a.output) or ".",exist_ok=True);json.dump(payload,open(a.output,"w"),indent=2);json.dump(cal,open("data/v6_calibration.json","w"),indent=2);print(json.dumps(payload,indent=2))
 if __name__=="__main__":main()
