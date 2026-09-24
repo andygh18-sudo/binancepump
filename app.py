@@ -3,6 +3,7 @@ import json
 import os
 import pandas as pd
 import numpy as np
+import urllib.request
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(
@@ -27,16 +28,31 @@ st.title("⚡ Binance Pump Radar")
 st.caption("Real-time early-pump intelligence • Binance USDT markets • automatic refresh every 15 seconds")
 
 path = "data/latest.json"
-if not os.path.exists(path):
-    st.warning("No scan has been published yet. Enable the GitHub Actions workflow.")
+RAW_BASE = "https://raw.githubusercontent.com/andygh18-sudo/binancepump/main/data/"
+
+def load_json_data(filename):
+    local_path = os.path.join("data", filename)
+    # Prefer the local checkout, but fall back to GitHub raw data. This is
+    # important for Streamlit deployments whose filesystem is not refreshed
+    # when GitHub Actions commits new scan data.
+    if os.path.exists(local_path):
+        try:
+            with open(local_path) as f:
+                return json.load(f), "local"
+        except Exception:
+            pass
+    try:
+        with urllib.request.urlopen(RAW_BASE + filename + "?t=" + str(int(pd.Timestamp.utcnow().timestamp())), timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8")), "github"
+    except Exception as e:
+        return None, str(e)
+
+d, data_source = load_json_data("latest.json")
+if d is None:
+    st.error(f"Unable to load live scanner data from the repository: {data_source}")
     st.stop()
 
-try:
-    with open(path) as f:
-        d = json.load(f)
-except Exception as e:
-    st.error(f"Unable to read scanner data: {e}")
-    st.stop()
+st.caption(f"📡 Data source: **GitHub Actions scan ({data_source})** • Scanner update: {pd.to_datetime(d.get('updated', 0), unit='s', errors='coerce')}")
 
 rows = d.get("rows", [])
 df = pd.DataFrame(rows)
@@ -78,15 +94,27 @@ if only_book_ready and "book_ready" in view.columns:
 
 history_path = "data/history.jsonl"
 history_records = []
+history_text = None
 if os.path.exists(history_path):
-    with open(history_path, errors="ignore") as hf:
-        for line in hf:
-            try:
-                item = json.loads(line)
-                if isinstance(item, dict) and item.get("rows"):
-                    history_records.append(item)
-            except Exception:
-                continue
+    try:
+        with open(history_path, errors="ignore") as hf:
+            history_text = hf.read()
+    except Exception:
+        history_text = None
+if history_text is None:
+    try:
+        with urllib.request.urlopen(RAW_BASE + "history.jsonl?t=" + str(int(pd.Timestamp.utcnow().timestamp())), timeout=10) as resp:
+            history_text = resp.read().decode("utf-8", errors="ignore")
+    except Exception:
+        history_text = None
+if history_text:
+    for line in history_text.splitlines():
+        try:
+            item = json.loads(line)
+            if isinstance(item, dict) and item.get("rows"):
+                history_records.append(item)
+        except Exception:
+            continue
 
 score_history = {}
 for item in history_records[-120:]:
