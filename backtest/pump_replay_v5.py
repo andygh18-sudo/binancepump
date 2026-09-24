@@ -55,7 +55,7 @@ def evaluate(df,btc,symbol):
             q=bi.index.get_indexer([t],method="nearest")[0];br=bi.iloc[q] if q>=0 else None
         z=calc(x.iloc[i],br)
         if z["v4_alert_quality"]=="REJECT":continue
-        entry=float(x.iloc[i].close);f=x.iloc[i+1:i+241];g={m:round((float(f.iloc[:m].high.max())/entry-1)*100,2) if len(f.iloc[:m]) else None for m in (15,30,60,240)}
+        entry=float(x.iloc[i].close);f=x.iloc[i+1:i+241];g={f"{m}m":round((float(f.iloc[:m].high.max())/entry-1)*100,2) if len(f.iloc[:m]) else None for m in (15,30,60,240)}
         raw.append({"time":t.isoformat(),"price":entry,**z,"future_max_gain":g})
     # Persistence: consecutive qualified observations inside a 10-minute window.
     for i,z in enumerate(raw):
