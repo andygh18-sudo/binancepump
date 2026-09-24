@@ -321,6 +321,57 @@ def v10_signal(s,v4,eps):
             "v10_second_candle_confirm":second_confirm,"v10_efficiency":round(efficiency,4),"v10_adverse_extension":round(extension,4),
             "v10_stall":stall,"v10_grade":grade,"v10_path":path,"v10_avoid":avoid,"v10_alert":alert}
 
+def load_v11_calibration():
+    try:
+        with open("data/v11_calibration.json") as f:return json.load(f)
+    except Exception:return {}
+V11_CALIBRATION=load_v11_calibration()
+
+def v11_signal(s,v4,eps):
+    if not v4 or not eps:return None
+    x=state[s];bucket=int(time.time()/max(INTERVAL,1));prev=int(x.get("v11_last_bucket",-1))
+    _,v10,b10,p10=stats(s,10);_,v60,_,p60=stats(s,60);_,v300,_,_=stats(s,300)
+    vr=v60/max(v300/5,1);acc=acceleration_ratio(v10,v60)
+    rs5=float(eps.get("relative_strength_5m",0) or 0);rs15=float(eps.get("relative_strength_15m",0) or 0)
+    btc5=float(eps.get("btc_ret_5m",0) or 0);btc15=float(eps.get("btc_ret_15m",0) or 0)
+    qualifying=v4.get("v4_score",0)>=55 and v4.get("v4_alert_quality") in ("A","B","C")
+    if qualifying:
+        if bucket==prev+1:x["v11_streak"]=int(x.get("v11_streak",0))+1
+        elif bucket!=prev:x["v11_streak"]=1
+    elif bucket!=prev:x["v11_streak"]=0
+    x["v11_last_bucket"]=bucket;streak=int(x.get("v11_streak",0))
+    prev_c=x.get("prev_candle");cur_c=x.get("candle")
+    second_confirm=bool(prev_c and cur_c and cur_c["close"]>prev_c["close"] and prev_c["close"]>=prev_c["open"])
+    second_hold=bool(prev_c and cur_c and cur_c["low"]>=prev_c["low"]*0.995)
+    confirmation=second_confirm and second_hold
+    efficiency=(p60/max(vr,1.0)) if vr>0 else 0.0
+    extension=max(0.0,p10-2.5)+max(0.0,p60-6.0)*0.35
+    stall=(vr>=3 and acc>=3 and p60<0.75)
+    momentum_ok=(p60>0 and (p60>=p10*0.75 or rs5>0.5))
+    btc_risk=(btc5<-1 or btc15<-2)
+    controlled=(p10<2.5 and p60<6)
+    activity=(vr>=1.5 and acc>=1.5)
+    efficiency_ok=(efficiency>=0.35 or (efficiency>=0.25 and p60>=2))
+    extension_ok=(extension<3 and p10<3.5)
+    follow_ok=(streak>=2 and momentum_ok and confirmation)
+    cal=V11_CALIBRATION.get(s,{}) if isinstance(V11_CALIBRATION,dict) else {}
+    samples=int(cal.get("samples",0) or 0);rate=float(cal.get("hit_rate_240m_ge10_pct",0) or 0)
+    reliability=50.0 if samples<20 else max(0.0,min(100.0,rate))
+    rel_mod=(reliability-50.0)*0.03
+    persist=min(streak/3,1)*100
+    eff_component=min(max(efficiency,0)/0.75*100,100)
+    rs_component=min(max(rs5,0)/2.0*100,100)
+    score=max(0,min(round(.55*v4.get("v4_score",0)+.10*persist+.10*(100 if momentum_ok else 50)+.15*eff_component+.05*rs_component+.05*(100 if confirmation else 0)+rel_mod),100))
+    avoid=(p10>=4 or p60>=8 or rs15<-1.5 or btc_risk or extension>=4 or stall or efficiency<0.15)
+    confirmed=(v4.get("v4_score",0)>=72 and v4.get("v4_confirmations",0)>=7 and streak>=3 and b10>=.60 and vr>=2 and acc>=2 and rs5>.25 and momentum_ok and controlled and not btc_risk and confirmation and efficiency>=.50 and extension_ok and not stall)
+    early=(v4.get("v4_score",0)>=60 and streak>=V11_MIN_PERSISTENCE and b10>=.58 and vr>=1.5 and acc>=1.5 and rs5>0 and momentum_ok and controlled and not btc_risk and confirmation and efficiency_ok and extension_ok and follow_ok and not stall)
+    if avoid:path="AVOID";grade="REJECT";alert=False
+    elif confirmed and score>=V11_CONFIRMED_SCORE:path="CONFIRMED";grade="A";alert=True
+    elif early and score>=V11_ALERT_SCORE:path="EARLY";grade="B";alert=True
+    elif score>=55 and streak>=1:path="WATCH";grade="WATCH";alert=False
+    else:path="REJECT";grade="REJECT";alert=False
+    return {"v11_score":score,"v11_persistence":streak,"v11_reliability":round(reliability,2),"v11_reliability_modifier":round(rel_mod,2),"v11_second_candle_confirm":second_confirm,"v11_second_candle_hold":second_hold,"v11_confirmation":confirmation,"v11_efficiency":round(efficiency,4),"v11_adverse_extension":round(extension,4),"v11_follow_ok":follow_ok,"v11_grade":grade,"v11_path":path,"v11_avoid":avoid,"v11_alert":alert}
+
 def v5_signal(s,v4):
     if not v4:return None
     x=state[s];bucket=int(time.time()/max(INTERVAL,1));prev=int(x.get("v5_last_bucket",-1))
@@ -355,6 +406,7 @@ def score(s):
     v7=v7_signal(s,v4)
     v8=v8_signal(s,v4,eps)
     v9=v9_signal(s,v4,eps)\n    v10=v10_signal(s,v4,eps)
+    v11=v11_signal(s,v4,eps)
     base=max(v300/30,1);vr=v60/max(v300/5,1);acc=v10/max(v60/6,1)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
@@ -407,15 +459,15 @@ async def main():
                         sync=asyncio.create_task(_resync_pending())
                     if int(time.time()/max(INTERVAL,1)) != int((time.time()-1)/max(INTERVAL,1)):
                         rows=[r for s in symbols if (r:=score(s))]
-                        rows.sort(key=lambda z: z.get("v10_score", z.get("v9_score", z.get("v8_score", z.get("v7_score", z.get("v6_score", z.get("v5_score", z.get("v4_score", 0))))))), reverse=True)
-                        candidates=[r for r in rows if r.get("v10_alert",False) and r.get("v10_score",0)>=max(MIN_ALERT_SCORE,V10_ALERT_SCORE) and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
+                        rows.sort(key=lambda z: z.get("v11_score", z.get("v10_score", z.get("v9_score", z.get("v8_score", z.get("v7_score", z.get("v6_score", z.get("v5_score", z.get("v4_score", 0)))))))), reverse=True)
+                        candidates=[r for r in rows if r.get("v11_alert",False) and r.get("v11_score",0)>=max(MIN_ALERT_SCORE,V11_ALERT_SCORE,V11_ALERT_SCORE) and r["stage"] in ("BUILDING","PRE-PUMP","EARLY MOMENTUM","BREAKOUT","CONFIRMED PUMP")][:TOP_ALERTS]
                         top_symbols={r["symbol"]:i+1 for i,r in enumerate(candidates)}
                         for r in candidates:
                             s=r["symbol"];old=state[s];rank=top_symbols[s]
                             changed=(old.get("last_stage")!=r["stage"] or old.get("last_entry")!=r["entry"] or old.get("last_alert_rank")!=rank)
                             now=time.time()
                             if changed and now-old["last_alert"]>=COOLDOWN:
-                                await telegram(f"⚡ V10 TOP {rank} ACTION ALERT | {s} | {r['stage']} | V10 {r['v10_score']}/100 | {r['v10_path']} | {r['v10_grade']}\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
+                                await telegram(f"⚡ V11 TOP {rank} ACTION ALERT | {s} | {r['stage']} | V10 {r['v11_score']}/100 | {r['v11_path']} | {r['v11_grade']}\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
                                 old["last_alert"]=now;old["last_alert_rank"]=rank
                             old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
                         accum_candidates=[r for r in rows if r.get("accumulation_score",0)>=ACCUM_ALERT_SCORE and r.get("accumulation_quality") and r.get("accumulation_stage") in ("ACCUMULATION WATCH","ACCUMULATION ALERT") and r.get("score",0)<70]
