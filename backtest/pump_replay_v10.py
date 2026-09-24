@@ -172,11 +172,11 @@ def evaluate(df,btc,symbol,calibration=None):
         })
         if not episodes or (pd.Timestamp(z["time"])-pd.Timestamp(episodes[-1]["time"])).total_seconds()>=1800:
             episodes.append(z)
-        elif z["v8_score"]>episodes[-1]["v8_score"]:episodes[-1]=z
+        elif z["v10_score"]>episodes[-1]["v8_score"]:episodes[-1]=z
     a=[z for z in episodes if z["v10_alert"]]
     bands={}
     for lo,hi in ((50,59),(60,69),(70,79),(80,89),(90,100)):
-        q=[z for z in episodes if lo<=z["v8_score"]<=hi];h60=[z for z in q if (z["future_max_gain"]["60m"] or 0)>=10];h240=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=10];h20=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=20]
+        q=[z for z in episodes if lo<=z["v10_score"]<=hi];h60=[z for z in q if (z["future_max_gain"]["60m"] or 0)>=10];h240=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=10];h20=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=20]
         bands[f"{lo}-{hi}"]={"signals":len(q),"hit_60m_ge10":len(h60),"hit_240m_ge10":len(h240),"hit_240m_ge20":len(h20),"precision_240m_ge10_pct":round(len(h240)/len(q)*100,2) if q else 0,"precision_240m_ge20_pct":round(len(h20)/len(q)*100,2) if q else 0}
     early_alerts=[z for z in a if z.get("v10_path")=="EARLY"]; confirmed_alerts=[z for z in a if z.get("v10_path")=="CONFIRMED"]
     false_pos=sum((z["future_max_gain"]["240m"] or 0)<10 for z in a)
@@ -197,6 +197,6 @@ def main():
             r=evaluate(fetch(s,a.start,a.end),btc_test,s,cal[s]);out.append(r)
         except Exception as e:out.append({"symbol":s,"status":"error","error":str(e)})
 
-    payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v10","data_source":BASE,"method":"Binance 1m Spot klines with V9 features plus next-candle confirmation, volume-to-price efficiency, adverse-extension veto and soft walk-forward reliability modifier","v10_design":{"v9_base":true,"v4_weight":0.68,"persistence_weight":0.10,"follow_through_weight":0.12,"reliability_modifier":0.08,"second_candle_confirmation":true,"efficiency_filter":true,"adverse_extension_veto":true,"historical_hard_gate":false,"early_min_score":60,"confirmed_min_score":68,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"v9_design":{"v4_weight":0.72,"persistence_weight":0.10,"follow_through_weight":0.13,"historical_risk_modifier":True,"historical_hard_gate":False,"smoothed_prior_hit_rate_pct":10,"early_v4_min_score":60,"early_min_follow_through":65,"early_min_persistence":2,"confirmed_v4_min_score":72,"confirmed_min_persistence":3,"confirmed_min_follow_through":75,"avoid_filter":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
+    payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v10","data_source":BASE,"method":"Binance 1m Spot klines with V9 features plus next-candle confirmation, volume-to-price efficiency, adverse-extension veto and soft walk-forward reliability modifier","v10_design":{"v9_base":True,"v4_weight":0.68,"persistence_weight":0.10,"follow_through_weight":0.12,"reliability_modifier":0.08,"second_candle_confirmation":True,"efficiency_filter":True,"adverse_extension_veto":True,"historical_hard_gate":False,"early_min_score":60,"confirmed_min_score":68,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"v9_design":{"v4_weight":0.72,"persistence_weight":0.10,"follow_through_weight":0.13,"historical_risk_modifier":True,"historical_hard_gate":False,"smoothed_prior_hit_rate_pct":10,"early_v4_min_score":60,"early_min_follow_through":65,"early_min_persistence":2,"confirmed_v4_min_score":72,"confirmed_min_persistence":3,"confirmed_min_follow_through":75,"avoid_filter":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
     os.makedirs(os.path.dirname(a.output) or ".",exist_ok=True);json.dump(payload,open(a.output,"w"),indent=2);json.dump(cal,open("data/v10_calibration.json","w"),indent=2);print(json.dumps(payload,indent=2))
 if __name__=="__main__":main()
