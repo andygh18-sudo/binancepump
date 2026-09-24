@@ -103,6 +103,6 @@ def main():
             r=evaluate(fetch(s,a.start,a.end),btc_test,s,cal[s]);out.append(r)
         except Exception as e:out.append({"symbol":s,"status":"error","error":str(e)})
 
-    payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v6","data_source":BASE,"method":"Binance 1m Spot klines with BTC-relative strength, independent pre-test calibration, persistent confirmation and early-entry exception","v6_design":{"v4_weight":0.70,"persistence_weight":0.15,"historical_weight":0.15,"action_min_score":65,"min_persistence":2,"min_historical_samples":20,"min_historical_hit_rate_pct":8,"early_entry_exception":true,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
+    payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v6","data_source":BASE,"method":"Binance 1m Spot klines with BTC-relative strength, independent pre-test calibration, persistent confirmation and early-entry exception","v6_design":{"v4_weight":0.70,"persistence_weight":0.15,"historical_weight":0.15,"action_min_score":65,"min_persistence":2,"min_historical_samples":20,"min_historical_hit_rate_pct":8,"early_entry_exception":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
     os.makedirs(os.path.dirname(a.output) or ".",exist_ok=True);json.dump(payload,open(a.output,"w"),indent=2);json.dump(cal,open("data/v6_calibration.json","w"),indent=2);print(json.dumps(payload,indent=2))
 if __name__=="__main__":main()
