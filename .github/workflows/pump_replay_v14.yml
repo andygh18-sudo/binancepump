@@ -32,15 +32,30 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          mkdir -p /tmp/v14_results
+          cp data/backtest_results_v14.json /tmp/v14_results/backtest_results_v14.json
+          cp data/v14_calibration.json /tmp/v14_results/v14_calibration.json
+
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --mixed origin/main
-            cp /tmp/nonexistent /tmp/nonexistent 2>/dev/null || true
-            test -f data/backtest_results_v14.json
-            test -f data/v14_calibration.json
+            cp /tmp/v14_results/backtest_results_v14.json data/backtest_results_v14.json
+            cp /tmp/v14_results/v14_calibration.json data/v14_calibration.json
             git add -f data/backtest_results_v14.json data/v14_calibration.json
-            git diff --cached --quiet || git commit -m "Update V14 expansion backtest results"
-            git push origin HEAD:main && exit 0
-            sleep 2
+
+            if git diff --cached --quiet; then
+              echo "V14 result files already match repository; nothing to commit."
+              exit 0
+            fi
+
+            git commit -m "Update V14 expansion backtest results"
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+
+            echo "Publish attempt $attempt failed due to concurrent main update; retrying."
+            sleep 3
           done
+
           exit 1
