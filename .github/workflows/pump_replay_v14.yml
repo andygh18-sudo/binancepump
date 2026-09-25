@@ -1,0 +1,39 @@
+name: Pump Replay Backtest v14
+
+on:
+  push:
+    paths:
+      - "backtest/pump_replay_v14.py"
+      - ".github/workflows/pump_replay_v14.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pandas requests
+      - name: Validate V14 syntax
+        run: python -m py_compile backtest/pump_replay_v14.py
+      - name: Run V14 replay
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          python backtest/pump_replay_v14.py --symbols "BNBUSDT,LINKUSDT,DOGEUSDT,XRPUSDT,ADAUSDT,LTCUSDT,ATOMUSDT,NEARUSDT,APTUSDT,FILUSDT" --train-start "2026-09-13T00:00:00Z" --start "2026-09-20T00:00:00Z" --end "2026-09-25T00:00:00Z"
+      - name: Publish V14 results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git reset --mixed origin/main
+          git add data/backtest_results_v14.json data/v14_calibration.json
+          git diff --cached --quiet || git commit -m "Update V14 expansion backtest results"
+          git push origin HEAD:main
