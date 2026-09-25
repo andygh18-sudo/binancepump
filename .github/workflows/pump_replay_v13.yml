@@ -33,7 +33,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
-git rebase origin/main
-git add data/backtest_results_v13.json data/v13_calibration.json
+          git rebase origin/main
+          git add data/backtest_results_v13.json data/v13_calibration.json
           git diff --cached --quiet || git commit -m "Update V13 expansion backtest results"
           git push origin HEAD:main
