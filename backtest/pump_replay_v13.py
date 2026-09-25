@@ -25,6 +25,16 @@ def fetch(symbol,start,end):
 def prep(x):
     x=x.copy()
     x["ret_1m"]=x.close.pct_change()*100;x["ret_5m"]=x.close.pct_change(5)*100;x["ret_15m"]=x.close.pct_change(15)*100
+    # StochRSI: Wilder-style RSI(14), stochastic window 14, smoothed K/D(3). Uses only past/current bars.
+    delta=x.close.diff();gain=delta.clip(lower=0);loss=-delta.clip(upper=0)
+    ag=gain.ewm(alpha=1/14,adjust=False,min_periods=14).mean();al=loss.ewm(alpha=1/14,adjust=False,min_periods=14).mean()
+    rs=ag/al.replace(0,pd.NA);x["rsi14"]=100-(100/(1+rs))
+    rmin=x.rsi14.rolling(14,min_periods=14).min();rmax=x.rsi14.rolling(14,min_periods=14).max()
+    x["stochrsi"]=((x.rsi14-rmin)/(rmax-rmin).replace(0,pd.NA)*100)
+    x["stochrsi_k"]=x.stochrsi.rolling(3,min_periods=3).mean();x["stochrsi_d"]=x.stochrsi_k.rolling(3,min_periods=3).mean()
+    x["stochrsi_slope"]=x.stochrsi_k.diff()
+    x["stochrsi_cross_up"]=(x.stochrsi_k>x.stochrsi_d)&(x.stochrsi_k.shift(1)<=x.stochrsi_d.shift(1))
+    x["stochrsi_cross_down"]=(x.stochrsi_k<x.stochrsi_d)&(x.stochrsi_k.shift(1)>=x.stochrsi_d.shift(1))
     x["vr"]=x.quote_volume/x.quote_volume.rolling(20,min_periods=10).mean().replace(0,pd.NA)
     x["ta"]=x.trades/x.trades.rolling(15,min_periods=5).mean().replace(0,pd.NA)
     x["bp"]=x.taker_buy_quote/x.quote_volume.replace(0,pd.NA)
@@ -33,16 +43,25 @@ def prep(x):
     return x
 def clamp(v,a=0,b=1):return max(a,min(b,v))
 def calc(r,b):
+    sr=float(r.stochrsi) if pd.notna(r.stochrsi) else 50.0;sk=float(r.stochrsi_k) if pd.notna(r.stochrsi_k) else sr;sd=float(r.stochrsi_d) if pd.notna(r.stochrsi_d) else sk;ss=float(r.stochrsi_slope) if pd.notna(r.stochrsi_slope) else 0.0
+    if sk<20 and ss>0: st_stage="IGNITION"
+    elif sk<50 and ss>0: st_stage="EARLY_MOMENTUM"
+    elif 50<=sk<80 and ss>0: st_stage="ACCELERATION"
+    elif sk>=80 and ss>0: st_stage="EXPANSION"
+    elif sk>=80 and ss<=0: st_stage="EXHAUSTION"
+    elif sk<50 and ss<0: st_stage="COOLDOWN"
+    else: st_stage="NEUTRAL"
     bp=float(r.bp) if pd.notna(r.bp) else .5;vr=float(r.vr) if pd.notna(r.vr) else 0;ta=float(r.ta) if pd.notna(r.ta) else 0;p1=float(r.ret_1m) if pd.notna(r.ret_1m) else 0;p5=float(r.ret_5m) if pd.notna(r.ret_5m) else 0;p15=float(r.ret_15m) if pd.notna(r.ret_15m) else 0;vexp=float(r.vexp) if pd.notna(r.vexp) else 1;dist=float(r.dist) if pd.notna(r.dist) else 99
     b5=float(b.ret_5m) if b is not None and pd.notna(b.ret_5m) else 0;b15=float(b.ret_15m) if b is not None and pd.notna(b.ret_15m) else 0;rs5=p5-b5;rs15=p15-b15
     bos=bool(pd.notna(r.hh20) and r.close>r.hh20);choch=bool(pd.notna(r.hh5) and r.close>r.hh5 and p5>0)
-    base=clamp((bp-.50)/.25)*14+clamp(max(vr-1,0)/2)*13+clamp(max(ta-1,0)/2)*13+clamp((p5+.5)/2.5)*8+(8 if bos else 0)+(6 if choch else 0)+clamp((rs5+.25)/1.5)*8+clamp(vexp-1)*6+(5 if -.5<=dist<=1 else 2 if dist<=2 else 0)
+    stoch_bonus=(6 if st_stage in ("IGNITION","EARLY_MOMENTUM","ACCELERATION","EXPANSION") and ss>0 else 0)-(4 if st_stage=="EXHAUSTION" else 0)
+    base=clamp((bp-.50)/.25)*14+clamp(max(vr-1,0)/2)*13+clamp(max(ta-1,0)/2)*13+clamp((p5+.5)/2.5)*8+(8 if bos else 0)+(6 if choch else 0)+clamp((rs5+.25)/1.5)*8+clamp(vexp-1)*6+(5 if -.5<=dist<=1 else 2 if dist<=2 else 0)+stoch_bonus
     pen=(6 if p1>3 else 0)+(5 if bp<.52 else 0)+(4 if ta<1.15 else 0)+(5 if vr<.8 else 0)+(4 if rs15<-1 else 0)+(3 if dist>4 else 0)
     early=max(0,min(round(base-pen),100))
     confirmations=sum([bp>=.60,vr>=1.5,ta>=1.5,rs5>0,bos or choch,dist<=1.5,p1<3,p5<4]);cpen=(2 if p1>=3 else 0)+(2 if rs15<-1 else 0)+(2 if vr<1 else 0)+(2 if bp<.55 else 0)
     conf=max(0,min(confirmations*12-cpen,100));v4=max(0,min(round(early*.8+conf*.2),100))
     grade="A" if v4>=70 and confirmations>=6 and cpen<=2 else "B" if v4>=60 and confirmations>=5 and cpen<=3 else "C" if v4>=50 and confirmations>=4 else "REJECT"
-    return {"early_pump_score":early,"v4_score":v4,"v4_confluence_score":conf,"v4_confirmations":confirmations,"v4_penalties":cpen,"v4_alert_quality":grade,"v4_alert":grade in ("A","B") and v4>=60,"buy_pressure":bp,"volume_ratio":vr,"trade_accel":ta,"ret_1m":p1,"ret_5m":p5,"ret_15m":p15,"btc_ret_5m":b5,"btc_ret_15m":b15,"relative_strength_5m":rs5,"relative_strength_15m":rs15,"BOS":bool(bos),"CHoCH":bool(choch),"distance_to_resistance_pct":dist,"volatility_expansion":vexp,"false_positive_penalty":pen}
+    return {"early_pump_score":early,"v4_score":v4,"v4_confluence_score":conf,"v4_confirmations":confirmations,"v4_penalties":cpen,"v4_alert_quality":grade,"v4_alert":grade in ("A","B") and v4>=60,"buy_pressure":bp,"volume_ratio":vr,"trade_accel":ta,"ret_1m":p1,"ret_5m":p5,"ret_15m":p15,"btc_ret_5m":b5,"btc_ret_15m":b15,"relative_strength_5m":rs5,"relative_strength_15m":rs15,"BOS":bool(bos),"CHoCH":bool(choch),"distance_to_resistance_pct":dist,"volatility_expansion":vexp,"false_positive_penalty":pen,"stochrsi":sr,"stochrsi_k":sk,"stochrsi_d":sd,"stochrsi_slope":ss,"stochrsi_cross_up":bool(r.stochrsi_cross_up),"stochrsi_cross_down":bool(r.stochrsi_cross_down),"stochrsi_stage":st_stage}
 
 def evaluate(df,btc,symbol,calibration=None):
     # V12 keeps V9's signal engine but adds confirmation and execution-quality filters.
@@ -116,6 +135,9 @@ def evaluate(df,btc,symbol,calibration=None):
         structure=(z["BOS"] or z["CHoCH"])
         activity=(z["volume_ratio"]>=1.5 and z["trade_accel"]>=1.5)
         relative=(z["relative_strength_5m"]>0)
+        stoch_early=z["stochrsi_stage"] in ("IGNITION","EARLY_MOMENTUM","ACCELERATION") and z["stochrsi_slope"]>0
+        stoch_expansion=z["stochrsi_stage"]=="EXPANSION" and z["stochrsi_slope"]>0
+        stoch_exhaustion=z["stochrsi_stage"]=="EXHAUSTION"
 
         # V12 reliability is a soft modifier, never a hard gate.
         rel_samples=int((cal or {}).get("samples",0) or 0)
@@ -148,14 +170,14 @@ def evaluate(df,btc,symbol,calibration=None):
         early_path=(
             z["v4_score"]>=60 and persistence>=2 and
             z["buy_pressure"]>=.58 and activity and relative and structure and controlled and
-            not btc_risk_off and follow_through>=65 and not stall and
+            not btc_risk_off and follow_through>=65 and not stall and stoch_early and
             efficiency_ok and extension_ok and confirmation and v12_follow_ok
         )
         confirmed_path=(
             z["v4_score"]>=72 and z["v4_confirmations"]>=7 and persistence>=3 and
             z["buy_pressure"]>=.60 and z["volume_ratio"]>=2.0 and z["trade_accel"]>=2.0 and
             z["relative_strength_5m"]>.25 and structure and controlled and not btc_risk_off and
-            follow_through>=75 and momentum_ok and confirmation and not stall and
+            follow_through>=75 and momentum_ok and confirmation and not stall and (stoch_early or stoch_expansion) and not stoch_exhaustion and
             efficiency>=0.50 and extension_ok and v12_follow_ok
         )
         # Avoid/chase filter.
@@ -181,7 +203,7 @@ def evaluate(df,btc,symbol,calibration=None):
             path="REJECT"; alert=False; grade="REJECT"
 
         z.update({
-            "v12_score":score,"v12_persistence":persistence,
+            "v12_score":score,"v12_persistence":persistence,"pump_stage":("EARLY" if stoch_early else "EXPANSION" if stoch_expansion else "EXHAUSTION" if stoch_exhaustion else "COOLDOWN" if z["stochrsi_stage"]=="COOLDOWN" else "WATCH"),
             "v12_reliability":round(reliability,2),
             "v12_reliability_modifier":round(reliability_modifier,2),
             "v12_grade":grade,"v12_path":path,"v12_alert":bool(alert),
@@ -246,6 +268,6 @@ def main():
             r=evaluate(fetch(s,a.start,a.end),btc_test,s,cal[s]);out.append(r)
         except Exception as e:out.append({"symbol":s,"status":"error","error":str(e)})
 
-    payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v12","data_source":BASE,"method":"Binance 1m Spot klines with V10 features plus efficiency-weighted scoring, multi-candle follow-through and structural confirmation, volume-to-price efficiency, adverse-extension veto and soft walk-forward reliability modifier","v12_design":{"v11_base":True,"v4_weight":0.55,"persistence_weight":0.10,"follow_through_weight":0.10,"efficiency_weight":0.15,"relative_strength_weight":0.05,"second_candle_confirmation":True,"efficiency_filter":True,"adverse_extension_veto":True,"multi_candle_follow_through":True,"historical_hard_gate":False,"early_min_score":62,"confirmed_min_score":70,"a_plus_setup":True,"a_plus_bonus":5,"mae_mfe_tracking":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"v9_design":{"v4_weight":0.72,"persistence_weight":0.10,"follow_through_weight":0.13,"historical_risk_modifier":True,"historical_hard_gate":False,"smoothed_prior_hit_rate_pct":10,"early_v4_min_score":60,"early_min_follow_through":65,"early_min_persistence":2,"confirmed_v4_min_score":72,"confirmed_min_persistence":3,"confirmed_min_follow_through":75,"avoid_filter":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
+    payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v12","data_source":BASE,"method":"Binance 1m Spot klines with V10 features plus efficiency-weighted scoring, multi-candle follow-through and structural confirmation, volume-to-price efficiency, adverse-extension veto and soft walk-forward reliability modifier","v12_design":{"v11_base":True,"v4_weight":0.55,"persistence_weight":0.10,"follow_through_weight":0.10,"efficiency_weight":0.15,"relative_strength_weight":0.05,"second_candle_confirmation":True,"stochrsi_stage_classification":True,"stochrsi_periods":"RSI14/Stoch14/K3/D3","stochrsi_stage_bonus":6,"stochrsi_exhaustion_penalty":4,"efficiency_filter":True,"adverse_extension_veto":True,"multi_candle_follow_through":True,"historical_hard_gate":False,"early_min_score":62,"confirmed_min_score":70,"a_plus_setup":True,"a_plus_bonus":5,"mae_mfe_tracking":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"v9_design":{"v4_weight":0.72,"persistence_weight":0.10,"follow_through_weight":0.13,"historical_risk_modifier":True,"historical_hard_gate":False,"smoothed_prior_hit_rate_pct":10,"early_v4_min_score":60,"early_min_follow_through":65,"early_min_persistence":2,"confirmed_v4_min_score":72,"confirmed_min_persistence":3,"confirmed_min_follow_through":75,"avoid_filter":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
     os.makedirs(os.path.dirname(a.output) or ".",exist_ok=True);json.dump(payload,open(a.output,"w"),indent=2);json.dump(cal,open("data/v13_calibration.json","w"),indent=2);print(json.dumps(payload,indent=2))
 if __name__=="__main__":main()
