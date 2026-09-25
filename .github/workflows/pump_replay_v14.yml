@@ -27,7 +27,7 @@ jobs:
         env:
           PYTHONUNBUFFERED: "1"
         run: |
-          python backtest/pump_replay_v14.py --symbols "BNBUSDT,LINKUSDT,DOGEUSDT,XRPUSDT,ADAUSDT,LTCUSDT,ATOMUSDT,NEARUSDT,APTUSDT,FILUSDT" --train-start "2026-09-13T00:00:00Z" --start "2026-09-20T00:00:00Z" --end "2026-09-25T00:00:00Z"
+          python backtest/pump_replay_v14.py --symbols "BNBUSDT,LINKUSDT,DOGEUSDT,XRPUSDT,ADAUSDT,LTCUSDT,ATOMUSDT,NEARUSDT,APTUSDT,FILUSDT" --train-start "2026-09-13T00:00:00Z" --start "2026-09-20T00:00:00Z" --end "2026-09-25T00:00:00Z" --output "data/backtest_results_v14.json"
       - name: Publish V14 results
         run: |
           git config user.name "github-actions[bot]"
