@@ -94,10 +94,10 @@ def evaluate(df,btc,symbol,calibration=None):
     samples=int(cal.get("samples",0) or 0);rate=float(cal.get("hit_rate_240m_ge10_pct",0) or 0)
     # Beta-style smoothing toward a 10% prior: prevents raw 0%/100% calibration from dominating.
     smooth_rate=((rate/100.0)*samples + 2.0) / (samples + 20.0) * 100.0 if samples>=0 else 10.0
+    times_ns=[pd.Timestamp(q["time"]).value for q in raw]
     for z in raw:
         persistence=int(z.get("persistence",0))
         # O(N) rolling lookup instead of repeatedly scanning the entire raw list.
-        times_ns=[pd.Timestamp(q["time"]).value for q in raw]
         z_ns=pd.Timestamp(z["time"]).value
         lo=bisect.bisect_left(times_ns,z_ns-600_000_000_000); hi=bisect.bisect_left(times_ns,z_ns)
         prior=[q for q in raw[lo:hi] if q.get("v4_alert_quality") in ("A","B")]
