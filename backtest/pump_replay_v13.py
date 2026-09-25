@@ -232,7 +232,7 @@ def expansion_matrix(items):
     return out
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--symbols",default="NOMUSDT,NILUSDT,STXUSDT,RAYUSDT,SEIUSDT,SUIUSDT,INJUSDT,AVAXUSDT,PUMPUSDT");ap.add_argument("--start",default="2026-09-20T00:00:00Z");ap.add_argument("--end",default="2026-09-25T00:00:00Z");ap.add_argument("--train-start",default="2026-09-13T00:00:00Z");ap.add_argument("--output",default="data/backtest_results_v12.json");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--symbols",default="NOMUSDT,NILUSDT,STXUSDT,RAYUSDT,SEIUSDT,SUIUSDT,INJUSDT,AVAXUSDT,PUMPUSDT");ap.add_argument("--start",default="2026-09-20T00:00:00Z");ap.add_argument("--end",default="2026-09-25T00:00:00Z");ap.add_argument("--train-start",default="2026-09-13T00:00:00Z");ap.add_argument("--output",default="data/backtest_results_v13.json");a=ap.parse_args()
     btc_train=fetch("BTCUSDT",a.train_start,a.start);btc_test=fetch("BTCUSDT",a.start,a.end);out=[];cal={}
     for s in [z.strip().upper() for z in a.symbols.split(",") if z.strip() and z.strip().upper()!="BTCUSDT"]:
         print("Calibrating",s)
@@ -247,5 +247,5 @@ def main():
         except Exception as e:out.append({"symbol":s,"status":"error","error":str(e)})
 
     payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v12","data_source":BASE,"method":"Binance 1m Spot klines with V10 features plus efficiency-weighted scoring, multi-candle follow-through and structural confirmation, volume-to-price efficiency, adverse-extension veto and soft walk-forward reliability modifier","v12_design":{"v11_base":True,"v4_weight":0.55,"persistence_weight":0.10,"follow_through_weight":0.10,"efficiency_weight":0.15,"relative_strength_weight":0.05,"second_candle_confirmation":True,"efficiency_filter":True,"adverse_extension_veto":True,"multi_candle_follow_through":True,"historical_hard_gate":False,"early_min_score":62,"confirmed_min_score":70,"a_plus_setup":True,"a_plus_bonus":5,"mae_mfe_tracking":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"v9_design":{"v4_weight":0.72,"persistence_weight":0.10,"follow_through_weight":0.13,"historical_risk_modifier":True,"historical_hard_gate":False,"smoothed_prior_hit_rate_pct":10,"early_v4_min_score":60,"early_min_follow_through":65,"early_min_persistence":2,"confirmed_v4_min_score":72,"confirmed_min_persistence":3,"confirmed_min_follow_through":75,"avoid_filter":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
-    os.makedirs(os.path.dirname(a.output) or ".",exist_ok=True);json.dump(payload,open(a.output,"w"),indent=2);json.dump(cal,open("data/v12_calibration.json","w"),indent=2);print(json.dumps(payload,indent=2))
+    os.makedirs(os.path.dirname(a.output) or ".",exist_ok=True);json.dump(payload,open(a.output,"w"),indent=2);json.dump(cal,open("data/v13_calibration.json","w"),indent=2);print(json.dumps(payload,indent=2))
 if __name__=="__main__":main()
