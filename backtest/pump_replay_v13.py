@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Pump Replay / Backtest Engine v13 - second-candle confirmation, efficiency, adverse-extension control and soft reliability."""
-import argparse,json,os,time
+import argparse,json,os,time,bisect
 from datetime import datetime,timezone
 import pandas as pd,requests
 BASE=os.getenv("BINANCE_REST_BASE","https://data-api.binance.vision")
@@ -96,7 +96,11 @@ def evaluate(df,btc,symbol,calibration=None):
     smooth_rate=((rate/100.0)*samples + 2.0) / (samples + 20.0) * 100.0 if samples>=0 else 10.0
     for z in raw:
         persistence=int(z.get("persistence",0))
-        prior=[q for q in raw if 0 < (pd.Timestamp(z["time"])-pd.Timestamp(q["time"])).total_seconds() <= 600 and q.get("v4_alert_quality") in ("A","B")]
+        # O(N) rolling lookup instead of repeatedly scanning the entire raw list.
+        times_ns=[pd.Timestamp(q["time"]).value for q in raw]
+        z_ns=pd.Timestamp(z["time"]).value
+        lo=bisect.bisect_left(times_ns,z_ns-600_000_000_000); hi=bisect.bisect_left(times_ns,z_ns)
+        prior=[q for q in raw[lo:hi] if q.get("v4_alert_quality") in ("A","B")]
         follow_price=max((q.get("ret_5m",0) for q in prior[-3:]), default=0.0)
         follow_volume=max((q.get("volume_ratio",0) for q in prior[-3:]), default=0.0)
         follow_accel=max((q.get("trade_accel",0) for q in prior[-3:]), default=0.0)
@@ -147,7 +151,8 @@ def evaluate(df,btc,symbol,calibration=None):
         efficiency_ok=(efficiency>=0.35 or (efficiency>=0.25 and z["ret_5m"]>=2.0))
         extension_ok=(adverse_extension<3.0 and z["ret_1m"]<3.5)
         # V12: require sustained follow-through across subsequent observations.
-        follow_window=[q for q in raw if 0 < (pd.Timestamp(q["time"])-pd.Timestamp(z["time"])).total_seconds() <= 180]
+        lo2=bisect.bisect_right(times_ns,z_ns); hi2=bisect.bisect_right(times_ns,z_ns+180_000_000_000)
+        follow_window=raw[lo2:hi2]
         follow_2m=bool(len(follow_window)>=1 and max(q.get("ret_1m",0) for q in follow_window)>=0.15)
         follow_3m=bool(len(follow_window)>=2 and sum(1 for q in follow_window[-2:] if q.get("ret_5m",0)>0)>=2)
         follow_strength=(20 if follow_2m else 0)+(20 if follow_3m else 0)
