@@ -289,8 +289,8 @@ st.dataframe(entry_view[entry_cols], use_container_width=True, hide_index=True, 
 
 st.divider()
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "🔥 Live Radar", "🟣 Accumulation", "⚡ Pre-Pump", "🗺️ Heatmap", "🔎 Coin Analysis", "📜 History"
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    "🔥 Live Radar", "🟣 Accumulation", "⚡ Pre-Pump", "🗺️ Heatmap", "🔎 Coin Analysis", "📜 History", "⚠️ Exhaustion"
 ])
 
 def format_signal_table(frame):
