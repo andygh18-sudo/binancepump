@@ -1,4 +1,4 @@
-name: Binance Pump Scanner v7.6
+name: Binance Pump Scanner V15 Production
 
 on:
   workflow_dispatch:
@@ -117,4 +117,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run "Binance Pump Scanner v7.6" --ref main
+          gh workflow run "Binance Pump Scanner V15 Production" --ref main
