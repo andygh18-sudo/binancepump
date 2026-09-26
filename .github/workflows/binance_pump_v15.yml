@@ -85,6 +85,49 @@ jobs:
                   p.write_text("\n".join(lines[-200:])+"\n")
           PY
 
+      - name: Compact scan history
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("data/history.jsonl")
+          if not p.exists():
+              raise SystemExit(0)
+
+          fields = [
+              "symbol","price","score","stage","entry","sell","price_1m","price_10s",
+              "volume_ratio","trade_accel","buy_pressure","book_imbalance",
+              "early_pump_score","early_pump_stage","relative_strength_5m","relative_strength_15m",
+              "v15_score","v15_stage","v15_opportunity_score","v15_confirmation_score",
+              "v12_score","v12_efficiency","hybrid_score","hybrid_path","hybrid_grade",
+              "exhaustion_score","exhaustion_state","exhaustion_alert","exhaustion_extension",
+              "exhaustion_rollover","exhaustion_symptoms"
+          ]
+
+          compact_lines = []
+          for line in p.read_text(errors="ignore").splitlines():
+              try:
+                  item = json.loads(line)
+                  rows = item.get("rows", [])
+                  compact_rows = [
+                      {k: row.get(k) for k in fields if k in row}
+                      for row in rows if isinstance(row, dict)
+                  ]
+                  if compact_rows:
+                      compact_lines.append(
+                          json.dumps(
+                              {"ts": item.get("ts"), "rows": compact_rows},
+                              separators=(",", ":")
+                          )
+                      )
+              except Exception:
+                  continue
+
+          p.write_text("\n".join(compact_lines[-200:]) + ("\n" if compact_lines else ""))
+          print(f"Compacted history to {len(compact_lines[-200:])} records.")
+          PY
+
       - name: Publish scan data
         run: |
           set -e
