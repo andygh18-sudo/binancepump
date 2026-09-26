@@ -1,4 +1,4 @@
-name: Pump Replay Backtest v15
+name: Pump Replay Backtest v15.1
 
 on:
   push:
@@ -21,20 +21,20 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: python -m pip install --upgrade pandas requests
-      - name: Validate V15 syntax
+      - name: Validate V15.1 syntax
         run: python -m py_compile backtest/pump_replay_v15.py
-      - name: Run V15 replay
+      - name: Run V15.1 replay
         env:
           PYTHONUNBUFFERED: "1"
         run: |
-          python backtest/pump_replay_v15.py --symbols "BNBUSDT,LINKUSDT,DOGEUSDT,XRPUSDT,ADAUSDT,LTCUSDT,ATOMUSDT,NEARUSDT,APTUSDT,FILUSDT" --train-start "2026-09-13T00:00:00Z" --start "2026-09-20T00:00:00Z" --end "2026-09-25T00:00:00Z" --output "data/backtest_results_v15.json"
+          python backtest/pump_replay_v15.py --symbols "BNBUSDT,LINKUSDT,DOGEUSDT,XRPUSDT,ADAUSDT,LTCUSDT,ATOMUSDT,NEARUSDT,APTUSDT,FILUSDT" --train-start "2026-09-13T00:00:00Z" --start "2026-09-20T00:00:00Z" --end "2026-09-25T00:00:00Z" --output "data/backtest_results_v15_1.json"
       - name: Publish V15 results
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mkdir -p /tmp/v15_results
           cp data/backtest_results_v15.json /tmp/v15_results/backtest_results_v15.json
-          cp data/v15_calibration.json /tmp/v15_results/v15_calibration.json
+          cp data/v15_1_calibration.json /tmp/v15_results/v15_calibration.json
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --mixed origin/main
@@ -45,7 +45,7 @@ jobs:
               echo "V15 result files already match repository; nothing to commit."
               exit 0
             fi
-            git commit -m "Update V15 two-score backtest results"
+            git commit -m "Update V15.1 MTF BTC-regime backtest results"
             if git push origin HEAD:main; then
               exit 0
             fi
