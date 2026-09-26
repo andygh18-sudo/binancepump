@@ -658,7 +658,7 @@ def v15_signal(s,v4,eps,v12):
     else:stage="NEUTRAL"
     early_candidate=stage in ("PRE_PUMP","EARLY_PUMP") and opportunity>=50 and b10>=.53 and vr>=1.15 and acc>=1.10 and rs5>-.25 and not btc_risk
     confirmed=stage=="CONFIRMED" and confirmation_score>=60 and b10>=.55 and vr>=1.5 and acc>=1.25 and rs5>0 and efficiency>=.25 and not btc_risk
-    return {"v15_opportunity_score":opportunity,"v15_confirmation_score":confirmation_score,"v15_score":max(opportunity,confirmation_score),"v15_stage":stage,"v15_early_candidate":early_candidate,"v15_confirmed":confirmed,"v15_streak":streak,"v15_btc_risk_off":btc_risk,"v15_relative_strength_5m":rs5,"v15_relative_strength_15m":rs15,**(ignition or {})}
+    return {"v15_opportunity_score":opportunity,"v15_confirmation_score":confirmation_score,"v15_score":max(opportunity,confirmation_score),"v15_stage":stage,"v15_early_candidate":early_candidate,"v15_confirmed":confirmed,"v15_streak":streak,"v15_btc_risk_off":btc_risk,"v15_relative_strength_5m":rs5,"v15_relative_strength_15m":rs15}
 
 def v11_v12_hybrid(v11,v12):
     if not v11 or not v12:return None
