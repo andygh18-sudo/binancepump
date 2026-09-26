@@ -40,7 +40,11 @@ def _row_score(row):
     return max(0,min(100,score))
 
 async def _scan(session,symbols,interval):
-    suffix=INTERVALS[interval]; columns=[f"{field}|{suffix}" for field in BASE_FIELDS]
+    suffix=INTERVALS[interval]
+    # TradingView's crypto scanner reliably exposes daily technicals through
+    # the default (unsuffixed) fields; use an explicit suffix for intraday
+    # frames. This avoids the 1D scanner column returning null values.
+    columns=[field if interval=="1d" else f"{field}|{suffix}" for field in BASE_FIELDS]
     payload={"symbols":{"tickers":[f"BINANCE:{s}" for s in symbols],"query":{"types":[]}},"columns":columns,"range":[0,len(symbols)]}
     try:
         async with session.post(TV_URL,json=payload,headers={"User-Agent":"Binance-Pump-Radar/15.0","Origin":"https://www.tradingview.com","Referer":"https://www.tradingview.com/"},timeout=TV_TIMEOUT) as response:
