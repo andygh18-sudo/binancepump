@@ -217,8 +217,8 @@ c1, c2, c3, c4, c5, c6 = st.columns(6)
 c1.metric("🔥 Active Signals", len(active))
 c2.metric("⚡ Pre-Pump / Early", len(early))
 c3.metric("🚀 Breakouts", len(breakouts))
-c4.metric("🏗️ Building", len(building))
-c5.metric("🏆 Top Score", f"{df['score'].max():.0f}")
+c4.metric("👀 Watch", len(building))
+c5.metric("🏆 Top V15", f"{df['v15_score'].max():.0f}")
 c6.metric("🕒 Last Scan", last_scan)
 
 if "book_status" in df.columns:
@@ -235,7 +235,7 @@ st.subheader("🎯 Entry Signal Monitor")
 st.caption("V15 is authoritative here: PRE-PUMP/EARLY_PUMP indicate opportunity; CONFIRMED requires stronger confirmation. Legacy V11/V12 values are supporting diagnostics.")
 
 entry_df = df.copy()
-for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_stage","v15_streak","v15_relative_strength_5m","v15_btc_risk_off","price_1m","volume_ratio","buy_pressure"]:
+for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","price_1m","volume_ratio","buy_pressure"]:
     if c in entry_df.columns:
         entry_df[c] = pd.to_numeric(entry_df[c], errors="coerce").fillna(0)
 
@@ -275,8 +275,9 @@ entry_view = entry_df[~entry_df["entry_signal"].eq("🔴 V15 AVOID")].copy()
 entry_view = entry_view.sort_values(["v15_score","v15_confirmation_score","v15_opportunity_score"], ascending=[False,False,False]).head(20)
 entry_cols = [c for c in ["symbol","entry_signal","v15_score","v15_opportunity_score","v15_confirmation_score","v15_stage","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
 st.dataframe(entry_view[entry_cols], use_container_width=True, hide_index=True, column_config={
-    "score": st.column_config.ProgressColumn("Pump Score", min_value=0, max_value=100, format="%d"),
-    "hybrid_score": st.column_config.ProgressColumn("Hybrid Score", min_value=0, max_value=100, format="%d"),
+    "v15_score": st.column_config.ProgressColumn("V15", min_value=0, max_value=100, format="%d"),
+    "v15_opportunity_score": st.column_config.ProgressColumn("Opportunity", min_value=0, max_value=100, format="%d"),
+    "v15_confirmation_score": st.column_config.ProgressColumn("Confirmation", min_value=0, max_value=100, format="%d"),
     "v11_score": st.column_config.NumberColumn("V11", format="%.0f"),
     "v12_score": st.column_config.NumberColumn("V12", format="%.0f"),
     "v12_efficiency": st.column_config.NumberColumn("Efficiency", format="%.2f"),
@@ -293,7 +294,10 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 
 def format_signal_table(frame):
     cols = [
-        "symbol", "price", "score", "stage", "book_status", "entry", "sell",
+        "symbol", "price", "v15_score", "v15_opportunity_score", "v15_confirmation_score",
+        "v15_stage", "v15_streak", "v15_relative_strength_5m", "v15_relative_strength_15m",
+        "v15_btc_risk_off", "v15_early_candidate", "v15_confirmed",
+        "score", "stage", "book_status", "entry", "sell",
         "price_1m", "price_10s", "volume_ratio", "trade_accel",
         "buy_pressure", "book_imbalance", "spread_bps", "book_ready",
         "accumulation_score", "accumulation_stage", "accum_buy_pressure", "accum_trade_accel", "accum_volume_ratio", "accum_book_imbalance",
