@@ -1,0 +1,23 @@
+name: Restart Binance Pump Scanner V15
+
+on:
+  workflow_run:
+    workflows:
+      - "Binance Pump Scanner V15 Live"
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  actions: write
+
+jobs:
+  restart:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start next V15 scan immediately
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run binance_pump_v15.yml --ref main
