@@ -24,8 +24,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Binance Pump Radar")
-st.caption("Real-time early-pump intelligence • Binance USDT markets • automatic refresh every 15 seconds")
+st.title("⚡ Binance Pump Radar — V15")
+st.caption("V15 opportunity + confirmation engine • Binance USDT markets • automatic refresh every 15 seconds")
 
 path = "data/latest.json"
 RAW_BASE = "https://raw.githubusercontent.com/andygh18-sudo/binancepump/main/data/"
@@ -54,7 +54,7 @@ if d is None:
     st.error(f"Unable to load live scanner data from the repository: {data_source}")
     st.stop()
 
-st.caption(f"📡 Data source: **GitHub Actions scan ({data_source})** • Scanner update: {pd.to_datetime(d.get('updated', 0), unit='s', errors='coerce')}")
+st.caption(f"📡 **V15 LIVE** • Data source: **GitHub Actions scan ({data_source})** • Scanner update: {pd.to_datetime(d.get('updated', 0), unit='s', errors='coerce')}")
 
 rows = d.get("rows", [])
 df = pd.DataFrame(rows)
@@ -86,7 +86,7 @@ min_volume_ratio = st.sidebar.number_input("Minimum volume ratio", min_value=0.0
 only_book_ready = st.sidebar.checkbox("Order book ready only", value=False)
 show_acceleration = st.sidebar.checkbox("Show score acceleration", value=True)
 
-view = df[df["score"] >= min_score].copy()
+view = df[df["v15_score"] >= min_score].copy()
 if "stage" in view.columns and selected_stages:
     view = view[view["stage"].isin(selected_stages)]
 if "volume_ratio" in view.columns:
@@ -218,20 +218,23 @@ if "book_status" in df.columns:
     syncing_count = int((df["book_status"] != "🟢 READY").sum())
     st.caption(f"📚 Order books: **{ready_count} ready** • **{syncing_count} syncing/resyncing**")
 
-st.success(f"Scanner data loaded: {len(df)} symbols • source: {data_source} • top score: {df['score'].max():.0f}")
+st.success(f"V15 scanner data loaded: {len(df)} symbols • source: {data_source} • top V15 score: {df['v15_score'].max():.0f}")
 
 st.subheader("📡 Live Scanner Snapshot")
 st.dataframe(df.head(20), use_container_width=True, hide_index=True)
 
 st.subheader("🎯 Entry Signal Monitor")
-st.caption("A candidate is shown as an ENTRY ZONE only when the scanner's stage, pump score, hybrid confirmation and extension filters agree.")
+st.caption("V15 is authoritative here: PRE-PUMP/EARLY_PUMP indicate opportunity; CONFIRMED requires stronger confirmation. Legacy V11/V12 values are supporting diagnostics.")
 
 entry_df = df.copy()
-for c in ["hybrid_score","v11_score","v12_score","v12_efficiency","price_1m","volume_ratio","buy_pressure"]:
+for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_stage","v15_streak","v15_relative_strength_5m","v15_btc_risk_off","price_1m","volume_ratio","buy_pressure"]:
     if c in entry_df.columns:
         entry_df[c] = pd.to_numeric(entry_df[c], errors="coerce").fillna(0)
 
-entry_df["entry_signal"] = "WATCH"
+entry_df["entry_signal"] = "⚪ V15 WATCH"
+entry_df.loc[entry_df.get("v15_early_candidate", pd.Series(False, index=entry_df.index)).astype(bool), "entry_signal"] = "🟡 V15 PRE-PUMP"
+entry_df.loc[entry_df.get("v15_confirmed", pd.Series(False, index=entry_df.index)).astype(bool), "entry_signal"] = "🟢 V15 CONFIRMED"
+entry_df.loc[entry_df.get("v15_stage", pd.Series("", index=entry_df.index)).eq("AVOID"), "entry_signal"] = "🔴 V15 AVOID"
 entry_df.loc[
     (entry_df.get("stage", pd.Series("", index=entry_df.index)).isin(["BUILDING"])) &
     (entry_df["score"] >= 20),
@@ -260,9 +263,9 @@ entry_df.loc[
     "entry_signal"
 ] = "🔴 CHASE / WAIT"
 
-entry_view = entry_df[entry_df["entry_signal"].isin(["🟢 ENTRY ZONE","🟢 CONFIRMATION ENTRY","🟡 WATCH"])].copy()
-entry_view = entry_view.sort_values(["entry_signal","hybrid_score","score"], ascending=[True,False,False]).head(20)
-entry_cols = [c for c in ["symbol","entry_signal","score","hybrid_score","stage","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
+entry_view = entry_df[~entry_df["entry_signal"].eq("🔴 V15 AVOID")].copy()
+entry_view = entry_view.sort_values(["v15_score","v15_confirmation_score","v15_opportunity_score"], ascending=[False,False,False]).head(20)
+entry_cols = [c for c in ["symbol","entry_signal","v15_score","v15_opportunity_score","v15_confirmation_score","v15_stage","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
 st.dataframe(entry_view[entry_cols], use_container_width=True, hide_index=True, column_config={
     "score": st.column_config.ProgressColumn("Pump Score", min_value=0, max_value=100, format="%d"),
     "hybrid_score": st.column_config.ProgressColumn("Hybrid Score", min_value=0, max_value=100, format="%d"),
@@ -298,7 +301,7 @@ def format_signal_table(frame):
 
 with tab1:
     st.subheader("🔥 Live Pump Radar")
-    st.caption("Ranked by current pump score. Focus first on score acceleration and PRE-PUMP/EARLY MOMENTUM stages.")
+    st.caption("Ranked by V15 score. Opportunity detects developing setups; confirmation validates stronger structure. V11/V12 remain supporting evidence.")
 
     radar = view.head(20).copy()
     if radar.empty:
@@ -313,7 +316,9 @@ with tab1:
             height=620,
             hide_index=True,
             column_config={
-                "score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100, format="%d"),
+                "v15_score": st.column_config.ProgressColumn("V15", min_value=0, max_value=100, format="%d"),
+                "v15_opportunity_score": st.column_config.ProgressColumn("Opportunity", min_value=0, max_value=100, format="%d"),
+                "v15_confirmation_score": st.column_config.ProgressColumn("Confirmation", min_value=0, max_value=100, format="%d"),
                 "buy_pressure": st.column_config.NumberColumn("Buy %", format="%.1f%%"),
                 "volume_ratio": st.column_config.NumberColumn("Vol Ratio", format="%.2fx"),
                 "price_1m": st.column_config.NumberColumn("1m %", format="%.2f"),
@@ -618,7 +623,7 @@ with tab5:
     price = coin.get("price", np.nan)
 
     a, b, c, e = st.columns(4)
-    a.metric("Pump Score", f"{score:.0f}/100")
+    a.metric("V15 Score", f"{score:.0f}/100")
     b.metric("Stage", stage)
     c.metric("Price", f"{price:g}" if pd.notna(price) else "—")
     e.metric("Volume Ratio", f"{float(coin.get('volume_ratio', 0)):.2f}x")
@@ -627,7 +632,7 @@ with tab5:
         st.metric("🟣 Accumulation Score", f"{float(coin.get('accumulation_score', 0)):.0f}/100")
         st.caption(f"Accumulation status: **{coin.get('accumulation_stage', 'MONITOR')}**")
 
-    st.progress(min(max(int(score), 0), 100), text=f"Pump Score {score:.0f}/100")
+    st.progress(min(max(int(score), 0), 100), text=f"V15 Score {score:.0f}/100")
 
     delta_now, delta_lookback, history_count = acceleration_for(selected)
     ac1, ac2, ac3 = st.columns(3)
@@ -654,7 +659,7 @@ with tab5:
     m4.metric("Spread", f"{float(coin.get('spread_bps', 0)):.2f} bps")
 
     st.subheader("Signal Lifecycle")
-    lifecycle = ["BUILDING", "PRE-PUMP", "EARLY MOMENTUM", "BREAKOUT", "CONFIRMED PUMP"]
+    lifecycle = ["NEUTRAL", "WATCH", "PRE_PUMP", "EARLY_PUMP", "CONFIRMED", "AVOID"]
     current_idx = lifecycle.index(stage) if stage in lifecycle else -1
     lifecycle_df = pd.DataFrame({
         "Stage": lifecycle,
@@ -671,7 +676,20 @@ with tab5:
     else:
         st.info("🟡 Order book is still synchronizing. Price/volume/trade signals may be available before book confirmation.")
 
-    st.subheader("📊 Momentum Evidence")
+    st.subheader("🧠 V15 Signal Breakdown")
+v15_metrics = pd.DataFrame({
+    "Component": ["Opportunity", "Confirmation", "Stage", "Streak", "RS 5m", "RS 15m", "BTC Risk-Off", "Early Candidate", "Confirmed"],
+    "Value": [
+        coin.get("v15_opportunity_score", 0), coin.get("v15_confirmation_score", 0),
+        coin.get("v15_stage", "—"), coin.get("v15_streak", 0),
+        coin.get("v15_relative_strength_5m", 0), coin.get("v15_relative_strength_15m", 0),
+        coin.get("v15_btc_risk_off", False), coin.get("v15_early_candidate", False),
+        coin.get("v15_confirmed", False)
+    ]
+})
+st.dataframe(v15_metrics, use_container_width=True, hide_index=True)
+
+st.subheader("📊 Momentum Evidence")
     evidence = {
         "1m Price Change": coin.get("price_1m", np.nan),
         "10s Price Change": coin.get("price_10s", np.nan),
@@ -713,4 +731,4 @@ with tab6:
         st.info("No history file has been published yet.")
 
 st.divider()
-st.caption(f"Dashboard refreshes automatically every 15 seconds • Showing {len(df)} scanned symbols • Historical acceleration uses the latest published scan records • Last scan: {last_scan}")
+st.caption(f"Dashboard runs on V15 as the primary model • V11/V12 are supporting diagnostics • Refreshes every 15 seconds • Showing {len(df)} scanned symbols • Historical acceleration uses the latest published scan records • Last scan: {last_scan}")
