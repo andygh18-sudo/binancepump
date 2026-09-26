@@ -1,0 +1,93 @@
+name: Binance Pump Scanner V15 Live
+
+on:
+  push:
+    paths:
+      - "scanner/worker.py"
+      - "run_scanner.py"
+      - ".github/workflows/binance_pump_v15.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: binance-pump-v15-live
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Prepare data
+        run: mkdir -p data
+
+      - name: Validate V15 production scanner
+        run: python -m py_compile scanner/worker.py run_scanner.py
+
+      - name: Run V15 live scan
+        env:
+          BINANCE_WS_BASE: wss://data-stream.binance.vision/stream
+          BINANCE_REST_BASE: https://data-api.binance.vision
+          MAX_SYMBOLS: "80"
+          MIN_QUOTE_VOLUME: "250000"
+          RUN_SECONDS: "300"
+          DECISION_INTERVAL: "5"
+          ALERT_COOLDOWN: "60"
+          ORDERBOOK_LIMIT: "500"
+          TOP_ALERTS: "5"
+          ACCUM_ALERT_SCORE: "60"
+          V8_ALERT_SCORE: "58"
+          V9_ALERT_SCORE: "58"
+          V9_MIN_PERSISTENCE: "2"
+          V10_ALERT_SCORE: "60"
+          V10_MIN_PERSISTENCE: "2"
+          V11_ALERT_SCORE: "65"
+          V11_CONFIRMED_SCORE: "72"
+          V11_MIN_PERSISTENCE: "2"
+          V12_ALERT_SCORE: "62"
+          V12_CONFIRMED_SCORE: "70"
+          V12_MIN_PERSISTENCE: "2"
+          V8_MIN_PERSISTENCE: "2"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python run_scanner.py
+
+      - name: Bound scan history
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("data/history.jsonl")
+          if p.exists():
+              lines=p.read_text().splitlines()
+              if len(lines)>200:
+                  p.write_text("\n".join(lines[-200:])+"\n")
+          PY
+
+      - name: Publish scan data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git add -A data/
+          if git diff --cached --quiet; then
+            echo "No scan data changes."
+            exit 0
+          fi
+          git commit -m "Update V15 production scanner data"
+          git pull --rebase --autostash origin main
+          git push origin HEAD:main
