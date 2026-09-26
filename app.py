@@ -227,7 +227,9 @@ if "book_status" in df.columns:
     syncing_count = int((df["book_status"] != "🟢 READY").sum())
     st.caption(f"📚 Order books: **{ready_count} ready** • **{syncing_count} syncing/resyncing**")
 
-tv_coverage = int(pd.to_numeric(df.get("tv_score", pd.Series(index=df.index)), errors="coerce").notna().sum()) if "tv_score" in df.columns else 0\nst.success(f"V15 scanner data loaded: {len(df)} symbols • source: {data_source} • top V15 score: {df['v15_score'].max():.0f}")\nst.caption(f"📺 TradingView confirmation: **{tv_coverage}/{len(df)} symbols** • 5m / 15m / 1h technical layer • Binance remains the primary live feed")
+tv_coverage = int(pd.to_numeric(df.get("tv_score", pd.Series(index=df.index)), errors="coerce").notna().sum()) if "tv_score" in df.columns else 0
+st.success(f"V15 scanner data loaded: {len(df)} symbols • source: {data_source} • top V15 score: {df['v15_score'].max():.0f}")
+st.caption(f"📺 TradingView confirmation: **{tv_coverage}/{len(df)} symbols** • 5m / 15m / 1h technical layer • Binance remains the primary live feed")
 
 st.subheader("📡 Live Scanner Snapshot")
 st.dataframe(df.head(20), use_container_width=True, hide_index=True)
