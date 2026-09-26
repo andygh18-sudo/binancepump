@@ -305,7 +305,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 def format_signal_table(frame):
     cols = [
         "symbol", "price", "v15_score", "v15_opportunity_score", "v15_confirmation_score",
-        "v15_stage", "v15_streak", "v15_relative_strength_5m", "v15_relative_strength_15m", "v15_tv_score", "v15_tv_adjustment", "tv_confirmation", "tv_bullish_timeframes", "tv_5m_rsi", "tv_15m_rsi", "tv_1h_rsi",
+        "v15_stage", "v15_streak", "v15_relative_strength_5m", "v15_relative_strength_15m", "v15_tv_score", "v15_tv_adjustment", "tv_confirmation", "tv_bullish_timeframes", "tv_30m_rsi", "tv_1h_rsi", "tv_4h_rsi", "tv_1d_rsi",
         "v15_btc_risk_off", "v15_early_candidate", "v15_confirmed", "exhaustion_score", "exhaustion_state",
         "score", "stage", "book_status", "entry", "sell",
         "price_1m", "price_10s", "volume_ratio", "trade_accel",
