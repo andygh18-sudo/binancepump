@@ -1,0 +1,55 @@
+name: Pump Replay Backtest v15
+
+on:
+  push:
+    paths:
+      - "backtest/pump_replay_v15.py"
+      - ".github/workflows/pump_replay_v15.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pandas requests
+      - name: Validate V15 syntax
+        run: python -m py_compile backtest/pump_replay_v15.py
+      - name: Run V15 replay
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          python backtest/pump_replay_v15.py --symbols "BNBUSDT,LINKUSDT,DOGEUSDT,XRPUSDT,ADAUSDT,LTCUSDT,ATOMUSDT,NEARUSDT,APTUSDT,FILUSDT" --train-start "2026-09-13T00:00:00Z" --start "2026-09-20T00:00:00Z" --end "2026-09-25T00:00:00Z" --output "data/backtest_results_v15.json"
+      - name: Publish V15 results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p /tmp/v15_results
+          cp data/backtest_results_v15.json /tmp/v15_results/backtest_results_v15.json
+          cp data/v15_calibration.json /tmp/v15_results/v15_calibration.json
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --mixed origin/main
+            cp /tmp/v15_results/backtest_results_v15.json data/backtest_results_v15.json
+            cp /tmp/v15_results/v15_calibration.json data/v15_calibration.json
+            git add -f data/backtest_results_v15.json data/v15_calibration.json
+            if git diff --cached --quiet; then
+              echo "V15 result files already match repository; nothing to commit."
+              exit 0
+            fi
+            git commit -m "Update V15 two-score backtest results"
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Publish attempt $attempt failed due to concurrent main update; retrying."
+            sleep 3
+          done
+          exit 1
