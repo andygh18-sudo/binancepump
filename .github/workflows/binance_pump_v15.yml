@@ -37,7 +37,7 @@ jobs:
         run: mkdir -p data
 
       - name: Validate V15 production scanner
-        run: python -m py_compile scanner/worker.py run_scanner.py
+        run: python -m py_compile scanner/worker.py run_scanner.py app.py
 
       - name: Run V15 live scan
         env:
