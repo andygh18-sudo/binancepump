@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Pump Replay / Backtest Engine v15.
+"""Pump Replay / Backtest Engine v15.1.
 
-V15 keeps V14 as the control arm and adds a two-score opportunity/confirmation model. It separates early discovery from confirmation, and distinguishes exhaustion-watch from reversal/cooldown.
+V15.1 keeps V15 as the control arm and adds higher-timeframe alignment plus a BTC regime filter. It preserves the two-score opportunity/confirmation model and separates early discovery from confirmation/exhaustion.
 """
 import argparse,json,os,time,bisect
 from datetime import datetime,timezone
@@ -44,7 +44,31 @@ def prep(x):
     x["bp"]=x.taker_buy_quote/x.quote_volume.replace(0,pd.NA)
     x["atr"]=(x.high-x.low).rolling(14,min_periods=5).mean()/x.close*100;x["atrbase"]=x.atr.rolling(30,min_periods=10).mean();x["vexp"]=x.atr/x.atrbase.replace(0,pd.NA)
     x["hh20"]=x.high.rolling(20,min_periods=10).max().shift(1);x["hh5"]=x.high.rolling(5,min_periods=3).max().shift(1);x["dist"]=(x.hh20-x.close)/x.close*100
-    return x
+    x["vr_accel"]=x.vr/x.vr.shift(3).replace(0,pd.NA);x["trade_accel_accel"]=x.ta/x.ta.shift(3).replace(0,pd.NA)
+    return add_mtf_features(x)
+
+def add_mtf_features(x):
+    """Attach completed 5m/15m trend and momentum features using only data available at each timestamp."""
+    y=x[["time","open","high","low","close","volume","quote_volume","trades","taker_buy_quote"]].copy().set_index("time")
+    frames={}
+    for minutes,label in ((5,"5m"),(15,"15m")):
+        q=y.resample(f"{minutes}min",label="right",closed="right").agg({"open":"first","high":"max","low":"min","close":"last","volume":"sum","quote_volume":"sum","trades":"sum","taker_buy_quote":"sum"}).dropna(subset=["close"])
+        q["ret"]=q.close.pct_change()*100
+        q["ema20"]=q.close.ewm(span=20,adjust=False,min_periods=20).mean()
+        q["ema50"]=q.close.ewm(span=50,adjust=False,min_periods=50).mean()
+        d=q.close.diff();gain=d.clip(lower=0);loss=-d.clip(upper=0)
+        ag=gain.ewm(alpha=1/14,adjust=False,min_periods=14).mean();al=loss.ewm(alpha=1/14,adjust=False,min_periods=14).mean()
+        rs=ag/al.replace(0,pd.NA);q["rsi"]=100-(100/(1+rs))
+        q["trend"]=(q.ema20>q.ema50).astype(int)
+        q["vol_mean"]=q.quote_volume.rolling(20,min_periods=10).mean()
+        q["vr"]=q.quote_volume/q.vol_mean.replace(0,pd.NA)
+        q["bp"]=q.taker_buy_quote/q.quote_volume.replace(0,pd.NA)
+        q=q.rename(columns={"ret":f"mtf_{label}_ret","rsi":f"mtf_{label}_rsi","trend":f"mtf_{label}_trend","vr":f"mtf_{label}_vr","bp":f"mtf_{label}_bp"})
+        frames[label]=q[[f"mtf_{label}_ret",f"mtf_{label}_rsi",f"mtf_{label}_trend",f"mtf_{label}_vr",f"mtf_{label}_bp"]]
+    out=x.copy()
+    for label,q in frames.items():
+        out=pd.merge_asof(out.sort_values("time"),q.sort_index(),left_on="time",right_index=True,direction="backward")
+    return out
 
 def clamp(v,a=0,b=1): return max(a,min(b,v))
 
@@ -103,9 +127,16 @@ def v15_model(z):
     vr=float(z.get("volume_ratio",0) or 0); ta=float(z.get("trade_accel",0) or 0); bp=float(z.get("buy_pressure",.5) or .5)
     rs=float(z.get("relative_strength_5m",0) or 0); p5=float(z.get("ret_5m",0) or 0); p1=float(z.get("ret_1m",0) or 0)
     bos=bool(z.get("BOS")); choch=bool(z.get("CHoCH")); eff=float(z.get("v12_efficiency",0) or 0)
-    early=0.24*min(max((vr-1)/2,0),1)+0.18*min(max((ta-1)/2,0),1)+0.18*min(max((bp-.50)/.20,0),1)+0.14*min(max((p5+.25)/2.5,0),1)+0.10*min(max((rs+.25)/1.25,0),1)+0.10*(1 if ss>0 else 0)+0.06*(1 if (st in ("WATCH","PRE_PUMP","EARLY_PUMP") or k<80) else 0)
+    rva=float(z.get("vr_accel",1) or 1); taa=float(z.get("trade_accel_accel",1) or 1)
+    m5r=float(z.get("mtf_5m_ret",0) or 0);m15r=float(z.get("mtf_15m_ret",0) or 0);m5trend=int(z.get("mtf_5m_trend",0) or 0);m15trend=int(z.get("mtf_15m_trend",0) or 0)
+    btc5=float(z.get("btc_mtf_5m_ret",0) or 0);btc15=float(z.get("btc_mtf_15m_ret",0) or 0);btc5t=int(z.get("btc_mtf_5m_trend",0) or 0);btc15t=int(z.get("btc_mtf_15m_trend",0) or 0)
+    btc_regime_score=round(25*clamp((btc5+1)/2)+25*clamp((btc15+2)/4)+25*btc5t+25*btc15t)
+    btc_risk_off=btc_regime_score<35 or (btc5<-1 and btc15<-2)
+    mtf_score=round(25*(1 if m5r>0 else 0)+25*(1 if m15r>0 else 0)+25*m5trend+25*m15trend)
+    relvol_bonus=8 if rva>=1.10 and taa>=1.05 else 4 if rva>=1.02 else 0
+    early=0.22*min(max((vr-1)/2,0),1)+0.17*min(max((ta-1)/2,0),1)+0.17*min(max((bp-.50)/.20,0),1)+0.13*min(max((p5+.25)/2.5,0),1)+0.09*min(max((rs+.25)/1.25,0),1)+0.08*(1 if ss>0 else 0)+0.06*(1 if (st in ("WATCH","PRE_PUMP","EARLY_PUMP") or k<80) else 0)+0.04*min(mtf_score/100,1)+0.04*min(relvol_bonus/8,1)
     early_score=round(max(0,min(100,early*100)))
-    conf=0.22*min(max((vr-1)/2,0),1)+0.18*min(max((ta-1)/2,0),1)+0.15*min(max((bp-.50)/.20,0),1)+0.12*(1 if bos else 0)+0.10*(1 if choch else 0)+0.10*min(max((rs+.25)/1.25,0),1)+0.08*min(max(eff/.75,0),1)+0.05*(1 if st in ("EARLY_PUMP","EXPANSION") else 0)
+    conf=0.19*min(max((vr-1)/2,0),1)+0.16*min(max((ta-1)/2,0),1)+0.14*min(max((bp-.50)/.20,0),1)+0.10*(1 if bos else 0)+0.08*(1 if choch else 0)+0.09*min(max((rs+.25)/1.25,0),1)+0.07*min(max(eff/.75,0),1)+0.07*min(mtf_score/100,1)+0.05*(1 if st in ("EARLY_PUMP","EXPANSION") else 0)+0.05*min(relvol_bonus/8,1)
     confirm_score=round(max(0,min(100,conf*100)))
     if st=="COOLDOWN" or (ss<0 and rs<0 and bp<.53): stage="COOLDOWN"
     elif st=="EXHAUSTION": stage="EXHAUSTION_REVERSAL" if (ss<0 and p1<0 and rs<0 and bp<.53) else "EXHAUSTION_WATCH"
@@ -114,9 +145,10 @@ def v15_model(z):
     elif st=="PRE_PUMP": stage="PRE_PUMP"
     elif st=="WATCH": stage="WATCH"
     else: stage="NEUTRAL"
-    early_candidate=stage in ("WATCH","PRE_PUMP","EARLY_PUMP") and early_score>=45 and ss>0 and bp>=.53 and vr>=1.15 and ta>=1.10 and rs>-.25
-    confirmed=stage in ("EARLY_PUMP","EXPANSION") and confirm_score>=60 and bp>=.55 and vr>=1.5 and ta>=1.25 and (bos or choch) and rs>0 and eff>=.25
-    return {"v15_opportunity_score":early_score,"v15_confirmation_score":confirm_score,"v15_stage":stage,"v15_early_candidate":bool(early_candidate),"v15_confirmed":bool(confirmed),"v15_exhaustion_watch":stage=="EXHAUSTION_WATCH","v15_reversal":stage in ("EXHAUSTION_REVERSAL","COOLDOWN")}
+    early_candidate=stage in ("WATCH","PRE_PUMP","EARLY_PUMP") and early_score>=45 and ss>0 and bp>=.53 and vr>=1.15 and ta>=1.10 and rs>-.25 and mtf_score>=25 and not btc_risk_off
+    confirmed=stage in ("EARLY_PUMP","EXPANSION") and confirm_score>=60 and bp>=.55 and vr>=1.5 and ta>=1.25 and (bos or choch) and rs>0 and eff>=.25 and mtf_score>=50 and not btc_risk_off
+    return {"v15_opportunity_score":early_score,"v15_confirmation_score":confirm_score,"v15_mtf_score":mtf_score,"v15_btc_regime_score":btc_regime_score,"v15_relvol_accel":round(rva,3),"v15_trade_accel_accel":round(taa,3),"v15_stage":stage,"v15_early_candidate":bool(early_candidate),"v15_confirmed":bool(confirmed),"v15_exhaustion_watch":stage=="EXHAUSTION_WATCH","v15_reversal":stage in ("EXHAUSTION_REVERSAL","COOLDOWN")}
+
 
 def expansion_matrix(items):
     targets=(3,5,8,10);horizons=(60,240);out={}
@@ -181,7 +213,12 @@ def evaluate(df,btc,symbol,calibration=None):
         efficiency_ok=efficiency>=.35 or (efficiency>=.25 and z["ret_5m"]>=2);extension_ok=adverse_extension<3 and z["ret_1m"]<3.5
         lo2=bisect.bisect_right(times_ns,z_ns);hi2=bisect.bisect_right(times_ns,z_ns+180_000_000_000);follow_window=raw[lo2:hi2]
         follow_2m=bool(len(follow_window)>=1 and max(q.get("ret_1m",0) for q in follow_window)>=.15);follow_3m=bool(len(follow_window)>=2 and sum(1 for q in follow_window[-2:] if q.get("ret_5m",0)>0)>=2);follow_strength=(20 if follow_2m else 0)+(20 if follow_3m else 0);v12_follow_ok=follow_strength>=20
-        v14=classify_v14(z,persistence=persistence,confirmation=confirmation,efficiency=efficiency);z.update(v14);z.update(v15_model(z))
+        v14=classify_v14(z,persistence=persistence,confirmation=confirmation,efficiency=efficiency);z.update(v14)
+        z["btc_mtf_5m_ret"]=float(br.get("mtf_5m_ret",0) or 0) if br is not None else 0
+        z["btc_mtf_15m_ret"]=float(br.get("mtf_15m_ret",0) or 0) if br is not None else 0
+        z["btc_mtf_5m_trend"]=int(br.get("mtf_5m_trend",0) or 0) if br is not None else 0
+        z["btc_mtf_15m_trend"]=int(br.get("mtf_15m_trend",0) or 0) if br is not None else 0
+        z.update(v15_model(z))
         a_plus=bool(confirmation and efficiency>=.60 and z["relative_strength_5m"]>=1 and z["BOS"] and z["CHoCH"] and persistence>=2 and z["buy_pressure"]>=.60 and not stall and extension_ok);a_plus_bonus=5 if a_plus else 0
         early_path=z["v4_score"]>=60 and persistence>=2 and z["buy_pressure"]>=.58 and activity and relative and structure and controlled and not btc_risk_off and follow_through>=65 and not stall and stoch_early and efficiency_ok and extension_ok and confirmation and v12_follow_ok
         confirmed_path=z["v4_score"]>=72 and z["v4_confirmations"]>=7 and persistence>=3 and z["buy_pressure"]>=.60 and z["volume_ratio"]>=2 and z["trade_accel"]>=2 and z["relative_strength_5m"]>.25 and structure and controlled and not btc_risk_off and follow_through>=75 and momentum_ok and confirmation and not stall and (stoch_early or stoch_expansion) and not stoch_exhaustion and efficiency>=.50 and extension_ok and v12_follow_ok
@@ -212,7 +249,7 @@ def main():
             cal[s]={"samples":len(train_eps),"hit_rate_240m_ge10_pct":round(min(hits/len(train_eps)*100,60),2) if train_eps else 0}
             print("Replaying",s);out.append(evaluate(fetch(s,a.start,a.end),btc_test,s,cal[s]))
         except Exception as e:out.append({"symbol":s,"status":"error","error":str(e)})
-    payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v15","data_source":BASE,"method":"Binance 1m Spot klines with V14 control plus V15 two-score opportunity/confirmation model and exhaustion-watch/reversal separation","v15_design":{"model":"two-score opportunity + confirmation","opportunity_score":"early discovery using volume, trade acceleration, buy pressure, momentum, relative strength and rising StochRSI","confirmation_score":"confirmation using volume, trade acceleration, buy pressure, BOS/CHoCH, relative strength and efficiency","stages":["WATCH","PRE_PUMP","EARLY_PUMP","CONFIRMED","EXPANSION","EXHAUSTION_WATCH","EXHAUSTION_REVERSAL","COOLDOWN"],"uses_future_data":False,"control":"V14 logic retained in each episode"}, "v14_design":{"stage_classifier":"StochRSI + volume + trade acceleration + buy pressure + BOS/CHoCH + BTC-relative strength + efficiency","uses_future_data":False,"stages":["WATCH","PRE_PUMP","EARLY_PUMP","EXPANSION","EXHAUSTION","COOLDOWN"],"baseline_comparison":"V12/V13 score and paths retained"},"v12_design":{"v11_base":True,"v4_weight":.55,"persistence_weight":.10,"follow_through_weight":.10,"efficiency_weight":.15,"relative_strength_weight":.05,"second_candle_confirmation":True,"stochrsi_stage_classification":True,"stochrsi_periods":"RSI14/Stoch14/K3/D3","stochrsi_stage_bonus":6,"stochrsi_exhaustion_penalty":4,"efficiency_filter":True,"adverse_extension_veto":True,"multi_candle_follow_through":True,"historical_hard_gate":False,"early_min_score":62,"confirmed_min_score":70,"a_plus_setup":True,"a_plus_bonus":5,"mae_mfe_tracking":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"v9_design":{"v4_weight":.72,"persistence_weight":.10,"follow_through_weight":.13,"historical_risk_modifier":True,"historical_hard_gate":False,"smoothed_prior_hit_rate_pct":10,"early_v4_min_score":60,"early_min_follow_through":65,"early_min_persistence":2,"confirmed_v4_min_score":72,"confirmed_min_persistence":3,"confirmed_min_follow_through":75,"avoid_filter":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
+    payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v15.1","data_source":BASE,"method":"Binance 1m Spot klines with V15 control plus V15.1 multi-timeframe alignment, BTC regime filter and relative-volume acceleration","v15_design":{"model":"two-score opportunity + confirmation with V15.1 filters","opportunity_score":"early discovery using volume, trade acceleration, buy pressure, momentum, relative strength and rising StochRSI","confirmation_score":"confirmation using volume, trade acceleration, buy pressure, BOS/CHoCH, relative strength and efficiency","stages":["WATCH","PRE_PUMP","EARLY_PUMP","CONFIRMED","EXPANSION","EXHAUSTION_WATCH","EXHAUSTION_REVERSAL","COOLDOWN"],"uses_future_data":False,"control":"V15 logic retained in each episode","v15_1_additions":["5m and 15m trend/momentum alignment","BTC 5m/15m regime score and risk-off filter","relative-volume and trade-acceleration acceleration"]}, "v14_design":{"stage_classifier":"StochRSI + volume + trade acceleration + buy pressure + BOS/CHoCH + BTC-relative strength + efficiency","uses_future_data":False,"stages":["WATCH","PRE_PUMP","EARLY_PUMP","EXPANSION","EXHAUSTION","COOLDOWN"],"baseline_comparison":"V12/V13 score and paths retained"},"v12_design":{"v11_base":True,"v4_weight":.55,"persistence_weight":.10,"follow_through_weight":.10,"efficiency_weight":.15,"relative_strength_weight":.05,"second_candle_confirmation":True,"stochrsi_stage_classification":True,"stochrsi_periods":"RSI14/Stoch14/K3/D3","stochrsi_stage_bonus":6,"stochrsi_exhaustion_penalty":4,"efficiency_filter":True,"adverse_extension_veto":True,"multi_candle_follow_through":True,"historical_hard_gate":False,"early_min_score":62,"confirmed_min_score":70,"a_plus_setup":True,"a_plus_bonus":5,"mae_mfe_tracking":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"v9_design":{"v4_weight":.72,"persistence_weight":.10,"follow_through_weight":.13,"historical_risk_modifier":True,"historical_hard_gate":False,"smoothed_prior_hit_rate_pct":10,"early_v4_min_score":60,"early_min_follow_through":65,"early_min_persistence":2,"confirmed_v4_min_score":72,"confirmed_min_persistence":3,"confirmed_min_follow_through":75,"avoid_filter":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
     os.makedirs(os.path.dirname(a.output) or ".",exist_ok=True);json.dump(payload,open(a.output,"w"),indent=2);json.dump(cal,open("data/v15_calibration.json","w"),indent=2);print(json.dumps(payload,indent=2))
 
 if __name__=="__main__":main()
