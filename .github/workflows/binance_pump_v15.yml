@@ -44,8 +44,11 @@ jobs:
         env:
           BINANCE_WS_BASE: wss://data-stream.binance.vision/stream
           BINANCE_REST_BASE: https://data-api.binance.vision
-          MAX_SYMBOLS: "80"
-          MIN_QUOTE_VOLUME: "250000"
+          MAX_SYMBOLS: "120"
+          MIN_QUOTE_VOLUME: "100000"
+          DISCOVERY_MIN_QUOTE_VOLUME: "50000"
+          LIQUID_SYMBOLS: "80"
+          MOMENTUM_SYMBOLS: "40"
           RUN_SECONDS: "300"
           DECISION_INTERVAL: "5"
           ALERT_COOLDOWN: "60"
