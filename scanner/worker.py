@@ -766,7 +766,12 @@ async def main():
                             s=r["symbol"];old=state[s];now=time.time()
                             changed=(r.get("v15_ignition_stage")!=old.get("last_ignition_stage") or r.get("v15_ignition_score",0)-float(old.get("last_ignition_score",0))>=5)
                             if changed and now-old["last_ignition_alert"]>=COOLDOWN:
-                                await telegram(f"🟢 V15.1 EARLY IGNITION | {s} | {r['v15_ignition_stage']} | Ignition {r['v15_ignition_score']}/100 | Signals {r['v15_ignition_signals']}\\nTrade accel: {r['v15_ignition_accel']:.2f}x | Accel slope: {r['v15_trade_accel_slope']:+.2f}x | Buy: {r['buy_pressure']*100:.1f}% | Buy slope: {r['v15_buy_pressure_slope']:+.3f}\\nRS 5m: {r['v15_ignition_rs5']:+.2f}% | RS 15m: {r['v15_ignition_rs15']:+.2f}% | Vol: {r['volume_ratio']:.2f}x | 10s trades: {r['v15_ignition_trades_10s']}\\nPrice: {r['price']} | 10s: {r['price_10s']:.2f}%\\n⚠️ Early ignition signal — volume confirmation may still be developing.')
+                                msg=(f"🟢 V15.1 EARLY IGNITION | {s} | {r['v15_ignition_stage']} | Ignition {r['v15_ignition_score']}/100 | Signals {r['v15_ignition_signals']}\\n"
+                                      f"Trade accel: {r['v15_ignition_accel']:.2f}x | Accel slope: {r['v15_trade_accel_slope']:+.2f}x | Buy: {r['buy_pressure']*100:.1f}% | Buy slope: {r['v15_buy_pressure_slope']:+.3f}\\n"
+                                      f"RS 5m: {r['v15_ignition_rs5']:+.2f}% | RS 15m: {r['v15_ignition_rs15']:+.2f}% | Vol: {r['volume_ratio']:.2f}x | 10s trades: {r['v15_ignition_trades_10s']}\\n"
+                                      f"Price: {r['price']} | 10s: {r['price_10s']:.2f}%\\n"
+                                      "⚠️ Early ignition signal — volume confirmation may still be developing.")
+                                await telegram(msg)
                                 old["last_ignition_alert"]=now
                             old["last_ignition_score"]=r.get("v15_ignition_score",0);old["last_ignition_stage"]=r.get("v15_ignition_stage","")
                         exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
