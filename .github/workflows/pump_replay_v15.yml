@@ -28,21 +28,21 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: |
           python backtest/pump_replay_v15.py --symbols "BNBUSDT,LINKUSDT,DOGEUSDT,XRPUSDT,ADAUSDT,LTCUSDT,ATOMUSDT,NEARUSDT,APTUSDT,FILUSDT" --train-start "2026-09-13T00:00:00Z" --start "2026-09-20T00:00:00Z" --end "2026-09-25T00:00:00Z" --output "data/backtest_results_v15_1.json"
-      - name: Publish V15 results
+      - name: Publish V15.1 results
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          mkdir -p /tmp/v15_results
-          cp data/backtest_results_v15.json /tmp/v15_results/backtest_results_v15.json
-          cp data/v15_1_calibration.json /tmp/v15_results/v15_calibration.json
+          mkdir -p /tmp/v151_results
+          cp data/backtest_results_v15_1.json /tmp/v151_results/backtest_results_v15_1.json
+          cp data/v15_1_calibration.json /tmp/v151_results/v15_1_calibration.json
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --mixed origin/main
-            cp /tmp/v15_results/backtest_results_v15.json data/backtest_results_v15.json
-            cp /tmp/v15_results/v15_calibration.json data/v15_calibration.json
-            git add -f data/backtest_results_v15.json data/v15_calibration.json
+            cp /tmp/v151_results/backtest_results_v15_1.json data/backtest_results_v15_1.json
+            cp /tmp/v151_results/v15_1_calibration.json data/v15_1_calibration.json
+            git add -f data/backtest_results_v15_1.json data/v15_1_calibration.json
             if git diff --cached --quiet; then
-              echo "V15 result files already match repository; nothing to commit."
+              echo "V15.1 result files already match repository; nothing to commit."
               exit 0
             fi
             git commit -m "Update V15.1 MTF BTC-regime backtest results"
