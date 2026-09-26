@@ -734,8 +734,8 @@ async def main():
     "exhaustion_score","exhaustion_state","exhaustion_alert","exhaustion_extension",
     "exhaustion_rollover","exhaustion_symptoms"
 ]
-compact_rows=[{key:r.get(key) for key in history_fields if key in r} for r in rows]
-with open("data/history.jsonl","a") as f:f.write(json.dumps({"ts":time.time(),"rows":compact_rows},separators=(",",":"))+"\n")
+                        compact_rows=[{key:r.get(key) for key in history_fields if key in r} for r in rows]
+                        with open("data/history.jsonl","a") as f:f.write(json.dumps({"ts":time.time(),"rows":compact_rows},separators=(",",":"))+"\n")
                         await asyncio.sleep(1)
             finally:
                 if not sync.done():
