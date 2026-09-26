@@ -35,7 +35,7 @@ jobs:
         run: mkdir -p data
 
       - name: Validate V15 production scanner
-        run: python -m py_compile scanner/worker.py run_scanner.py app.py
+        run: python -m py_compile scanner/worker.py scanner/tradingview.py run_scanner.py app.py
 
       - name: Run V15 live scan
         env:
@@ -66,6 +66,9 @@ jobs:
           EXHAUSTION_ALERT_SCORE: "72"
           EXHAUSTION_MIN_EXTENSION: "2.5"
           EXHAUSTION_COOLDOWN: "120"
+          TRADINGVIEW_ENABLED: "1"
+          TRADINGVIEW_REFRESH_SECONDS: "30"
+          TRADINGVIEW_TIMEOUT: "8"
           V8_MIN_PERSISTENCE: "2"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -96,7 +99,7 @@ jobs:
               "symbol","price","score","stage","entry","sell","price_1m","price_10s",
               "volume_ratio","trade_accel","buy_pressure","book_imbalance",
               "early_pump_score","early_pump_stage","relative_strength_5m","relative_strength_15m",
-              "v15_score","v15_stage","v15_opportunity_score","v15_confirmation_score",
+              "v15_score","v15_stage","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_5m_rsi","tv_15m_rsi","tv_1h_rsi",
               "v12_score","v12_efficiency","hybrid_score","hybrid_path","hybrid_grade",
               "exhaustion_score","exhaustion_state","exhaustion_alert","exhaustion_extension",
               "exhaustion_rollover","exhaustion_symptoms"
