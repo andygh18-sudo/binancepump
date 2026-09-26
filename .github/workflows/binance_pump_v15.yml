@@ -62,6 +62,9 @@ jobs:
           V12_ALERT_SCORE: "62"
           V12_CONFIRMED_SCORE: "70"
           V12_MIN_PERSISTENCE: "2"
+          EXHAUSTION_ALERT_SCORE: "72"
+          EXHAUSTION_MIN_EXTENSION: "2.5"
+          EXHAUSTION_COOLDOWN: "120"
           V8_MIN_PERSISTENCE: "2"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
