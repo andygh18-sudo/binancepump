@@ -63,24 +63,32 @@ if df.empty:
     st.info("No usable market data in the latest run.")
     st.stop()
 
-if "score" not in df.columns:
-    st.error("Scanner data does not contain a score column.")
+# V15 is the primary dashboard model; legacy score/stage fields are supporting diagnostics only.
+if "v15_score" not in df.columns or "v15_stage" not in df.columns:
+    st.error("Latest scanner data does not contain V15 fields. Run the V15 GitHub Actions scanner first.")
     st.stop()
 
-df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0)
-df = df.sort_values("score", ascending=False).reset_index(drop=True)
+for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_relative_strength_5m","v15_relative_strength_15m","v15_streak"]:
+    if c in df.columns:
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+
+df["score"] = df["v15_score"]
+df["stage"] = df["v15_stage"].fillna("NEUTRAL")
+df = df.sort_values(["v15_score","v15_confirmation_score","v15_opportunity_score"], ascending=False).reset_index(drop=True)
 
 numeric_cols = [
     "price", "price_1m", "price_10s", "volume_ratio", "trade_accel",
-    "buy_pressure", "book_imbalance", "spread_bps", "score"
+    "buy_pressure", "book_imbalance", "spread_bps", "score",
+    "v15_score", "v15_opportunity_score", "v15_confirmation_score",
+    "v15_relative_strength_5m", "v15_relative_strength_15m", "v15_streak"
 ]
 for c in numeric_cols:
     if c in df.columns:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-st.sidebar.header("⚙️ Radar Filters")
-min_score = st.sidebar.slider("Minimum score", 0, 100, 0)
-stages = ["BUILDING", "PRE-PUMP", "EARLY MOMENTUM", "BREAKOUT", "CONFIRMED PUMP"]
+st.sidebar.header("⚙️ V15 Radar Filters")
+min_score = st.sidebar.slider("Minimum V15 score", 0, 100, 0)
+stages = ["NEUTRAL", "WATCH", "PRE_PUMP", "EARLY_PUMP", "CONFIRMED", "AVOID"]
 selected_stages = st.sidebar.multiselect("Stages", stages, default=stages)
 min_volume_ratio = st.sidebar.number_input("Minimum volume ratio", min_value=0.0, value=0.0, step=0.1)
 only_book_ready = st.sidebar.checkbox("Order book ready only", value=False)
