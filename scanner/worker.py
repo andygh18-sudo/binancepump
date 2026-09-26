@@ -578,4 +578,5 @@ async def main():
             rows=[r for s in symbols if (r:=score(s))];rows.sort(key=lambda z:z["score"],reverse=True)
             with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
 
+# V15 production deployment active
 if __name__=="__main__":asyncio.run(main())
