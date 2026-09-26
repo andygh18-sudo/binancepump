@@ -163,7 +163,7 @@ def expansion_matrix(items):
         out[label]=d
     return out
 
-def evaluate(df,btc,symbol,calibration=None):
+def evaluate(df,btc,symbol,calibration=None,episode_start=None):
     x=prep(df);b=prep(btc)
     if len(x)<300 or len(b)<100:return {"symbol":symbol,"status":"insufficient_data"}
     bi=b.set_index("time");raw=[]
@@ -232,6 +232,9 @@ def evaluate(df,btc,symbol,calibration=None):
         z.update({"v12_score":score,"v15_score":round(.55*z["v15_opportunity_score"]+.45*z["v15_confirmation_score"]),"v12_persistence":persistence,"pump_stage":("EARLY" if stoch_early else "EXPANSION" if stoch_expansion else "EXHAUSTION" if stoch_exhaustion else "COOLDOWN" if z["stochrsi_stage"]=="COOLDOWN" else "WATCH"),"v12_reliability":round(reliability,2),"v12_reliability_modifier":round(reliability_modifier,2),"v12_grade":grade,"v12_path":path,"v12_alert":bool(alert),"v12_confirmation":bool(confirmation),"v12_a_plus":bool(a_plus),"v15_model":"two_score_opportunity_confirmation","v12_follow_strength":follow_strength,"v12_follow_ok":bool(v12_follow_ok),"v12_efficiency":round(efficiency,4),"v12_adverse_extension":round(adverse_extension,4),"v8_hist_samples":samples,"v8_hist_hit_rate_240m":round(rate,2),"v8_smoothed_hist_rate_240m":round(smooth_rate,2),"v8_hist_modifier":round(hist_modifier,2),"v8_grade":grade,"v8_path":path,"v8_early_path":bool(early_path),"v8_confirmed_path":bool(confirmed_path),"v8_avoid":bool(avoid),"v8_btc_risk_off":bool(btc_risk_off),"v8_alert":bool(alert)})
         if not episodes or (pd.Timestamp(z["time"])-pd.Timestamp(episodes[-1]["time"])).total_seconds()>=1800:episodes.append(z)
         elif z["v12_score"]>episodes[-1]["v12_score"]:episodes[-1]=z
+    if episode_start:
+        cutoff=pd.Timestamp(episode_start)
+        episodes=[z for z in episodes if pd.Timestamp(z["time"])>=cutoff]
     a=[z for z in episodes if z["v12_alert"]];bands={}
     for lo,hi in ((50,59),(60,69),(70,79),(80,89),(90,100)):
         q=[z for z in episodes if lo<=z["v12_score"]<=hi];h60=[z for z in q if (z["future_max_gain"]["60m"] or 0)>=10];h240=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=10];h20=[z for z in q if (z["future_max_gain"]["240m"] or 0)>=20]
@@ -247,7 +250,7 @@ def main():
         try:
             tr=evaluate(fetch(s,a.train_start,a.start),btc_train,s,{"samples":0,"hit_rate_240m_ge10_pct":0});train_eps=tr.get("episodes",[]) if tr.get("status")=="ok" else [];hits=sum((q.get("future_max_gain",{}).get("240m") or 0)>=10 for q in train_eps)
             cal[s]={"samples":len(train_eps),"hit_rate_240m_ge10_pct":round(min(hits/len(train_eps)*100,60),2) if train_eps else 0}
-            print("Replaying",s);out.append(evaluate(fetch(s,a.start,a.end),btc_test,s,cal[s]))
+            print("Replaying",s);out.append(evaluate(fetch(s,a.train_start,a.end),fetch("BTCUSDT",a.train_start,a.end),s,cal[s],episode_start=a.start))
         except Exception as e:out.append({"symbol":s,"status":"error","error":str(e)})
     payload={"generated_at":datetime.now(timezone.utc).isoformat(),"engine":"Pump Replay / Backtest v15.1","data_source":BASE,"method":"Binance 1m Spot klines with V15 control plus V15.1 multi-timeframe alignment, BTC regime filter and relative-volume acceleration","v15_design":{"model":"two-score opportunity + confirmation with V15.1 filters","opportunity_score":"early discovery using volume, trade acceleration, buy pressure, momentum, relative strength and rising StochRSI","confirmation_score":"confirmation using volume, trade acceleration, buy pressure, BOS/CHoCH, relative strength and efficiency","stages":["WATCH","PRE_PUMP","EARLY_PUMP","CONFIRMED","EXPANSION","EXHAUSTION_WATCH","EXHAUSTION_REVERSAL","COOLDOWN"],"uses_future_data":False,"control":"V15 logic retained in each episode","v15_1_additions":["5m and 15m trend/momentum alignment","BTC 5m/15m regime score and risk-off filter","relative-volume and trade-acceleration acceleration"]}, "v14_design":{"stage_classifier":"StochRSI + volume + trade acceleration + buy pressure + BOS/CHoCH + BTC-relative strength + efficiency","uses_future_data":False,"stages":["WATCH","PRE_PUMP","EARLY_PUMP","EXPANSION","EXHAUSTION","COOLDOWN"],"baseline_comparison":"V12/V13 score and paths retained"},"v12_design":{"v11_base":True,"v4_weight":.55,"persistence_weight":.10,"follow_through_weight":.10,"efficiency_weight":.15,"relative_strength_weight":.05,"second_candle_confirmation":True,"stochrsi_stage_classification":True,"stochrsi_periods":"RSI14/Stoch14/K3/D3","stochrsi_stage_bonus":6,"stochrsi_exhaustion_penalty":4,"efficiency_filter":True,"adverse_extension_veto":True,"multi_candle_follow_through":True,"historical_hard_gate":False,"early_min_score":62,"confirmed_min_score":70,"a_plus_setup":True,"a_plus_bonus":5,"mae_mfe_tracking":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"v9_design":{"v4_weight":.72,"persistence_weight":.10,"follow_through_weight":.13,"historical_risk_modifier":True,"historical_hard_gate":False,"smoothed_prior_hit_rate_pct":10,"early_v4_min_score":60,"early_min_follow_through":65,"early_min_persistence":2,"confirmed_v4_min_score":72,"confirmed_min_persistence":3,"confirmed_min_follow_through":75,"avoid_filter":True,"targets":["10% in 60m","10% in 240m","20% in 240m"]},"calibration":cal,"results":out}
     os.makedirs(os.path.dirname(a.output) or ".",exist_ok=True);json.dump(payload,open(a.output,"w"),indent=2);json.dump(cal,open("data/v15_calibration.json","w"),indent=2);print(json.dumps(payload,indent=2))
