@@ -9,7 +9,7 @@ on:
       - ".github/workflows/binance_pump_v15.yml"
   workflow_dispatch:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "0,15,30,45 0-23 * * *"
 
 permissions:
   contents: write
