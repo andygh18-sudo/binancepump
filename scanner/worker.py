@@ -9,8 +9,8 @@ REST=os.getenv("BINANCE_REST_BASE","https://data-api.binance.vision")
 MAX=int(os.getenv("MAX_SYMBOLS","40"));MINVOL=float(os.getenv("MIN_QUOTE_VOLUME","1000000"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"))
-TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"))
-symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0})
+TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"))
+symbols=[];books={};state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"")
 
 async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
@@ -432,6 +432,100 @@ def v5_signal(s,v4):
     else:grade="REJECT"
     return {"v5_score":max(0,min(v5,100)),"v5_persistence":streak,"v5_hist_samples":samples,"v5_hist_hit_rate_240m":rate,"v5_grade":grade,"v5_alert":grade in ("A","B") and v5>=V5_ALERT_SCORE and streak>=V5_MIN_PERSISTENCE and samples>=V5_MIN_HIST_SAMPLES and rate>=V5_MIN_HIST_RATE}
 
+def exhaustion_momentum(s, eps, v12, v15):
+    """Detect momentum exhaustion after an extended move.
+    This is deliberately a reversal-risk alert, not a short/exit command.
+    """
+    x=state[s]
+    _,v10,b10,p10=stats(s,10)
+    _,v60,b60,p60=stats(s,60)
+    _,v300,_,_=stats(s,300)
+    if not x.get("price") or not x.get("candle"):
+        return None
+
+    vr=v60/max(v300/5,1)
+    acc=acceleration_ratio(v10,v60)
+    rs5=float((eps or {}).get("relative_strength_5m",0) or 0)
+    rs15=float((eps or {}).get("relative_strength_15m",0) or 0)
+    v15_score=float((v15 or {}).get("v15_score",0) or 0)
+    v15_stage=str((v15 or {}).get("v15_stage","") or "")
+    efficiency=float((v12 or {}).get("v12_efficiency",0) or 0)
+    ob=books[s].metrics(20)
+    imb=float(ob.get("imbalance",0) or 0)
+
+    # Current extension: fast price expansion is the first exhaustion ingredient.
+    extension=max(0.0,p10)*0.55 + max(0.0,p60)*0.30 + max(0.0,(p10-p60))*0.15
+
+    # Momentum rollover: strong activity but weaker price follow-through.
+    activity=min(max((vr-1)/3,0),1)*100
+    acceleration=min(max((acc-1)/3,0),1)*100
+    follow_through=max(0.0,min((p60/max(p10,0.25))*100,120)) if p10>0 else 0.0
+    stall_penalty=30 if (vr>=2.5 and acc>=2.0 and p60<1.0) else 0
+    rollover=max(0.0,min(100.0, 100.0-follow_through)) + stall_penalty
+
+    # Buying-pressure deterioration and order-book weakening increase exhaustion risk.
+    buy_stress=max(0.0,min((0.58-b10)/0.18,1))*100
+    book_stress=max(0.0,min((0.05-imb)/0.35,1))*100
+
+    # Relative-strength fade: still positive, but losing leadership versus the prior window.
+    rs_fade=max(0.0,min((rs5-rs15+0.25)/1.25,1))*100 if rs5<rs15 else max(0.0,min((rs15-rs5+0.25)/1.25,1))*100
+    if rs5 < rs15:
+        rs_fade=100.0
+    elif rs5 < 0:
+        rs_fade=75.0
+    else:
+        rs_fade=max(0.0,min((rs15-rs5+0.25)/1.25,1))*100
+
+    # V15 score at very high levels raises the consequence of extension, but does not create exhaustion alone.
+    score_pressure=max(0.0,min((v15_score-70)/25,1))*100
+    extension_component=max(0.0,min((extension-EXHAUSTION_MIN_EXTENSION)/4.0,1))*100
+    efficiency_stress=max(0.0,min((0.45-efficiency)/0.45,1))*100
+
+    raw=(
+        extension_component*0.28 +
+        rollover*0.22 +
+        buy_stress*0.16 +
+        book_stress*0.10 +
+        rs_fade*0.09 +
+        score_pressure*0.08 +
+        efficiency_stress*0.07
+    )
+    # Require an actual extended move plus at least two exhaustion symptoms.
+    symptoms=sum([
+        extension>=EXHAUSTION_MIN_EXTENSION,
+        rollover>=45,
+        b10<0.54,
+        imb<0.0,
+        rs5<rs15,
+        (vr>=2.0 and acc>=1.5 and p60<1.0),
+    ])
+    score=max(0,min(round(raw),100))
+
+    if extension<EXHAUSTION_MIN_EXTENSION:
+        state_name="NORMAL"
+    elif score>=EXHAUSTION_ALERT_SCORE and symptoms>=3:
+        state_name="EXHAUSTION ALERT"
+    elif score>=58 and symptoms>=2:
+        state_name="EXHAUSTION WATCH"
+    else:
+        state_name="EXTENDED / MONITOR"
+
+    alert=state_name=="EXHAUSTION ALERT" and v15_stage!="AVOID"
+    return {
+        "exhaustion_score":score,
+        "exhaustion_state":state_name,
+        "exhaustion_alert":alert,
+        "exhaustion_extension":round(extension,2),
+        "exhaustion_rollover":round(rollover,1),
+        "exhaustion_buy_stress":round(buy_stress,1),
+        "exhaustion_book_stress":round(book_stress,1),
+        "exhaustion_rs_fade":round(rs_fade,1),
+        "exhaustion_efficiency_stress":round(efficiency_stress,1),
+        "exhaustion_symptoms":symptoms,
+        "exhaustion_volume_ratio":round(vr,2),
+        "exhaustion_trade_accel":round(acc,2),
+    }
+
 def v15_signal(s,v4,eps,v12):
     if not v4 or not eps or not v12:return None
     x=state[s];bucket=int(time.time()/max(INTERVAL,1));prev=int(x.get("v15_last_bucket",-1))
@@ -492,6 +586,7 @@ def score(s):
     v11=v11_signal(s,v4,eps)
     v12=v12_signal(s,v4,eps)
     v15=v15_signal(s,v4,eps,v12)
+    exhaustion=exhaustion_momentum(s,eps,v12,v15)
     hybrid=v11_v12_hybrid(v11,v12)
     hs=hybrid.get("hybrid_score",0) if hybrid else 0
     alert_tier="HIGH PRIORITY" if hs>=80 else "EARLY ACTION" if hs>=70 else "PRE-PUMP WATCH" if hs>=62 else "BELOW WATCH"
@@ -508,7 +603,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"two_score_opportunity_confirmation","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"updated":time.time()}
+    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"two_score_opportunity_confirmation","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,**(exhaustion or {}),"updated":time.time()}
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
@@ -558,6 +653,15 @@ async def main():
                                 await telegram(f"🚨 {r['alert_tier']} | V15 TOP {rank} | {s} | {r['stage']} | V15 {r['v15_score']}/100 | Opportunity {r['v15_opportunity_score']}/100 | Confirmation {r['v15_confirmation_score']}/100 | V11 {r['v11_score']}/100 | V12 {r['v12_score']}/100\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
                                 old["last_alert"]=now;old["last_alert_rank"]=rank
                             old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
+                        exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
+                        exhaustion_candidates=sorted(exhaustion_candidates,key=lambda r:(r.get("exhaustion_score",0),r.get("v15_score",0)),reverse=True)[:TOP_ALERTS]
+                        for r in exhaustion_candidates:
+                            s=r["symbol"];old=state[s];now=time.time()
+                            changed=(r.get("exhaustion_state")!=old.get("last_exhaustion_state") or r.get("exhaustion_score",0)-float(old.get("last_exhaustion_score",0))>=5)
+                            if changed and now-old["last_exhaustion_alert"]>=EXHAUSTION_COOLDOWN:
+                                await telegram(f"⚠️ EXHAUSTION MOMENTUM | {s} | {r['exhaustion_state']} | Exhaustion {r['exhaustion_score']}/100\\nV15 {r['v15_score']}/100 | Stage: {r['v15_stage']} | Extension: {r['exhaustion_extension']:.2f}% | Rollover: {r['exhaustion_rollover']:.0f}\\nBuy pressure: {r['buy_pressure']*100:.1f}% | Vol: {r['volume_ratio']:.2f}x | Trade accel: {r['trade_accel']:.2f}x\\nBook imbalance: {r['book_imbalance']:+.2f} | RS 5m: {r['v15_relative_strength_5m']:+.2f}% | RS 15m: {r['v15_relative_strength_15m']:+.2f}%\\n⚠️ Momentum is extended and showing deterioration signals; confirmation of reversal is still required.")
+                                old["last_exhaustion_alert"]=now
+                            old["last_exhaustion_score"]=r.get("exhaustion_score",0);old["last_exhaustion_state"]=r.get("exhaustion_state","")
                         accum_candidates=[r for r in rows if r.get("accumulation_score",0)>=ACCUM_ALERT_SCORE and r.get("accumulation_quality") and r.get("accumulation_stage") in ("ACCUMULATION WATCH","ACCUMULATION ALERT") and r.get("score",0)>=70]
                         accum_candidates=sorted(accum_candidates,key=lambda r:(r.get("accumulation_score",0),r.get("score",0)),reverse=True)[:TOP_ALERTS]
                         for r in accum_candidates:
