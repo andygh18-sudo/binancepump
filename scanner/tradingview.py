@@ -5,7 +5,7 @@ import time
 TV_URL = os.getenv("TRADINGVIEW_SCAN_URL", "https://scanner.tradingview.com/crypto/scan")
 TV_TIMEOUT = float(os.getenv("TRADINGVIEW_TIMEOUT", "8"))
 TV_BATCH = int(os.getenv("TRADINGVIEW_BATCH", "120"))
-INTERVALS = {"5m": "5", "15m": "15", "1h": "60"}
+INTERVALS = {"30m": "30", "1h": "60", "4h": "240", "1d": "1D"}
 BASE_FIELDS = ["close", "RSI", "EMA20", "EMA50", "ADX", "volume", "change", "Recommend.All"]
 
 def _f(value):
@@ -74,7 +74,7 @@ async def fetch_tradingview_signals(session,symbols):
         if not tf: continue
         scores=[tf[iv]["score"] for iv in INTERVALS if iv in tf]; recs=[tf[iv]["recommend"] for iv in INTERVALS if iv in tf and tf[iv]["recommend"] is not None]
         bullish=sum(1 for iv in INTERVALS if tf.get(iv,{}).get("bullish_alignment"))
-        final[sym]={"tv_score":round(sum(scores)/len(scores),1) if scores else 0.0,"tv_bullish_timeframes":bullish,"tv_recommendation":round(sum(recs)/len(recs),3) if recs else None,"tv_5m_rsi":tf.get("5m",{}).get("rsi"),"tv_15m_rsi":tf.get("15m",{}).get("rsi"),"tv_1h_rsi":tf.get("1h",{}).get("rsi"),"tv_5m_trend":bool(tf.get("5m",{}).get("bullish_alignment")),"tv_15m_trend":bool(tf.get("15m",{}).get("bullish_alignment")),"tv_1h_trend":bool(tf.get("1h",{}).get("bullish_alignment")),"tv_5m_adx":tf.get("5m",{}).get("adx"),"tv_15m_adx":tf.get("15m",{}).get("adx"),"tv_1h_adx":tf.get("1h",{}).get("adx"),"tv_5m_change":tf.get("5m",{}).get("change"),"tv_15m_change":tf.get("15m",{}).get("change"),"tv_1h_change":tf.get("1h",{}).get("change")}
+        final[sym]={"tv_score":round(sum(scores)/len(scores),1) if scores else 0.0,"tv_bullish_timeframes":bullish,"tv_recommendation":round(sum(recs)/len(recs),3) if recs else None,"tv_30m_rsi":tf.get("30m",{}).get("rsi"),"tv_1h_rsi":tf.get("1h",{}).get("rsi"),"tv_4h_rsi":tf.get("4h",{}).get("rsi"),"tv_1d_rsi":tf.get("1d",{}).get("rsi"),"tv_30m_trend":bool(tf.get("30m",{}).get("bullish_alignment")),"tv_1h_trend":bool(tf.get("1h",{}).get("bullish_alignment")),"tv_4h_trend":bool(tf.get("4h",{}).get("bullish_alignment")),"tv_1d_trend":bool(tf.get("1d",{}).get("bullish_alignment")),"tv_30m_adx":tf.get("30m",{}).get("adx"),"tv_1h_adx":tf.get("1h",{}).get("adx"),"tv_4h_adx":tf.get("4h",{}).get("adx"),"tv_1d_adx":tf.get("1d",{}).get("adx"),"tv_30m_change":tf.get("30m",{}).get("change"),"tv_1h_change":tf.get("1h",{}).get("change"),"tv_4h_change":tf.get("4h",{}).get("change"),"tv_1d_change":tf.get("1d",{}).get("change")}
         score=final[sym]["tv_score"]
         final[sym]["tv_confirmation"]="STRONG" if score>=72 and bullish>=2 else "CONFIRM" if score>=60 and bullish>=1 else "BEARISH" if score<=35 else "NEUTRAL"
     return final,time.time()
