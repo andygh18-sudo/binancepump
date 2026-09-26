@@ -689,19 +689,19 @@ with tab5:
         st.info("🟡 Order book is still synchronizing. Price/volume/trade signals may be available before book confirmation.")
 
     st.subheader("🧠 V15 Signal Breakdown")
-v15_metrics = pd.DataFrame({
-    "Component": ["Opportunity", "Confirmation", "Stage", "Streak", "RS 5m", "RS 15m", "BTC Risk-Off", "Early Candidate", "Confirmed"],
-    "Value": [
-        coin.get("v15_opportunity_score", 0), coin.get("v15_confirmation_score", 0),
-        coin.get("v15_stage", "—"), coin.get("v15_streak", 0),
-        coin.get("v15_relative_strength_5m", 0), coin.get("v15_relative_strength_15m", 0),
-        coin.get("v15_btc_risk_off", False), coin.get("v15_early_candidate", False),
-        coin.get("v15_confirmed", False)
-    ]
-})
-st.dataframe(v15_metrics, use_container_width=True, hide_index=True)
+    v15_metrics = pd.DataFrame({
+        "Component": ["Opportunity", "Confirmation", "Stage", "Streak", "RS 5m", "RS 15m", "BTC Risk-Off", "Early Candidate", "Confirmed"],
+        "Value": [
+            coin.get("v15_opportunity_score", 0), coin.get("v15_confirmation_score", 0),
+            coin.get("v15_stage", "—"), coin.get("v15_streak", 0),
+            coin.get("v15_relative_strength_5m", 0), coin.get("v15_relative_strength_15m", 0),
+            coin.get("v15_btc_risk_off", False), coin.get("v15_early_candidate", False),
+            coin.get("v15_confirmed", False)
+        ]
+    })
+    st.dataframe(v15_metrics, use_container_width=True, hide_index=True)
 
-st.subheader("📊 Momentum Evidence")
+    st.subheader("📊 Momentum Evidence")
     evidence = {
         "1m Price Change": coin.get("price_1m", np.nan),
         "10s Price Change": coin.get("price_10s", np.nan),
