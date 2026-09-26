@@ -725,7 +725,17 @@ async def main():
                                 old["last_accum_alert"]=now
                             old["last_accum_score"]=r["accumulation_score"];old["last_accum_stage"]=r["accumulation_stage"]
                         with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
-                        with open("data/history.jsonl","a") as f:f.write(json.dumps({"ts":time.time(),"rows":rows})+"\n")
+                        history_fields=[
+    "symbol","price","score","stage","entry","sell","price_1m","price_10s",
+    "volume_ratio","trade_accel","buy_pressure","book_imbalance",
+    "early_pump_score","early_pump_stage","relative_strength_5m","relative_strength_15m",
+    "v15_score","v15_stage","v15_opportunity_score","v15_confirmation_score",
+    "v12_score","v12_efficiency","hybrid_score","hybrid_path","hybrid_grade",
+    "exhaustion_score","exhaustion_state","exhaustion_alert","exhaustion_extension",
+    "exhaustion_rollover","exhaustion_symptoms"
+]
+compact_rows=[{key:r.get(key) for key in history_fields if key in r} for r in rows]
+with open("data/history.jsonl","a") as f:f.write(json.dumps({"ts":time.time(),"rows":compact_rows},separators=(",",":"))+"\n")
                         await asyncio.sleep(1)
             finally:
                 if not sync.done():
