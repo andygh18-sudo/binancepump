@@ -229,7 +229,7 @@ if "book_status" in df.columns:
 
 tv_coverage = int(pd.to_numeric(df.get("tv_score", pd.Series(index=df.index)), errors="coerce").notna().sum()) if "tv_score" in df.columns else 0
 st.success(f"V15 scanner data loaded: {len(df)} symbols • source: {data_source} • top V15 score: {df['v15_score'].max():.0f}")
-st.caption(f"📺 TradingView confirmation: **{tv_coverage}/{len(df)} symbols** • 5m / 15m / 1h technical layer • Binance remains the primary live feed")
+st.caption(f"📺 TradingView confirmation: **{tv_coverage}/{len(df)} symbols** • 30m / 1h / 4h / 1D technical layer • Binance remains the primary live feed")
 
 st.subheader("📡 Live Scanner Snapshot")
 st.dataframe(df.head(20), use_container_width=True, hide_index=True)
@@ -276,7 +276,7 @@ entry_df.loc[
 
 entry_view = entry_df[~entry_df["entry_signal"].eq("🔴 V15 AVOID")].copy()
 entry_view = entry_view.sort_values(["v15_score","v15_confirmation_score","v15_opportunity_score"], ascending=[False,False,False]).head(20)
-entry_cols = [c for c in ["symbol","entry_signal","v15_score","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_5m_rsi","tv_15m_rsi","tv_1h_rsi","v15_stage","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
+entry_cols = [c for c in ["symbol","entry_signal","v15_score","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_30m_rsi","tv_1h_rsi","tv_4h_rsi","tv_1d_rsi","v15_stage","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
 st.dataframe(entry_view[entry_cols], use_container_width=True, hide_index=True, column_config={
     "v15_score": st.column_config.ProgressColumn("V15", min_value=0, max_value=100, format="%d"),
     "v15_opportunity_score": st.column_config.ProgressColumn("Opportunity", min_value=0, max_value=100, format="%d"),
@@ -284,9 +284,10 @@ st.dataframe(entry_view[entry_cols], use_container_width=True, hide_index=True, 
     "v15_tv_score": st.column_config.ProgressColumn("TV Score", min_value=0, max_value=100, format="%d"),
     "v15_tv_adjustment": st.column_config.NumberColumn("TV Adj", format="%+.0f"),
     "tv_bullish_timeframes": st.column_config.NumberColumn("TV Bull TF", format="%d"),
-    "tv_5m_rsi": st.column_config.NumberColumn("TV RSI 5m", format="%.1f"),
-    "tv_15m_rsi": st.column_config.NumberColumn("TV RSI 15m", format="%.1f"),
+    "tv_30m_rsi": st.column_config.NumberColumn("TV RSI 30m", format="%.1f"),
     "tv_1h_rsi": st.column_config.NumberColumn("TV RSI 1h", format="%.1f"),
+    "tv_4h_rsi": st.column_config.NumberColumn("TV RSI 4h", format="%.1f"),
+    "tv_1d_rsi": st.column_config.NumberColumn("TV RSI 1D", format="%.1f"),
     "v11_score": st.column_config.NumberColumn("V11", format="%.0f"),
     "v12_score": st.column_config.NumberColumn("V12", format="%.0f"),
     "v12_efficiency": st.column_config.NumberColumn("Efficiency", format="%.2f"),
