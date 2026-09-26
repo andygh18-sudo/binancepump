@@ -20,4 +20,9 @@ jobs:
       - name: Start next V15 scan immediately
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run binance_pump_v15.yml --ref main --repo andygh18-sudo/binancepump
+        run: |
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/andygh18-sudo/binancepump/actions/workflows/binance_pump_v15.yml/dispatches \
+            -f ref=main
