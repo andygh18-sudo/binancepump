@@ -439,7 +439,7 @@ def v15_signal(s,v4,eps,v12):
     vr=v60/max(v300/5,1);acc=acceleration_ratio(v10,v60)
     rs5=float(eps.get("relative_strength_5m",0) or 0);rs15=float(eps.get("relative_strength_15m",0) or 0)
     btc5=float(eps.get("btc_ret_5m",0) or 0);btc15=float(eps.get("btc_ret_15m",0) or 0)
-    efficiency=float(v12.get("v12_efficiency",0) or 0);confirmation=bool(v12.get("v12_confirmation",False))
+    efficiency=float(v12.get("v12_efficiency",0) or 0);confirmation=bool(v12.get("v12_confirmation",False));eff=efficiency
     structure=bool(v4.get("v4_confirmations",0)>=6 or confirmation)
     qualifying=v4.get("v4_score",0)>=55 and v4.get("v4_alert_quality") in ("A","B","C")
     if qualifying:
