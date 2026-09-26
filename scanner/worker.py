@@ -763,7 +763,7 @@ async def main():
                             changed=(old.get("last_stage")!=r["stage"] or old.get("last_entry")!=r["entry"] or old.get("last_alert_rank")!=rank)
                             now=time.time()
                             if changed and now-old["last_alert"]>=COOLDOWN:
-                                await telegram(f"🚨 {r['alert_tier']} | V15 TOP {rank} | {s} | {r['stage']} | V15 {r['v15_score']}/100 | Opportunity {r['v15_opportunity_score']}/100 | Confirmation {r['v15_confirmation_score']}/100 | V11 {r['v11_score']}/100 | V12 {r['v12_score']}/100\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\nPrice: {r['price']}")
+                                await telegram(f"🚨 {r['alert_tier']} | V15 TOP {rank} | {s} | {r['stage']} | V15 {r['v15_score']}/100 | Opportunity {r['v15_opportunity_score']}/100 | Confirmation {r['v15_confirmation_score']}/100 | V11 {r['v11_score']}/100 | V12 {r['v12_score']}/100\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\n📺 TV: {r.get('tv_confirmation','N/A')} | TV {r.get('tv_score',0):.0f}/100 | RSI 5m {(r.get('tv_5m_rsi') or 0):.1f}\nPrice: {r['price']}")
                                 old["last_alert"]=now;old["last_alert_rank"]=rank
                             old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
                         ignition_candidates=[r for r in rows if r.get("v15_ignition_alert") and r.get("v15_ignition_score",0)>=65 and r.get("v15_ignition_signals",0)>=3]
@@ -803,7 +803,7 @@ async def main():
     "symbol","price","score","stage","entry","sell","price_1m","price_10s",
     "volume_ratio","trade_accel","buy_pressure","book_imbalance",
     "early_pump_score","early_pump_stage","relative_strength_5m","relative_strength_15m",
-    "v15_score","v15_stage","v15_opportunity_score","v15_confirmation_score","v15_ignition_score","v15_ignition_stage","v15_ignition_alert","v15_ignition_signals","v15_trade_accel_slope","v15_buy_pressure_slope",
+    "v15_score","v15_stage","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_5m_rsi","tv_15m_rsi","tv_1h_rsi","v15_ignition_score","v15_ignition_stage","v15_ignition_alert","v15_ignition_signals","v15_trade_accel_slope","v15_buy_pressure_slope",
     "v12_score","v12_efficiency","hybrid_score","hybrid_path","hybrid_grade",
     "exhaustion_score","exhaustion_state","exhaustion_alert","exhaustion_extension",
     "exhaustion_rollover","exhaustion_symptoms"
