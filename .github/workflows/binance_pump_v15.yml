@@ -92,5 +92,16 @@ jobs:
             exit 0
           fi
           git commit -m "Update V15 production scanner data"
-          git pull --rebase --autostash origin main
+          git checkout --theirs data/latest.json data/history.jsonl || true
+          git add data/latest.json data/history.jsonl
+          git -c core.editor=true rebase --continue || true
+          git rebase --abort >/dev/null 2>&1 || true
+          git fetch origin main
+          git reset --soft origin/main
+          git add -A data/
+          if git diff --cached --quiet; then
+            echo "Scan data already synchronized."
+            exit 0
+          fi
+          git commit -m "Update V15 production scanner data"
           git push origin HEAD:main
