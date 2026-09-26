@@ -68,7 +68,7 @@ if "v15_score" not in df.columns or "v15_stage" not in df.columns:
     st.error("Latest scanner data does not contain V15 fields. Run the V15 GitHub Actions scanner first.")
     st.stop()
 
-for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_relative_strength_5m","v15_relative_strength_15m","v15_streak"]:
+for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_relative_strength_5m","v15_relative_strength_15m","v15_streak","exhaustion_score","exhaustion_extension","exhaustion_rollover","exhaustion_buy_stress","exhaustion_book_stress","exhaustion_rs_fade","exhaustion_efficiency_stress","exhaustion_symptoms","exhaustion_volume_ratio","exhaustion_trade_accel"]:
     if c in df.columns:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
@@ -213,13 +213,14 @@ early = df[df.get("stage", pd.Series(index=df.index, dtype=str)).isin(["PRE-PUMP
 breakouts = df[df.get("stage", pd.Series(index=df.index, dtype=str)).isin(["BREAKOUT", "CONFIRMED PUMP"])]
 building = df[df.get("stage", pd.Series(index=df.index, dtype=str)) == "BUILDING"]
 
-c1, c2, c3, c4, c5, c6 = st.columns(6)
+c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 c1.metric("🔥 Active Signals", len(active))
 c2.metric("⚡ Pre-Pump / Early", len(early))
 c3.metric("🚀 Breakouts", len(breakouts))
 c4.metric("👀 Watch", len(building))
 c5.metric("🏆 Top V15", f"{df['v15_score'].max():.0f}")
-c6.metric("🕒 Last Scan", last_scan)
+c6.metric("⚠️ Exhaustion", int((df.get("exhaustion_state", pd.Series(index=df.index)).eq("EXHAUSTION ALERT")).sum()))
+c7.metric("🕒 Last Scan", last_scan)
 
 if "book_status" in df.columns:
     ready_count = int((df["book_status"] == "🟢 READY").sum())
@@ -296,12 +297,12 @@ def format_signal_table(frame):
     cols = [
         "symbol", "price", "v15_score", "v15_opportunity_score", "v15_confirmation_score",
         "v15_stage", "v15_streak", "v15_relative_strength_5m", "v15_relative_strength_15m",
-        "v15_btc_risk_off", "v15_early_candidate", "v15_confirmed",
+        "v15_btc_risk_off", "v15_early_candidate", "v15_confirmed", "exhaustion_score", "exhaustion_state",
         "score", "stage", "book_status", "entry", "sell",
         "price_1m", "price_10s", "volume_ratio", "trade_accel",
         "buy_pressure", "book_imbalance", "spread_bps", "book_ready",
         "accumulation_score", "accumulation_stage", "accum_buy_pressure", "accum_trade_accel", "accum_volume_ratio", "accum_book_imbalance",
-        "score_delta", "score_delta_5", "score_velocity", "volume_accel", "acceleration", "chase_risk"
+        "score_delta", "score_delta_5", "score_velocity", "volume_accel", "acceleration", "chase_risk", "exhaustion_score", "exhaustion_state", "exhaustion_extension", "exhaustion_rollover"
     ]
     cols = list(dict.fromkeys(c for c in cols if c in frame.columns))
     x = frame.loc[:, cols].copy()
@@ -342,6 +343,9 @@ with tab1:
                 "volume_accel": st.column_config.NumberColumn("Vol Δ", format="%+.2fx"),
                 "chase_risk": st.column_config.TextColumn("Entry Risk"),
                 "book_status": st.column_config.TextColumn("Order Book"),
+                "exhaustion_score": st.column_config.ProgressColumn("Exhaustion", min_value=0, max_value=100, format="%d"),
+                "exhaustion_extension": st.column_config.NumberColumn("Extension %", format="%.2f"),
+                "exhaustion_rollover": st.column_config.NumberColumn("Rollover", format="%.0f"),
             },
         )
 
@@ -640,6 +644,14 @@ with tab5:
     c.metric("Price", f"{price:g}" if pd.notna(price) else "—")
     e.metric("Volume Ratio", f"{float(coin.get('volume_ratio', 0)):.2f}x")
 
+    if "exhaustion_score" in coin.index:
+        ex1, ex2, ex3 = st.columns(3)
+        ex1.metric("⚠️ Exhaustion", f"{float(coin.get('exhaustion_score',0)):.0f}/100")
+        ex2.metric("Exhaustion State", str(coin.get("exhaustion_state","NORMAL")))
+        ex3.metric("Extension", f"{float(coin.get('exhaustion_extension',0)):.2f}%")
+        if str(coin.get("exhaustion_state","NORMAL")) == "EXHAUSTION ALERT":
+            st.warning("⚠️ Momentum exhaustion alert: extension and deterioration symptoms are elevated.")
+
     if "accumulation_score" in coin.index:
         st.metric("🟣 Accumulation Score", f"{float(coin.get('accumulation_score', 0)):.0f}/100")
         st.caption(f"Accumulation status: **{coin.get('accumulation_stage', 'MONITOR')}**")
@@ -713,6 +725,69 @@ with tab5:
     }
     edf = pd.DataFrame({"Metric": list(evidence.keys()), "Value": list(evidence.values())})
     st.dataframe(edf, use_container_width=True, hide_index=True)
+
+with tab7:
+    st.subheader("⚠️ Exhaustion Momentum Alert")
+    st.caption("Detects an extended momentum move that is beginning to lose follow-through. This is a reversal-risk warning, not an automatic short or sell signal.")
+
+    ex = df.copy()
+    for col in ["exhaustion_score","exhaustion_extension","exhaustion_rollover","exhaustion_buy_stress","exhaustion_book_stress","exhaustion_rs_fade","exhaustion_efficiency_stress","exhaustion_symptoms","exhaustion_volume_ratio","exhaustion_trade_accel","v15_score"]:
+        if col in ex.columns:
+            ex[col] = pd.to_numeric(ex[col], errors="coerce").fillna(0)
+
+    if "exhaustion_state" not in ex.columns:
+        st.warning("Exhaustion data is not present in the latest scanner run. Run the updated V15 workflow first.")
+    else:
+        alerts = ex[ex["exhaustion_state"].eq("EXHAUSTION ALERT")].sort_values(["exhaustion_score","v15_score"], ascending=False)
+        watches = ex[ex["exhaustion_state"].eq("EXHAUSTION WATCH")].sort_values(["exhaustion_score","v15_score"], ascending=False)
+        extended = ex[ex["exhaustion_state"].eq("EXTENDED / MONITOR")].sort_values(["exhaustion_score","v15_score"], ascending=False)
+
+        e1,e2,e3,e4 = st.columns(4)
+        e1.metric("🚨 Alert", len(alerts))
+        e2.metric("🟠 Watch", len(watches))
+        e3.metric("🟡 Extended", len(extended))
+        e4.metric("Highest Exhaustion", f"{ex['exhaustion_score'].max():.0f}/100")
+
+        st.markdown("### 🚨 Active Exhaustion Alerts")
+        if alerts.empty:
+            st.success("No active exhaustion alerts in the latest scan.")
+        else:
+            display = alerts[[c for c in ["symbol","exhaustion_score","exhaustion_state","v15_score","v15_stage","exhaustion_extension","exhaustion_rollover","exhaustion_buy_stress","exhaustion_book_stress","exhaustion_rs_fade","exhaustion_symptoms","price_1m","price_10s","volume_ratio","trade_accel","buy_pressure","book_imbalance"] if c in alerts.columns]].copy()
+            if "buy_pressure" in display.columns:
+                display["buy_pressure"] *= 100
+            st.dataframe(display, use_container_width=True, hide_index=True, column_config={
+                "exhaustion_score": st.column_config.ProgressColumn("Exhaustion", min_value=0, max_value=100, format="%d"),
+                "v15_score": st.column_config.ProgressColumn("V15", min_value=0, max_value=100, format="%d"),
+                "exhaustion_extension": st.column_config.NumberColumn("Extension %", format="%.2f"),
+                "exhaustion_rollover": st.column_config.NumberColumn("Rollover", format="%.0f"),
+                "exhaustion_buy_stress": st.column_config.NumberColumn("Buy Stress", format="%.0f"),
+                "exhaustion_book_stress": st.column_config.NumberColumn("Book Stress", format="%.0f"),
+                "exhaustion_rs_fade": st.column_config.NumberColumn("RS Fade", format="%.0f"),
+                "buy_pressure": st.column_config.NumberColumn("Buy %", format="%.1f%%"),
+                "price_1m": st.column_config.NumberColumn("1m %", format="%.2f"),
+                "price_10s": st.column_config.NumberColumn("10s %", format="%.2f"),
+                "volume_ratio": st.column_config.NumberColumn("Volume", format="%.2fx"),
+                "trade_accel": st.column_config.NumberColumn("Trade Accel", format="%.2fx"),
+                "book_imbalance": st.column_config.NumberColumn("Book Imbalance", format="%+.2f"),
+            })
+
+        st.markdown("### 🟠 Exhaustion Watch")
+        watch_display = ex[ex["exhaustion_state"].isin(["EXHAUSTION WATCH","EXTENDED / MONITOR"])].head(20)
+        if watch_display.empty:
+            st.info("No extended momentum setups currently require monitoring.")
+        else:
+            st.dataframe(watch_display[[c for c in ["symbol","exhaustion_score","exhaustion_state","v15_score","v15_stage","exhaustion_extension","exhaustion_rollover","exhaustion_symptoms","price_1m","volume_ratio","buy_pressure","book_imbalance"] if c in watch_display.columns]], use_container_width=True, hide_index=True, column_config={
+                "exhaustion_score": st.column_config.ProgressColumn("Exhaustion", min_value=0, max_value=100, format="%d"),
+                "v15_score": st.column_config.ProgressColumn("V15", min_value=0, max_value=100, format="%d"),
+                "exhaustion_extension": st.column_config.NumberColumn("Extension %", format="%.2f"),
+                "exhaustion_rollover": st.column_config.NumberColumn("Rollover", format="%.0f"),
+                "buy_pressure": st.column_config.NumberColumn("Buy %", format="%.1f%%"),
+                "price_1m": st.column_config.NumberColumn("1m %", format="%.2f"),
+                "volume_ratio": st.column_config.NumberColumn("Volume", format="%.2fx"),
+                "book_imbalance": st.column_config.NumberColumn("Book Imbalance", format="%+.2f"),
+            })
+
+        st.info("How to read it: **Exhaustion Alert** means the move is extended and multiple deterioration symptoms are present. Use it alongside price structure and confirmation; it does not predict a reversal by itself.")
 
 with tab6:
     st.subheader("📜 Signal History")
