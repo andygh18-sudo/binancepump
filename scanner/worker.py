@@ -6,7 +6,11 @@ from .orderbook import LocalOrderBook
 load_dotenv()
 WS=os.getenv("BINANCE_WS_BASE","wss://data-stream.binance.vision/stream")
 REST=os.getenv("BINANCE_REST_BASE","https://data-api.binance.vision")
-MAX=int(os.getenv("MAX_SYMBOLS","40"));MINVOL=float(os.getenv("MIN_QUOTE_VOLUME","1000000"))
+MAX=int(os.getenv("MAX_SYMBOLS","120"))
+MINVOL=float(os.getenv("MIN_QUOTE_VOLUME","100000"))
+DISCOVERY_MINVOL=float(os.getenv("DISCOVERY_MIN_QUOTE_VOLUME","50000"))
+MOMENTUM_SYMBOLS=int(os.getenv("MOMENTUM_SYMBOLS","40"))
+LIQUID_SYMBOLS=int(os.getenv("LIQUID_SYMBOLS","80"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"))
 TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"))
@@ -17,15 +21,64 @@ async def get_json(s,url,params=None):
         r.raise_for_status();return await r.json()
 
 async def discover(s):
+    """
+    Build a wider pump-detection universe instead of selecting only the
+    highest 24h-volume symbols.
+
+    The intensive WebSocket/order-book scan is the union of:
+      1) liquidity leaders (stable, high-volume markets), and
+      2) momentum leaders (large current 24h price moves with enough liquidity).
+
+    This lets a lower-ranked coin enter the monitored universe when it starts
+    moving rapidly, rather than waiting until its 24h volume rank catches up.
+    """
     info=await get_json(s,REST+"/api/v3/exchangeInfo")
     stable_bases={"USDT","USDC","FDUSD","TUSD","USDP","DAI","BUSD","PYUSD","USDD","EUR","GBP","TRY","BRL","ARS","AUD","RUB","UAH","PLN","RON","ZAR","NGN","JPY"}
     trad={x["symbol"] for x in info["symbols"] if x["status"]=="TRADING" and x["quoteAsset"]=="USDT" and x.get("baseAsset") not in stable_bases}
     ticks=await get_json(s,REST+"/api/v3/ticker/24hr")
-    rows=[x for x in ticks if x["symbol"] in trad and float(x.get("quoteVolume",0))>=MINVOL]
-    rows.sort(key=lambda x:float(x.get("quoteVolume",0)),reverse=True)
-    out=[x["symbol"] for x in rows[:MAX]]
-    if "BTCUSDT" not in out and "BTCUSDT" in trad:out.append("BTCUSDT")
-    return out
+
+    rows=[
+        x for x in ticks
+        if x["symbol"] in trad
+        and float(x.get("quoteVolume",0)) >= DISCOVERY_MINVOL
+    ]
+
+    # Keep a strong liquidity core.
+    liquidity=sorted(
+        rows,
+        key=lambda x: float(x.get("quoteVolume",0)),
+        reverse=True
+    )[:LIQUID_SYMBOLS]
+
+    # Add markets showing unusually strong 24h momentum. Use quote volume as
+    # a secondary key so extremely illiquid percentage moves do not dominate.
+    momentum=sorted(
+        rows,
+        key=lambda x: (
+            float(x.get("priceChangePercent",0)),
+            float(x.get("quoteVolume",0))
+        ),
+        reverse=True
+    )[:MOMENTUM_SYMBOLS]
+
+    selected={}
+    for row in liquidity + momentum:
+        selected[row["symbol"]]=row
+
+    # Respect the overall WebSocket budget while guaranteeing the liquidity
+    # core remains represented.
+    out=[x["symbol"] for x in liquidity]
+    for x in momentum:
+        if x["symbol"] not in out and len(out)<MAX:
+            out.append(x["symbol"])
+
+    if "BTCUSDT" not in out and "BTCUSDT" in trad:
+        if len(out)>=MAX:
+            out[-1]="BTCUSDT"
+        else:
+            out.append("BTCUSDT")
+
+    return out[:MAX]
 
 def event(stream,d):
     s=d.get("s","")
