@@ -1,6 +1,10 @@
 name: Binance Pump Scanner V15 Production
 
 on:
+  push:
+    paths:
+      - "scanner/worker.py"
+      - ".github/workflows/pump_scanner.yml"
   workflow_dispatch:
   schedule:
     - cron: "*/15 * * * *"
