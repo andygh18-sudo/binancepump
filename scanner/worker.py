@@ -689,7 +689,10 @@ def score(s):
     v10=v10_signal(s,v4,eps)
     v11=v11_signal(s,v4,eps)
     v12=v12_signal(s,v4,eps)
+    ignition=v15_early_ignition(s,eps,v12)
     v15=v15_signal(s,v4,eps,v12)
+    if not v15:v15={"v15_opportunity_score":0,"v15_confirmation_score":0,"v15_score":0,"v15_stage":"NEUTRAL","v15_early_candidate":False,"v15_confirmed":False,"v15_streak":0,"v15_btc_risk_off":False,"v15_relative_strength_5m":eps.get("relative_strength_5m",0) if eps else 0,"v15_relative_strength_15m":eps.get("relative_strength_15m",0) if eps else 0}
+    v15.update(ignition or {})
     exhaustion=exhaustion_momentum(s,eps,v12,v15)
     hybrid=v11_v12_hybrid(v11,v12)
     hs=hybrid.get("hybrid_score",0) if hybrid else 0
