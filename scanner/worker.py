@@ -910,6 +910,75 @@ def v11_v12_hybrid(v11,v12):
     else:path="WATCH";grade="WATCH"
     return {"hybrid_score":score,"hybrid_path":path,"hybrid_grade":grade,"hybrid_alert":alert,"hybrid_a_plus":a_plus,"hybrid_confirmation":confirmation,"hybrid_efficiency":round(efficiency,4)}
 
+def pump_momentum_score(s, v15, eps):
+    """Dedicated short-term pump intensity score; independent of BUY SETUP QUALITY."""
+    x=state[s]
+    _,v10,b10,p10=stats(s,10)
+    _,v60,_,p60=stats(s,60)
+    _,v300,_,_=stats(s,300)
+    vr=v60/max(v300/5,1)
+    accel=acceleration_ratio(v10,v60)
+    ob=books[s].metrics(20)
+    imb=float(ob.get("imbalance",0) or 0)
+
+    rs5=float((eps or {}).get("relative_strength_5m",0) or 0)
+    rs15=float((eps or {}).get("relative_strength_15m",0) or 0)
+    v15_score=float((v15 or {}).get("v15_score",0) or 0)
+    v15_opp=float((v15 or {}).get("v15_opportunity_score",0) or 0)
+    ign_score=float((v15 or {}).get("v15_ignition_score",0) or 0)
+    accel_slope=float((v15 or {}).get("v15_trade_accel_slope",0) or 0)
+    buy_slope=float((v15 or {}).get("v15_buy_pressure_slope",0) or 0)
+
+    # Price intensity: reward sustained 60s movement while retaining the
+    # faster 10s impulse as an early-pump component.
+    price_10=max(0,min((p10+0.25)/2.75,1))
+    price_60=max(0,min((p60+0.25)/5.0,1))
+    price_component=(price_10*8 + price_60*12)
+
+    volume_component=max(0,min((vr-0.75)/2.75,1))*15
+    trade_component=max(0,min((accel-0.75)/2.75,1))*15
+    buy_component=max(0,min((b10-.45)/.35,1))*10
+    book_component=max(0,min((imb+.25)/.75,1))*10
+    rs_component=(max(0,min((rs5+.50)/2.0,1))*6 +
+                  max(0,min((rs15+.75)/3.0,1))*4)
+
+    trajectory=(max(0,min(v15_score/100,1))*4 +
+                max(0,min(v15_opp/100,1))*2 +
+                max(0,min(ign_score/100,1))*2 +
+                max(0,min((accel_slope+0.25)/1.25,1))*1 +
+                max(0,min((buy_slope+0.01)/0.06,1))*1)
+
+    score=max(0,min(round(price_component+volume_component+trade_component+
+                         buy_component+book_component+rs_component+trajectory),100))
+
+    if score>=90:
+        label="EXTREME"
+    elif score>=75:
+        label="EXPLOSIVE"
+    elif score>=60:
+        label="STRONG"
+    elif score>=40:
+        label="BUILDING"
+    else:
+        label="NORMAL"
+
+    reasons=[]
+    if price_component>=15: reasons.append("PRICE ACCELERATION")
+    if volume_component>=10: reasons.append("VOLUME EXPANSION")
+    if trade_component>=10: reasons.append("TRADE ACCELERATION")
+    if buy_component>=7: reasons.append("BUY PRESSURE")
+    if book_component>=7: reasons.append("ORDER BOOK")
+    if rs_component>=7: reasons.append("OUTPERFORMING BTC")
+    if trajectory>=7: reasons.append("V15 TRAJECTORY")
+    if not reasons: reasons.append("MOMENTUM BUILDING")
+
+    return {
+        "pump_momentum_score":score,
+        "pump_momentum_label":label,
+        "pump_momentum_reasons":" | ".join(reasons[:3]),
+    }
+
+
 def score(s):
     x=state[s];c=x["candle"]
     if not x["price"] or not c or s not in books:return None
@@ -963,6 +1032,7 @@ def score(s):
     v15["v15_reignition_score"]=reignition_score
     v15["v15_reignition_watch"]=reset_condition
     exhaustion=exhaustion_momentum(s,eps,v12,v15)
+    pump_momentum=pump_momentum_score(s,v15,eps)
     base=max(v300/30,1);vr=v60/max(v300/5,1);acc=acceleration_ratio(raw_v10,v60)
     buy_quality=buy_setup_quality(v15,tv,exhaustion,v12,vr,acc,b10,bool(v15.get("v15_btc_risk_off",False)))
     buy_decision=buy_decision_layer(v15,tv,exhaustion,buy_quality,v12)
@@ -981,7 +1051,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**buy_quality,**buy_decision,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
+    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,**pump_momentum,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**buy_quality,**buy_decision,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
