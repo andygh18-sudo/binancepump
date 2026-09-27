@@ -313,7 +313,7 @@ st.subheader("🎯 Entry Signal Monitor")
 st.caption("V15 is authoritative here: PRE-PUMP/EARLY_PUMP indicate opportunity; CONFIRMED requires stronger confirmation. Legacy V11/V12 values are supporting diagnostics.")
 
 entry_df = df.copy()
-for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_reignition_score","buy_setup_quality","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","price_1m","volume_ratio","buy_pressure"]:
+for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_reignition_score","buy_setup_quality","buy_decision_score","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","price_1m","volume_ratio","buy_pressure"]:
     if c in entry_df.columns:
         entry_df[c] = pd.to_numeric(entry_df[c], errors="coerce").fillna(0)
 
@@ -355,6 +355,12 @@ entry_view = entry_df[~entry_df["entry_signal"].eq("🔴 V15 AVOID")].copy()
 # the newly added BUY SETUP QUALITY fields.
 if "buy_setup_quality" not in entry_view.columns:
     entry_view["buy_setup_quality"] = np.nan
+if "buy_decision" not in entry_view.columns:
+    entry_view["buy_decision"] = "N/A"
+if "buy_decision_reasons" not in entry_view.columns:
+    entry_view["buy_decision_reasons"] = "Awaiting V15 scanner refresh"
+if "buy_decision_score" not in entry_view.columns:
+    entry_view["buy_decision_score"] = np.nan
 if "buy_setup_quality_label" not in entry_view.columns:
     entry_view["buy_setup_quality_label"] = "N/A"
 if "buy_setup_quality_reasons" not in entry_view.columns:
@@ -365,6 +371,7 @@ entry_view["buy_setup_quality"] = pd.to_numeric(
     entry_view["buy_setup_quality"], errors="coerce"
 )
 for _sort_col in ["v15_score", "v15_confirmation_score"]:
+
     if _sort_col not in entry_view.columns:
         entry_view[_sort_col] = 0
     entry_view[_sort_col] = pd.to_numeric(
@@ -375,8 +382,11 @@ entry_view = entry_view.sort_values(
     ["buy_setup_quality", "v15_score", "v15_confirmation_score"],
     ascending=[False, False, False]
 ).head(20)
-entry_cols = [c for c in ["symbol","entry_signal","buy_setup_quality","buy_setup_quality_label","buy_setup_quality_reasons","v15_score","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_30m_rsi","tv_1h_rsi","tv_4h_rsi","tv_1d_rsi","tv_1w_rsi","tv_1m_rsi","v15_stage","v15_regime","v15_reignition_score","v15_reignition_watch","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
+entry_cols = [c for c in ["symbol","entry_signal","buy_decision","buy_decision_reasons","buy_setup_quality","buy_setup_quality_label","buy_setup_quality_reasons","v15_score","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_30m_rsi","tv_1h_rsi","tv_4h_rsi","tv_1d_rsi","tv_1w_rsi","tv_1m_rsi","v15_stage","v15_regime","v15_reignition_score","v15_reignition_watch","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
 st.dataframe(entry_view[entry_cols], use_container_width=True, hide_index=True, column_config={
+    "buy_decision": st.column_config.TextColumn("DECISION"),
+    "buy_decision_reasons": st.column_config.TextColumn("Decision Why"),
+    "buy_decision_score": st.column_config.ProgressColumn("Decision Score", min_value=0, max_value=100, format="%d"),
     "buy_setup_quality": st.column_config.ProgressColumn("BUY SETUP QUALITY", min_value=0, max_value=100, format="%d"),
     "buy_setup_quality_label": st.column_config.TextColumn("Setup Quality"),
     "buy_setup_quality_reasons": st.column_config.TextColumn("Why"),
