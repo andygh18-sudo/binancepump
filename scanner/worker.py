@@ -139,13 +139,15 @@ def early_pump_score(s, ac):
     buy=max(0,min((b10-.50)/.25,1))*14
     vol=max(0,min((vr-1)/2,1))*13
     trade=max(0,min((accel-1)/2,1))*13
-    pressure=max(0,min((p10+.5)/2.5,1))*8
+    # V15.1: use the 60s move as the primary short-term price direction.
+    # The 10s move remains a microstructure input, not a hard direction gate.
+    pressure=max(0,min((p60+.25)/2.5,1))*8
     compression=7 if abs(p60)<2 and vr<1.5 else 0
-    structure=8 if p10>0 and p60>0 else 4 if p10>=-0.25 else 0
+    structure=8 if p60>0 else 4 if p60>=-0.25 else 0
     book=max(0,min((imb+.20)/.60,1))*8
     activity=5 if stats(s,10)[0]>=4 and stats(s,60)[0]>=12 else 0
     relative=max(0,min((rs5+.25)/1.5,1))*7
-    volatility=5 if abs(p10)>0.35 and vr>1.3 else 0
+    volatility=5 if abs(p60)>0.75 and vr>1.3 else 0
     resistance=5 if -0.5 <= p1 <= 1.5 else 1
 
     penalty=0
@@ -156,7 +158,7 @@ def early_pump_score(s, ac):
     if rs15 < -1: penalty+=4
 
     score=max(0,min(round(buy+vol+trade+pressure+compression+structure+book+activity+relative+volatility+resistance-penalty),100))
-    quality=score>=50 and b10>=.55 and accel>=1.25 and p10<4 and rs5>-1
+    quality=score>=50 and b10>=.55 and accel>=1.25 and p60<8 and rs5>-1
     stage="EARLY PUMP" if score>=80 and quality else "PRE-PUMP" if score>=65 and quality else "BUILDING" if score>=50 and quality else "MONITOR"
     return {"early_pump_score":score,"early_pump_stage":stage,"early_pump_quality":quality,
             "relative_strength_5m":rs5,"relative_strength_15m":rs15,"btc_ret_5m":btc5,"btc_ret_15m":btc15,
@@ -647,29 +649,40 @@ def v15_early_ignition(s, eps, v12):
     rs_score=min(max((rs5-.05)/.75,0),1)*16
     buy_slope_score=min(max(buy_slope/.08,0),1)*8
     activity_score=7 if trades10>=4 else 3 if trades10>=2 else 0
-    compression_bonus=5 if abs(p60)<2.0 and p10<3.0 else 0
+    compression_bonus=5 if abs(p60)<2.0 else 0
     volume_bonus=min(max((vr-.50)/1.50,0),1)*5
     penalty=0
-    if p10>=3: penalty+=8
+    # 10s is deliberately a soft reversal/exhaustion signal.
+    if p10 < -0.75: penalty+=5
+    if p10 < -1.25: penalty+=5
     if p60>=5: penalty+=8
     if rs5<-.25: penalty+=8
     if btc_risk: penalty+=25
     score=max(0,min(round(pressure_score+accel_score+slope_score+rs_score+buy_slope_score+activity_score+compression_bonus+volume_bonus-penalty),100))
-    signals=sum([
-        b10>=.55,
+    # Primary early-pump gates: 60s direction + participation, then independent confirmation.
+    confirmations=sum([
+        p60>=1.50,
+        vr>=2.00,
         accel10>=1.50,
-        accel_slope>=0.15,
-        rs5>=.10,
-        buy_slope>=0.01,
-        trades10>=4,
-        p10<3.0,
+        b10>=.60,
+        buy_slope>=.15,
+        p5>0,
+        rs5>0,
     ])
-    if btc_risk or p10>=4 or p60>=8:stage="AVOID"
-    elif score>=78 and signals>=4:stage="EARLY_IGNITION"
-    elif score>=65 and signals>=3:stage="PRE_PUMP_IGNITION"
-    elif score>=55 and signals>=3:stage="IGNITION_WATCH"
+    signals=sum([
+        p60>=1.50,
+        vr>=2.00,
+        accel10>=1.50,
+        b10>=.60,
+        accel_slope>=0.15,
+        rs5>=0,
+    ])
+    if btc_risk or p60>=8 or p10 < -1.25:stage="AVOID"
+    elif p60>=2.00 and vr>=2.50 and accel10>=1.75 and confirmations>=5 and score>=78:stage="EARLY_IGNITION"
+    elif p60>=1.50 and vr>=2.00 and accel10>=1.50 and confirmations>=4 and score>=65:stage="PRE_PUMP_IGNITION"
+    elif p60>=0.75 and score>=55 and signals>=3:stage="IGNITION_WATCH"
     else:stage="NORMAL"
-    alert=stage in ("EARLY_IGNITION","PRE_PUMP_IGNITION") and score>=65 and signals>=3 and not btc_risk
+    alert=stage in ("EARLY_IGNITION","PRE_PUMP_IGNITION") and score>=65 and not btc_risk
     return {
         "v15_ignition_score":score,"v15_ignition_stage":stage,"v15_ignition_alert":alert,
         "v15_ignition_signals":signals,"v15_trade_accel_slope":round(accel_slope,2),
@@ -698,14 +711,24 @@ def v15_signal(s,v4,eps,v12):
     opportunity=max(0,min(round(early*100),100))
     conf=0.22*min(max((vr-1)/2,0),1)+0.18*min(max((acc-1)/2,0),1)+0.15*min(max((b10-.50)/.20,0),1)+0.12*(1 if structure else 0)+0.10*(1 if confirmation else 0)+0.10*min(max((rs5+.25)/1.25,0),1)+0.08*min(max(eff/.75,0),1)+0.05*(1 if v4.get("v4_alert_quality") in ("A","B") else 0)
     tv=tv_cache.get(s,{}) or {};tv_score=float(tv.get("tv_score",50) or 50);tv_adj=round((tv_score-50.0)*0.18);confirmation_score=max(0,min(round(conf*100)+tv_adj,100))
-    if btc_risk or p10>=4 or p60>=8 or rs15<-1.5:stage="AVOID"
-    elif v4.get("v4_alert_quality")=="A" and confirmation_score>=70 and p10<2.5:stage="CONFIRMED"
+    # 60s direction is the main short-term gate; 10s only protects against a sharp reversal.
+    if btc_risk or p60>=8 or p10 < -1.25 or rs15<-1.5:stage="AVOID"
+    elif v4.get("v4_alert_quality")=="A" and confirmation_score>=70 and p60>=2.5 and vr>=3.0 and acc>=2.0:stage="CONFIRMED"
     elif eps.get("early_pump_stage")=="EARLY PUMP" and opportunity>=60:stage="EARLY_PUMP"
     elif eps.get("early_pump_stage")=="PRE-PUMP" and opportunity>=50:stage="PRE_PUMP"
     elif opportunity>=40:stage="WATCH"
     else:stage="NEUTRAL"
-    early_candidate=stage in ("PRE_PUMP","EARLY_PUMP") and opportunity>=50 and b10>=.53 and vr>=1.15 and acc>=1.10 and rs5>-.25 and not btc_risk
-    confirmed=stage=="CONFIRMED" and confirmation_score>=60 and b10>=.55 and vr>=1.5 and acc>=1.25 and rs5>0 and efficiency>=.25 and not btc_risk
+    # Recommended thresholds:
+    # MONITOR 60s >= +0.75%; EARLY >= +1.5% + 2x volume + 1.5x accel;
+    # STRONG EARLY >= +2% + 2.5x volume + 1.75x accel;
+    # CONFIRMED >= +2.5% + 3x volume + 2x accel.
+    early_candidate=(stage in ("PRE_PUMP","EARLY_PUMP") and opportunity>=50
+                     and p60>=1.50 and vr>=2.00 and acc>=1.50
+                     and sum([b10>=.60, p60>=1.50, rs5>0, rs15>0, structure])>=2
+                     and not btc_risk)
+    confirmed=(stage=="CONFIRMED" and confirmation_score>=60
+               and p60>=2.50 and vr>=3.00 and acc>=2.00
+               and b10>=.55 and rs5>0 and efficiency>=.25 and not btc_risk)
     return {"v15_opportunity_score":opportunity,"v15_confirmation_score":confirmation_score,"v15_score":max(opportunity,confirmation_score),"v15_tv_adjustment":tv_adj,"v15_tv_score":tv_score,"v15_stage":stage,"v15_early_candidate":early_candidate,"v15_confirmed":confirmed,"v15_streak":streak,"v15_btc_risk_off":btc_risk,"v15_relative_strength_5m":rs5,"v15_relative_strength_15m":rs15}
 
 def v11_v12_hybrid(v11,v12):
