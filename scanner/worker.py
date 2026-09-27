@@ -828,16 +828,8 @@ async def main():
                                 tv_cache={};tv_last_refresh=time.time()
                         rows=[r for s in symbols if (r:=score(s))]
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
-                        candidates=[r for r in rows if r.get("v15_alert",False) and r.get("v15_score",0)>=55 and r.get("v15_stage") in ("PRE_PUMP","EARLY_PUMP","CONFIRMED")][:TOP_ALERTS]
-                        top_symbols={r["symbol"]:i+1 for i,r in enumerate(candidates)}
-                        for r in candidates:
-                            s=r["symbol"];old=state[s];rank=top_symbols[s]
-                            changed=(old.get("last_stage")!=r["stage"] or old.get("last_entry")!=r["entry"] or old.get("last_alert_rank")!=rank)
-                            now=time.time()
-                            if changed and now-old["last_alert"]>=COOLDOWN:
-                                await telegram(f"🚨 {r['alert_tier']} | V15 TOP {rank} | {s} | {r['stage']} | V15 {r['v15_score']}/100 | Opportunity {r['v15_opportunity_score']}/100 | Confirmation {r['v15_confirmation_score']}/100 | V11 {r['v11_score']}/100 | V12 {r['v12_score']}/100\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\n📺 TV: {r.get('tv_confirmation','N/A')} | TV {r.get('tv_score',0):.0f}/100 | RSI 30m {(r.get('tv_30m_rsi') if r.get('tv_30m_rsi') is not None else 0):.1f} | 1h {(r.get('tv_1h_rsi') if r.get('tv_1h_rsi') is not None else 0):.1f} | 4h {(r.get('tv_4h_rsi') if r.get('tv_4h_rsi') is not None else 0):.1f} | 1D {(r.get('tv_1d_rsi') if r.get('tv_1d_rsi') is not None else 0):.1f} | 1W {(r.get('tv_1w_rsi') if r.get('tv_1w_rsi') is not None else 0):.1f} | 1M {(r.get('tv_1m_rsi') if r.get('tv_1m_rsi') is not None else 0):.1f}\nPrice: {r['price']}")
-                                old["last_alert"]=now;old["last_alert_rank"]=rank
-                            old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
+                        # Legacy V15 TOP alerts are intentionally disabled here.
+                        # Early Telegram alerts are governed exclusively by the three-stage V15.1 ignition model below.
                         # V15.1 Telegram uses a single three-stage ignition model:
                         # 1) IGNITION_WATCH      >=55 score, >=3 signals, 60s >=0.75%
                         # 2) PRE_PUMP_IGNITION   >=65 score, >=4 confirmations, 60s >=1.50%, Vol >=2x, Accel >=1.50x
