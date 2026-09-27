@@ -858,11 +858,11 @@ def score(s):
     v15["v15_reignition_score"]=reignition_score
     v15["v15_reignition_watch"]=reset_condition
     exhaustion=exhaustion_momentum(s,eps,v12,v15)
+    base=max(v300/30,1);vr=v60/max(v300/5,1);acc=acceleration_ratio(raw_v10,v60)
     buy_quality=buy_setup_quality(v15,tv,exhaustion,v12,vr,acc,b10,bool(v15.get("v15_btc_risk_off",False)))
     hybrid=v11_v12_hybrid(v11,v12)
     hs=hybrid.get("hybrid_score",0) if hybrid else 0
     alert_tier="HIGH PRIORITY" if hs>=80 else "EARLY ACTION" if hs>=70 else "PRE-PUMP WATCH" if hs>=62 else "BELOW WATCH"
-    base=max(v300/30,1);vr=v60/max(v300/5,1);acc=acceleration_ratio(raw_v10,v60)
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
     raw=min(max(p10,0)*10,20)+min(max(vr-1,0)*14,28)+min(max(acc-1,0)*12,18)
