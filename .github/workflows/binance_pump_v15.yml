@@ -101,6 +101,10 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           }
 
+          python run_scanner.py &
+          V15_PID=$!
+          export V15_PID
+
           (
             while kill -0 "$V15_PID" 2>/dev/null; do
               sleep 30
@@ -109,9 +113,6 @@ jobs:
           ) &
           PUBLISHER_PID=$!
 
-          python run_scanner.py &
-          V15_PID=$!
-          export V15_PID
           wait $V15_PID
           wait $PUBLISHER_PID || true
 
