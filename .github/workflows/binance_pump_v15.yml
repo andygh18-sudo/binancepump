@@ -11,6 +11,7 @@ on:
 permissions:
   contents: write
 
+# V15.1 five-minute trajectory retry trigger
 concurrency:
   group: binance-pump-v15-live
   cancel-in-progress: false
