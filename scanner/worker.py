@@ -685,7 +685,7 @@ def v15_early_ignition(s, eps, v12):
     alert=stage in ("EARLY_IGNITION","PRE_PUMP_IGNITION") and score>=65 and not btc_risk
     return {
         "v15_ignition_score":score,"v15_ignition_stage":stage,"v15_ignition_alert":alert,
-        "v15_ignition_signals":signals,"v15_trade_accel_slope":round(accel_slope,2),
+        "v15_ignition_signals":signals,"v15_ignition_confirmations":confirmations,"v15_trade_accel_slope":round(accel_slope,2),
         "v15_buy_pressure_slope":round(buy_slope,4),"v15_ignition_volume_ratio":round(vr,2),
         "v15_ignition_accel":round(accel10,2),"v15_ignition_rs5":round(rs5,2),
         "v15_ignition_rs15":round(rs15,2),"v15_ignition_trades_10s":trades10,
@@ -783,7 +783,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
+    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
@@ -838,20 +838,60 @@ async def main():
                                 await telegram(f"🚨 {r['alert_tier']} | V15 TOP {rank} | {s} | {r['stage']} | V15 {r['v15_score']}/100 | Opportunity {r['v15_opportunity_score']}/100 | Confirmation {r['v15_confirmation_score']}/100 | V11 {r['v11_score']}/100 | V12 {r['v12_score']}/100\nEntry: {r['entry']}\n1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}% | Vol: {r['volume_ratio']:.2f}x\nBuy: {r['buy_pressure']*100:.1f}% | OB: {r['book_imbalance']:+.2f} | Spread: {r['spread_bps']:.2f} bps\n📺 TV: {r.get('tv_confirmation','N/A')} | TV {r.get('tv_score',0):.0f}/100 | RSI 30m {(r.get('tv_30m_rsi') if r.get('tv_30m_rsi') is not None else 0):.1f} | 1h {(r.get('tv_1h_rsi') if r.get('tv_1h_rsi') is not None else 0):.1f} | 4h {(r.get('tv_4h_rsi') if r.get('tv_4h_rsi') is not None else 0):.1f} | 1D {(r.get('tv_1d_rsi') if r.get('tv_1d_rsi') is not None else 0):.1f} | 1W {(r.get('tv_1w_rsi') if r.get('tv_1w_rsi') is not None else 0):.1f} | 1M {(r.get('tv_1m_rsi') if r.get('tv_1m_rsi') is not None else 0):.1f}\nPrice: {r['price']}")
                                 old["last_alert"]=now;old["last_alert_rank"]=rank
                             old["last_stage"]=r["stage"];old["last_entry"]=r["entry"]
-                        ignition_candidates=[r for r in rows if r.get("v15_ignition_alert") and r.get("v15_ignition_score",0)>=65 and r.get("v15_ignition_signals",0)>=3]
-                        ignition_candidates=sorted(ignition_candidates,key=lambda r:(r.get("v15_ignition_score",0),r.get("v15_trade_accel_slope",0)),reverse=True)[:TOP_ALERTS]
+                        # V15.1 Telegram uses a single three-stage ignition model:
+                        # 1) IGNITION_WATCH      >=55 score, >=3 signals, 60s >=0.75%
+                        # 2) PRE_PUMP_IGNITION   >=65 score, >=4 confirmations, 60s >=1.50%, Vol >=2x, Accel >=1.50x
+                        # 3) EARLY_IGNITION      >=78 score, >=5 confirmations, 60s >=2.00%, Vol >=2.50x, Accel >=1.75x
+                        # AVOID/BTC risk-off never alerts. Alerts are sent on stage entry or meaningful score improvement.
+                        def telegram_ignition_stage(r):
+                            stage=r.get("v15_ignition_stage","NORMAL")
+                            score_i=float(r.get("v15_ignition_score",0) or 0)
+                            p60=float(r.get("price_60s",0) or 0)
+                            vr_i=float(r.get("volume_ratio",0) or 0)
+                            acc_i=float(r.get("v15_ignition_accel",0) or 0)
+                            sig=int(r.get("v15_ignition_signals",0) or 0)
+                            confirmations=int(r.get("v15_ignition_confirmations",sig) or sig)
+                            btc_off=bool(r.get("v15_btc_risk_off",False))
+                            if btc_off or stage in ("AVOID","NORMAL"):
+                                return None
+                            if stage=="EARLY_IGNITION" and score_i>=78 and confirmations>=5 and p60>=2.0 and vr_i>=2.5 and acc_i>=1.75:
+                                return "EARLY_IGNITION"
+                            if stage=="PRE_PUMP_IGNITION" and score_i>=65 and confirmations>=4 and p60>=1.5 and vr_i>=2.0 and acc_i>=1.5:
+                                return "PRE_PUMP_IGNITION"
+                            if stage=="IGNITION_WATCH" and score_i>=55 and sig>=3 and p60>=0.75:
+                                return "IGNITION_WATCH"
+                            return None
+
+                        ignition_candidates=[]
+                        for r in rows:
+                            stage=telegram_ignition_stage(r)
+                            if stage:
+                                rr=dict(r);rr["_telegram_ignition_stage"]=stage
+                                ignition_candidates.append(rr)
+                        ignition_candidates=sorted(
+                            ignition_candidates,
+                            key=lambda r: (
+                                {"EARLY_IGNITION":3,"PRE_PUMP_IGNITION":2,"IGNITION_WATCH":1}.get(r["_telegram_ignition_stage"],0),
+                                r.get("v15_ignition_score",0),
+                                r.get("v15_trade_accel_slope",0)
+                            ),
+                            reverse=True
+                        )[:TOP_ALERTS]
                         for r in ignition_candidates:
-                            s=r["symbol"];old=state[s];now=time.time()
-                            changed=(r.get("v15_ignition_stage")!=old.get("last_ignition_stage") or r.get("v15_ignition_score",0)-float(old.get("last_ignition_score",0))>=5)
+                            s=r["symbol"];old=state[s];now=time.time();stage=r["_telegram_ignition_stage"]
+                            changed=(stage!=old.get("last_ignition_stage") or
+                                     r.get("v15_ignition_score",0)-float(old.get("last_ignition_score",0))>=5)
                             if changed and now-old["last_ignition_alert"]>=COOLDOWN:
-                                msg=(f"🟢 V15.1 EARLY IGNITION | {s} | {r['v15_ignition_stage']} | Ignition {r['v15_ignition_score']}/100 | Signals {r['v15_ignition_signals']}\\n"
-                                      f"Trade accel: {r['v15_ignition_accel']:.2f}x | Accel slope: {r['v15_trade_accel_slope']:+.2f}x | Buy: {r['buy_pressure']*100:.1f}% | Buy slope: {r['v15_buy_pressure_slope']:+.3f}\\n"
-                                      f"RS 5m: {r['v15_ignition_rs5']:+.2f}% | RS 15m: {r['v15_ignition_rs15']:+.2f}% | Vol: {r['volume_ratio']:.2f}x | 10s trades: {r['v15_ignition_trades_10s']}\\n"
-                                      f"Price: {r['price']} | 10s: {r['price_10s']:.2f}%\\n"
-                                      "⚠️ Early ignition signal — volume confirmation may still be developing.")
+                                icon={"IGNITION_WATCH":"🟡","PRE_PUMP_IGNITION":"🟠","EARLY_IGNITION":"🟢"}[stage]
+                                msg=(f"{icon} V15.1 {stage} | {s} | Ignition {r['v15_ignition_score']}/100 | Signals {r['v15_ignition_signals']}\\n"
+                                      f"60s: {r.get('price_60s',0):+.2f}% | Trade accel: {r['v15_ignition_accel']:.2f}x | Accel slope: {r['v15_trade_accel_slope']:+.2f}x\\n"
+                                      f"Buy: {r['buy_pressure']*100:.1f}% | Buy slope: {r['v15_buy_pressure_slope']:+.3f} | Vol: {r['volume_ratio']:.2f}x\\n"
+                                      f"RS 5m: {r['v15_ignition_rs5']:+.2f}% | RS 15m: {r['v15_ignition_rs15']:+.2f}% | 10s trades: {r['v15_ignition_trades_10s']}\\n"
+                                      f"Price: {r['price']}\\n"
+                                      "Three-stage V15.1 trajectory alert — confirmation strengthens as the stage advances.")
                                 await telegram(msg)
                                 old["last_ignition_alert"]=now
-                            old["last_ignition_score"]=r.get("v15_ignition_score",0);old["last_ignition_stage"]=r.get("v15_ignition_stage","")
+                            old["last_ignition_score"]=r.get("v15_ignition_score",0);old["last_ignition_stage"]=stage
                         exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
                         exhaustion_candidates=sorted(exhaustion_candidates,key=lambda r:(r.get("exhaustion_score",0),r.get("v15_score",0)),reverse=True)[:TOP_ALERTS]
                         for r in exhaustion_candidates:
