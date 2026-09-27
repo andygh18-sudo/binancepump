@@ -1073,11 +1073,16 @@ async def main():
                                      r.get("v15_ignition_score",0)-float(old.get("last_ignition_score",0))>=5)
                             if changed and now-old["last_ignition_alert"]>=COOLDOWN:
                                 icon={"IGNITION_WATCH":"🟡","PRE_PUMP_IGNITION":"🟠","EARLY_IGNITION":"🟢"}[stage]
-                                msg=(f"{icon} V15.1 {stage} | {s} | Ignition {r['v15_ignition_score']}/100 | Signals {r['v15_ignition_signals']}\\n"
-                                      f"60s: {r.get('price_60s',0):+.2f}% | Trade accel: {r['v15_ignition_accel']:.2f}x | Accel slope: {r['v15_trade_accel_slope']:+.2f}x\\n"
-                                      f"Buy: {r['buy_pressure']*100:.1f}% | Buy slope: {r['v15_buy_pressure_slope']:+.3f} | Vol: {r['volume_ratio']:.2f}x\\n"
-                                      f"RS 5m: {r['v15_ignition_rs5']:+.2f}% | RS 15m: {r['v15_ignition_rs15']:+.2f}% | 10s trades: {r['v15_ignition_trades_10s']}\\n"
-                                      f"Price: {r['price']}\\n"
+                                msg=(f"{icon} V15.1 {stage} | {s} | Ignition {r['v15_ignition_score']}/100 | Signals {r['v15_ignition_signals']}\
+"
+                                      f"60s: {r.get('price_60s',0):+.2f}% | Trade accel: {r['v15_ignition_accel']:.2f}x | Accel slope: {r['v15_trade_accel_slope']:+.2f}x\
+"
+                                      f"Buy: {r['buy_pressure']*100:.1f}% | Buy slope: {r['v15_buy_pressure_slope']:+.3f} | Vol: {r['volume_ratio']:.2f}x\
+"
+                                      f"RS 5m: {r['v15_ignition_rs5']:+.2f}% | RS 15m: {r['v15_ignition_rs15']:+.2f}% | 10s trades: {r['v15_ignition_trades_10s']}\
+"
+                                      f"Price: {r['price']}\
+"
                                       "Three-stage V15.1 trajectory alert — confirmation strengthens as the stage advances.")
                                 await telegram(msg)
                                 old["last_ignition_alert"]=now
@@ -1085,13 +1090,76 @@ async def main():
                         # Dedicated BUY Telegram alerts require strong setup quality,
                         # confirmation, higher-timeframe confirmation, a ready V15 stage,
                         # no BTC risk-off, and no exhaustion watch/alert.
-                        buy_candidates=[]\n                        for r in rows:\n                            decision=str(r.get("buy_decision","") or "")\n                            q=float(r.get("buy_setup_quality",0) or 0)\n                            conf=float(r.get("v15_confirmation_score",0) or 0)\n                            opp=float(r.get("v15_opportunity_score",0) or 0)\n                            tvs=float(r.get("tv_score",0) or 0)\n                            bull_tf=int(r.get("tv_bullish_timeframes",0) or 0)\n                            ex=float(r.get("exhaustion_score",0) or 0)\n                            stage=str(r.get("v15_stage","") or "")\n                            v12_conf=bool(r.get("v12_confirmation",False))\n                            btc_off=bool(r.get("v15_btc_risk_off",False))\n                            ready_stage=stage in ("PRE_PUMP","EARLY_PUMP","CONFIRMED")\n                            strong=(\n                                decision=="BUY" and q>=BUY_ALERT_MIN_QUALITY and\n                                conf>=BUY_ALERT_MIN_CONFIRMATION and opp>=BUY_ALERT_MIN_OPPORTUNITY and\n                                tvs>=BUY_ALERT_MIN_TV and bull_tf>=BUY_ALERT_MIN_BULL_TF and\n                                ex<BUY_ALERT_MAX_EXHAUSTION and not btc_off and ready_stage and\n                                (v12_conf or opp>=70)\n                            )\n                            if strong:\n                                rr=dict(r);rr["_buy_alert_quality"]=q;buy_candidates.append(rr)\n                        buy_candidates=sorted(\n                            buy_candidates,\n                            key=lambda r:(r.get("_buy_alert_quality",0),r.get("v15_confirmation_score",0),r.get("tv_score",0)),\n                            reverse=True\n                        )[:BUY_ALERT_TOP]\n                        for r in buy_candidates:\n                            s=r["symbol"];old=state[s];now=time.time();q=float(r.get("_buy_alert_quality",0) or 0)\n                            changed=(old.get("last_buy_decision")!="BUY" or q-float(old.get("last_buy_quality",0) or 0)>=5)\n                            if changed and now-float(old.get("last_buy_alert",0) or 0)>=BUY_ALERT_COOLDOWN:\n                                await telegram(\n                                    f"🟢 BUY SETUP | {s} | BUY\\n"\n                                    f"BUY SETUP QUALITY: {q:.0f}/100 | {r.get('buy_setup_quality_label','')}\\n"\n                                    f"V15: {r.get('v15_score',0):.0f}/100 | Stage: {r.get('v15_stage','')}\\n"\n                                    f"Opportunity: {r.get('v15_opportunity_score',0):.0f} | Confirmation: {r.get('v15_confirmation_score',0):.0f}\\n"\n                                    f"TradingView: {r.get('tv_score',0):.1f} | Bullish TFs: {r.get('tv_bullish_timeframes',0)}\\n"\n                                    f"V12 confirmation: {'YES' if r.get('v12_confirmation') else 'NO'} | Exhaustion: {r.get('exhaustion_score',0):.0f}\\n"\n                                    f"Volume: {r.get('volume_ratio',0):.2f}x | Trade accel: {r.get('trade_accel',0):.2f}x | Buy pressure: {r.get('buy_pressure',0)*100:.1f}%\\n"\n                                    f"RS 5m: {r.get('v15_relative_strength_5m',0):+.2f}% | RS 15m: {r.get('v15_relative_strength_15m',0):+.2f}%\\n"\n                                    f"Price: {r.get('price',0)}\\n"\n                                    f"Reason: {r.get('buy_decision_reasons','HIGH-QUALITY CONFLUENCE')}\\n"\n                                    "⚠️ Scanner decision only — confirm execution conditions before entering."\n                                )\n                                old["last_buy_alert"]=now\n                        for r in rows:\n                            old=state[r["symbol"]]\n                            old["last_buy_quality"]=float(r.get("buy_setup_quality",0) or 0)\n                            old["last_buy_decision"]=str(r.get("buy_decision","") or "")\n                        exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
+                        buy_candidates=[]
+                        for r in rows:
+                            decision=str(r.get("buy_decision","") or "")
+                            q=float(r.get("buy_setup_quality",0) or 0)
+                            conf=float(r.get("v15_confirmation_score",0) or 0)
+                            opp=float(r.get("v15_opportunity_score",0) or 0)
+                            tvs=float(r.get("tv_score",0) or 0)
+                            bull_tf=int(r.get("tv_bullish_timeframes",0) or 0)
+                            ex=float(r.get("exhaustion_score",0) or 0)
+                            stage=str(r.get("v15_stage","") or "")
+                            v12_conf=bool(r.get("v12_confirmation",False))
+                            btc_off=bool(r.get("v15_btc_risk_off",False))
+                            ready_stage=stage in ("PRE_PUMP","EARLY_PUMP","CONFIRMED")
+                            strong=(
+                                decision=="BUY" and q>=BUY_ALERT_MIN_QUALITY and
+                                conf>=BUY_ALERT_MIN_CONFIRMATION and opp>=BUY_ALERT_MIN_OPPORTUNITY and
+                                tvs>=BUY_ALERT_MIN_TV and bull_tf>=BUY_ALERT_MIN_BULL_TF and
+                                ex<BUY_ALERT_MAX_EXHAUSTION and not btc_off and ready_stage and
+                                (v12_conf or opp>=70)
+                            )
+                            if strong:
+                                rr=dict(r);rr["_buy_alert_quality"]=q;buy_candidates.append(rr)
+                        buy_candidates=sorted(
+                            buy_candidates,
+                            key=lambda r:(r.get("_buy_alert_quality",0),r.get("v15_confirmation_score",0),r.get("tv_score",0)),
+                            reverse=True
+                        )[:BUY_ALERT_TOP]
+                        for r in buy_candidates:
+                            s=r["symbol"];old=state[s];now=time.time();q=float(r.get("_buy_alert_quality",0) or 0)
+                            changed=(old.get("last_buy_decision")!="BUY" or q-float(old.get("last_buy_quality",0) or 0)>=5)
+                            if changed and now-float(old.get("last_buy_alert",0) or 0)>=BUY_ALERT_COOLDOWN:
+                                await telegram(
+                                    f"🟢 BUY SETUP | {s} | BUY\
+"
+                                    f"BUY SETUP QUALITY: {q:.0f}/100 | {r.get('buy_setup_quality_label','')}\
+"
+                                    f"V15: {r.get('v15_score',0):.0f}/100 | Stage: {r.get('v15_stage','')}\
+"
+                                    f"Opportunity: {r.get('v15_opportunity_score',0):.0f} | Confirmation: {r.get('v15_confirmation_score',0):.0f}\
+"
+                                    f"TradingView: {r.get('tv_score',0):.1f} | Bullish TFs: {r.get('tv_bullish_timeframes',0)}\
+"
+                                    f"V12 confirmation: {'YES' if r.get('v12_confirmation') else 'NO'} | Exhaustion: {r.get('exhaustion_score',0):.0f}\
+"
+                                    f"Volume: {r.get('volume_ratio',0):.2f}x | Trade accel: {r.get('trade_accel',0):.2f}x | Buy pressure: {r.get('buy_pressure',0)*100:.1f}%\
+"
+                                    f"RS 5m: {r.get('v15_relative_strength_5m',0):+.2f}% | RS 15m: {r.get('v15_relative_strength_15m',0):+.2f}%\
+"
+                                    f"Price: {r.get('price',0)}\
+"
+                                    f"Reason: {r.get('buy_decision_reasons','HIGH-QUALITY CONFLUENCE')}\
+"
+                                    "⚠️ Scanner decision only — confirm execution conditions before entering."
+                                )
+                                old["last_buy_alert"]=now
+                        for r in rows:
+                            old=state[r["symbol"]]
+                            old["last_buy_quality"]=float(r.get("buy_setup_quality",0) or 0)
+                            old["last_buy_decision"]=str(r.get("buy_decision","") or "")
+                        exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
                         exhaustion_candidates=sorted(exhaustion_candidates,key=lambda r:(r.get("exhaustion_score",0),r.get("v15_score",0)),reverse=True)[:TOP_ALERTS]
                         for r in exhaustion_candidates:
                             s=r["symbol"];old=state[s];now=time.time()
                             changed=(r.get("exhaustion_state")!=old.get("last_exhaustion_state") or r.get("exhaustion_score",0)-float(old.get("last_exhaustion_score",0))>=5)
                             if changed and now-old["last_exhaustion_alert"]>=EXHAUSTION_COOLDOWN:
-                                await telegram(f"⚠️ EXHAUSTION MOMENTUM | {s} | {r['exhaustion_state']} | Exhaustion {r['exhaustion_score']}/100\\nV15 {r['v15_score']}/100 | Stage: {r['v15_stage']} | Extension: {r['exhaustion_extension']:.2f}% | Rollover: {r['exhaustion_rollover']:.0f}\\nBuy pressure: {r['buy_pressure']*100:.1f}% | Vol: {r['volume_ratio']:.2f}x | Trade accel: {r['trade_accel']:.2f}x\\nBook imbalance: {r['book_imbalance']:+.2f} | RS 5m: {r['v15_relative_strength_5m']:+.2f}% | RS 15m: {r['v15_relative_strength_15m']:+.2f}%\\n⚠️ Momentum is extended and showing deterioration signals; confirmation of reversal is still required.")
+                                await telegram(f"⚠️ EXHAUSTION MOMENTUM | {s} | {r['exhaustion_state']} | Exhaustion {r['exhaustion_score']}/100\
+V15 {r['v15_score']}/100 | Stage: {r['v15_stage']} | Extension: {r['exhaustion_extension']:.2f}% | Rollover: {r['exhaustion_rollover']:.0f}\
+Buy pressure: {r['buy_pressure']*100:.1f}% | Vol: {r['volume_ratio']:.2f}x | Trade accel: {r['trade_accel']:.2f}x\
+Book imbalance: {r['book_imbalance']:+.2f} | RS 5m: {r['v15_relative_strength_5m']:+.2f}% | RS 15m: {r['v15_relative_strength_15m']:+.2f}%\
+⚠️ Momentum is extended and showing deterioration signals; confirmation of reversal is still required.")
                                 old["last_exhaustion_alert"]=now
                             old["last_exhaustion_score"]=r.get("exhaustion_score",0);old["last_exhaustion_state"]=r.get("exhaustion_state","")
                         accum_candidates=[r for r in rows if r.get("accumulation_score",0)>=ACCUM_ALERT_SCORE and r.get("accumulation_quality") and r.get("accumulation_stage") in ("ACCUMULATION WATCH","ACCUMULATION ALERT") and r.get("score",0)>=70]
@@ -1100,7 +1168,12 @@ async def main():
                             s=r["symbol"];old=state[s];now=time.time();prev=float(old.get("last_accum_score",0))
                             changed=(r["accumulation_score"]-prev>=5 or old.get("last_accum_stage")!=r["accumulation_stage"])
                             if changed and now-old["last_accum_alert"]>=COOLDOWN:
-                                await telegram(f"🟣 ACCUMULATION / PRE-PUMP | {s} | {r['accumulation_stage']} | Accum {r['accumulation_score']}/100\nPump score: {r['score']}/100 | 1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}%\nBuy pressure: {r['accum_buy_pressure']*100:.1f}% | Trade accel: {r['accum_trade_accel']:.2f}x | Vol ratio: {r['accum_volume_ratio']:.2f}x\nBook imbalance: {r['accum_book_imbalance']:+.2f} | Trades/10s: {r['accum_trades_10s']}\nPrice: {r['price']}\n⚠️ Early signal — confirmation still required.")
+                                await telegram(f"🟣 ACCUMULATION / PRE-PUMP | {s} | {r['accumulation_stage']} | Accum {r['accumulation_score']}/100
+Pump score: {r['score']}/100 | 1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}%
+Buy pressure: {r['accum_buy_pressure']*100:.1f}% | Trade accel: {r['accum_trade_accel']:.2f}x | Vol ratio: {r['accum_volume_ratio']:.2f}x
+Book imbalance: {r['accum_book_imbalance']:+.2f} | Trades/10s: {r['accum_trades_10s']}
+Price: {r['price']}
+⚠️ Early signal — confirmation still required.")
                                 old["last_accum_alert"]=now
                             old["last_accum_score"]=r["accumulation_score"];old["last_accum_stage"]=r["accumulation_stage"]
                         with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
@@ -1123,7 +1196,8 @@ async def main():
                         ]
                         if ignition_rows:
                             with open("data/ignition_history.jsonl","a") as f:
-                                f.write(json.dumps({"ts":time.time(),"rows":ignition_rows},separators=(",",":"))+"\n")
+                                f.write(json.dumps({"ts":time.time(),"rows":ignition_rows},separators=(",",":"))+"
+")
                         await asyncio.sleep(1)
             finally:
                 if not sync.done():
