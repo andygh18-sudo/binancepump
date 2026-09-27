@@ -192,6 +192,64 @@ else:
                 volume_lookup.setdefault(sym, []).append(float(r.get("volume_ratio", 0) or 0))
 
 
+def _history_points(symbol):
+    """Return chronological V15 history points for one symbol."""
+    key = str(symbol or "").strip().upper()
+    points = score_history.get(key, [])
+    if not isinstance(points, list):
+        return []
+    return points
+
+
+def acceleration_for(symbol):
+    """Return (latest score delta, 5-scan score delta, history count)."""
+    points = _history_points(symbol)
+    if len(points) < 2:
+        return 0.0, 0.0, len(points)
+
+    scores = [float(p.get("score", 0) or 0) for p in points]
+    delta_now = scores[-1] - scores[-2]
+    lookback = min(5, len(scores) - 1)
+    delta_lookback = scores[-1] - scores[-1 - lookback]
+    return float(delta_now), float(delta_lookback), len(scores)
+
+
+def velocity_for(symbol):
+    """Estimate score change per hour from the available history."""
+    points = _history_points(symbol)
+    if len(points) < 2:
+        return 0.0
+
+    first = points[-2]
+    last = points[-1]
+    try:
+        dt = float(last.get("ts", 0) or 0) - float(first.get("ts", 0) or 0)
+        if dt <= 0:
+            return 0.0
+        ds = float(last.get("score", 0) or 0) - float(first.get("score", 0) or 0)
+        return float(ds / (dt / 3600.0))
+    except (TypeError, ValueError, ZeroDivisionError):
+        return 0.0
+
+
+def recent_signal_info(symbol):
+    """Return latest score change plus previous/current history stages."""
+    points = _history_points(symbol)
+    if not points:
+        return 0.0, "", ""
+
+    current = points[-1]
+    previous = points[-2] if len(points) >= 2 else current
+    try:
+        delta = float(current.get("score", 0) or 0) - float(previous.get("score", 0) or 0)
+    except (TypeError, ValueError):
+        delta = 0.0
+
+    prev_stage = str(previous.get("stage", "") or "")
+    curr_stage = str(current.get("stage", "") or "")
+    return float(delta), prev_stage, curr_stage
+
+
 if "book_ready" in df.columns:
     def book_status(row):
         ready = bool(row.get("book_ready", False))
