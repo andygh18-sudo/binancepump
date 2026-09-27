@@ -13,6 +13,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: write
 
 # V15.1 five-minute trajectory retry trigger
 concurrency:
@@ -186,3 +187,10 @@ jobs:
           fi
           git commit -m "Update V15 production scanner data"
           git push origin HEAD:main
+
+      - name: Start next V15 scan after successful run
+        if: ${{ success() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run binance_pump_v15.yml --ref main
