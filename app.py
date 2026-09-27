@@ -313,7 +313,7 @@ st.subheader("🎯 Entry Signal Monitor")
 st.caption("V15 is authoritative here: PRE-PUMP/EARLY_PUMP indicate opportunity; CONFIRMED requires stronger confirmation. Legacy V11/V12 values are supporting diagnostics.")
 
 entry_df = df.copy()
-for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_reignition_score","buy_setup_quality","buy_decision_score","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","price_1m","volume_ratio","buy_pressure"]:
+for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_reignition_score","buy_setup_quality","buy_decision_score","pump_momentum_score","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","price_1m","volume_ratio","buy_pressure"]:
     if c in entry_df.columns:
         entry_df[c] = pd.to_numeric(entry_df[c], errors="coerce").fillna(0)
 
@@ -382,12 +382,15 @@ entry_view = entry_view.sort_values(
     ["buy_setup_quality", "v15_score", "v15_confirmation_score"],
     ascending=[False, False, False]
 ).head(20)
-entry_cols = [c for c in ["symbol","entry_signal","buy_decision","buy_decision_reasons","buy_setup_quality","buy_setup_quality_label","buy_setup_quality_reasons","v15_score","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_30m_rsi","tv_1h_rsi","tv_4h_rsi","tv_1d_rsi","tv_1w_rsi","tv_1m_rsi","v15_stage","v15_regime","v15_reignition_score","v15_reignition_watch","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
+entry_cols = [c for c in ["symbol","entry_signal","buy_decision","buy_decision_reasons","buy_setup_quality","buy_setup_quality_label","buy_setup_quality_reasons","pump_momentum_score","pump_momentum_label","pump_momentum_reasons","v15_score","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_30m_rsi","tv_1h_rsi","tv_4h_rsi","tv_1d_rsi","tv_1w_rsi","tv_1m_rsi","v15_stage","v15_regime","v15_reignition_score","v15_reignition_watch","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
 st.dataframe(entry_view[entry_cols], use_container_width=True, hide_index=True, column_config={
     "buy_decision": st.column_config.TextColumn("DECISION"),
     "buy_decision_reasons": st.column_config.TextColumn("Decision Why"),
     "buy_decision_score": st.column_config.ProgressColumn("Decision Score", min_value=0, max_value=100, format="%d"),
     "buy_setup_quality": st.column_config.ProgressColumn("BUY SETUP QUALITY", min_value=0, max_value=100, format="%d"),
+    "pump_momentum_score": st.column_config.ProgressColumn("PUMP MOMENTUM", min_value=0, max_value=100, format="%d"),
+    "pump_momentum_label": st.column_config.TextColumn("Momentum State"),
+    "pump_momentum_reasons": st.column_config.TextColumn("Momentum Why"),
     "buy_setup_quality_label": st.column_config.TextColumn("Setup Quality"),
     "buy_setup_quality_reasons": st.column_config.TextColumn("Why"),
     "v15_score": st.column_config.ProgressColumn("V15", min_value=0, max_value=100, format="%d"),
@@ -624,6 +627,14 @@ with tab1:
     momentum["m_book"] = bounded_series(momentum.get("book_imbalance", pd.Series(0, index=momentum.index)), -1, 1)
     momentum["m_accel"] = bounded_series(momentum.get("score_delta_5", pd.Series(0, index=momentum.index)))
     momentum["momentum_score"] = (
+        pd.to_numeric(
+            momentum.get("pump_momentum_score", pd.Series(np.nan, index=momentum.index)),
+            errors="coerce"
+        )
+        if "pump_momentum_score" in momentum.columns
+        else pd.Series(np.nan, index=momentum.index)
+    )
+    fallback_momentum = (
         momentum["m_score"] * 0.25 +
         momentum["m_1m"] * 0.15 +
         momentum["m_10s"] * 0.10 +
@@ -633,6 +644,7 @@ with tab1:
         momentum["m_book"] * 0.05 +
         momentum["m_accel"] * 0.10
     )
+    momentum["momentum_score"] = momentum["momentum_score"].fillna(fallback_momentum)
     momentum = momentum[pd.to_numeric(momentum["score"], errors="coerce").fillna(0) >= 20].sort_values("momentum_score", ascending=False).head(10)
 
     if momentum.empty:
@@ -767,8 +779,8 @@ with tab5:
 
     a, b, c, e = st.columns(4)
     a.metric("V15 Score", f"{score:.0f}/100")
-    b.metric("Stage", stage)
-    c.metric("Price", f"{price:g}" if pd.notna(price) else "—")
+    b.metric("PUMP MOMENTUM", f"{float(coin.get('pump_momentum_score', 0) or 0):.0f}/100")
+    c.metric("Stage", stage)
     e.metric("Volume Ratio", f"{float(coin.get('volume_ratio', 0)):.2f}x")
 
     if "exhaustion_score" in coin.index:
@@ -840,6 +852,12 @@ with tab5:
     })
     st.dataframe(v15_metrics, use_container_width=True, hide_index=True)
 
+    st.subheader("🚀 PUMP MOMENTUM")
+    pm_score = float(coin.get("pump_momentum_score", 0) or 0)
+    pm_label = str(coin.get("pump_momentum_label", "NORMAL") or "NORMAL")
+    st.progress(min(max(int(pm_score), 0), 100), text=f"PUMP MOMENTUM {pm_score:.0f}/100 • {pm_label}")
+    st.caption(f"Momentum drivers: {coin.get('pump_momentum_reasons', 'Awaiting V15 scanner refresh')}")
+
     st.subheader("📊 Momentum Evidence")
     evidence = {
         "1m Price Change": coin.get("price_1m", np.nan),
@@ -868,7 +886,7 @@ with tab6:
     if not hdf.empty:
         if "ts" in hdf.columns:
             hdf["Time"] = pd.to_datetime(hdf["ts"], unit="s", errors="coerce")
-        for col in ["score","v15_score","v15_opportunity_score","v15_confirmation_score","price_60s","price_1m","price_10s","volume_ratio","trade_accel","buy_pressure","v15_ignition_score"]:
+        for col in ["score","v15_score","v15_opportunity_score","v15_confirmation_score","pump_momentum_score","price_60s","price_1m","price_10s","volume_ratio","trade_accel","buy_pressure","v15_ignition_score"]:
             if col in hdf.columns:
                 hdf[col] = pd.to_numeric(hdf[col], errors="coerce")
 
@@ -888,7 +906,7 @@ with tab6:
 
         display_cols = [
             "Time","symbol","price","price_60s","price_1m","price_10s",
-            "v15_score","v15_stage","v15_ignition_score","v15_ignition_stage",
+            "v15_score","pump_momentum_score","pump_momentum_label","v15_stage","v15_ignition_score","v15_ignition_stage",
             "v15_ignition_confirmations","volume_ratio","trade_accel","buy_pressure",
             "v15_relative_strength_5m","v15_relative_strength_15m","exhaustion_state"
         ]
