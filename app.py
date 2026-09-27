@@ -68,7 +68,7 @@ if "v15_score" not in df.columns or "v15_stage" not in df.columns:
     st.error("Latest scanner data does not contain V15 fields. Run the V15 GitHub Actions scanner first.")
     st.stop()
 
-for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_relative_strength_5m","v15_relative_strength_15m","v15_streak","exhaustion_score","exhaustion_extension","exhaustion_rollover","exhaustion_buy_stress","exhaustion_book_stress","exhaustion_rs_fade","exhaustion_efficiency_stress","exhaustion_symptoms","exhaustion_volume_ratio","exhaustion_trade_accel"]:
+for c in ["v15_score","v15_opportunity_score","v15_confirmation_score","v15_relative_strength_5m","v15_relative_strength_15m","v15_streak","v15_reignition_score","exhaustion_score","exhaustion_extension","exhaustion_rollover","exhaustion_buy_stress","exhaustion_book_stress","exhaustion_rs_fade","exhaustion_efficiency_stress","exhaustion_symptoms","exhaustion_volume_ratio","exhaustion_trade_accel"]:
     if c in df.columns:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
@@ -80,7 +80,7 @@ numeric_cols = [
     "price", "price_1m", "price_10s", "volume_ratio", "trade_accel",
     "buy_pressure", "book_imbalance", "spread_bps", "score",
     "v15_score", "v15_opportunity_score", "v15_confirmation_score",
-    "v15_relative_strength_5m", "v15_relative_strength_15m", "v15_streak", "v15_tv_score", "v15_tv_adjustment", "tv_bullish_timeframes"
+    "v15_relative_strength_5m", "v15_relative_strength_15m", "v15_streak", "v15_reignition_score", "v15_tv_score", "v15_tv_adjustment", "tv_bullish_timeframes"
 ]
 for c in numeric_cols:
     if c in df.columns:
@@ -351,11 +351,13 @@ entry_df.loc[
 
 entry_view = entry_df[~entry_df["entry_signal"].eq("🔴 V15 AVOID")].copy()
 entry_view = entry_view.sort_values(["v15_score","v15_confirmation_score","v15_opportunity_score"], ascending=[False,False,False]).head(20)
-entry_cols = [c for c in ["symbol","entry_signal","v15_score","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_30m_rsi","tv_1h_rsi","tv_4h_rsi","tv_1d_rsi","tv_1w_rsi","tv_1m_rsi","v15_stage","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
+entry_cols = [c for c in ["symbol","entry_signal","v15_score","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_30m_rsi","tv_1h_rsi","tv_4h_rsi","tv_1d_rsi","tv_1w_rsi","tv_1m_rsi","v15_stage","v15_regime","v15_reignition_score","v15_reignition_watch","v15_streak","v15_relative_strength_5m","v15_relative_strength_15m","v15_btc_risk_off","v11_score","v12_score","v12_confirmation","v12_efficiency","price_1m","volume_ratio","buy_pressure","book_ready"] if c in entry_view.columns]
 st.dataframe(entry_view[entry_cols], use_container_width=True, hide_index=True, column_config={
     "v15_score": st.column_config.ProgressColumn("V15", min_value=0, max_value=100, format="%d"),
     "v15_opportunity_score": st.column_config.ProgressColumn("Opportunity", min_value=0, max_value=100, format="%d"),
     "v15_confirmation_score": st.column_config.ProgressColumn("Confirmation", min_value=0, max_value=100, format="%d"),
+                "v15_reignition_score": st.column_config.ProgressColumn("Re-ignition", min_value=0, max_value=100, format="%d"),
+                "v15_regime": st.column_config.TextColumn("V15 Regime"),
     "v15_tv_score": st.column_config.ProgressColumn("TV Score", min_value=0, max_value=100, format="%d"),
     "v15_tv_adjustment": st.column_config.NumberColumn("TV Adj", format="%+.0f"),
     "tv_bullish_timeframes": st.column_config.NumberColumn("TV Bull TF", format="%d"),
@@ -384,7 +386,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 def format_signal_table(frame):
     cols = [
         "symbol", "price", "v15_score", "v15_opportunity_score", "v15_confirmation_score",
-        "v15_stage", "v15_streak", "v15_relative_strength_5m", "v15_relative_strength_15m", "v15_tv_score", "v15_tv_adjustment", "tv_confirmation", "tv_bullish_timeframes", "tv_30m_rsi", "tv_1h_rsi", "tv_4h_rsi", "tv_1d_rsi", "tv_1w_rsi", "tv_1m_rsi",
+        "v15_stage", "v15_regime", "v15_reignition_score", "v15_reignition_watch", "v15_streak", "v15_relative_strength_5m", "v15_relative_strength_15m", "v15_tv_score", "v15_tv_adjustment", "tv_confirmation", "tv_bullish_timeframes", "tv_30m_rsi", "tv_1h_rsi", "tv_4h_rsi", "tv_1d_rsi", "tv_1w_rsi", "tv_1m_rsi",
         "v15_btc_risk_off", "v15_early_candidate", "v15_confirmed", "exhaustion_score", "exhaustion_state",
         "score", "stage", "book_status", "entry", "sell",
         "price_1m", "price_10s", "volume_ratio", "trade_accel",
