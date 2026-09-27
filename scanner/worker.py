@@ -15,7 +15,7 @@ LIQUID_SYMBOLS=int(os.getenv("LIQUID_SYMBOLS","80"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"));IGNITION_HISTORY_SAMPLES=int(os.getenv("IGNITION_HISTORY_SAMPLES","60"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"))
 TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"));TRADINGVIEW_ENABLED=os.getenv("TRADINGVIEW_ENABLED","1")=="1";TRADINGVIEW_REFRESH_SECONDS=float(os.getenv("TRADINGVIEW_REFRESH_SECONDS","30"))
-symbols=[];books={};tv_cache={};tv_last_refresh=0.0;state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":""})
+symbols=[];books={};tv_cache={};tv_last_refresh=0.0;state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"ignition_window":deque(maxlen=60),"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":""})
 
 async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
@@ -580,6 +580,53 @@ def exhaustion_momentum(s, eps, v12, v15):
         "exhaustion_trade_accel":round(acc,2),
     }
 
+def track_v15_ignition_trajectory(s, ignition):
+    """Maintain a five-minute rolling trajectory for V15.1 ignition."""
+    if not ignition:return None
+    now=time.time();window=state[s]["ignition_window"]
+    window.append({
+        "ts":now,"price":float(state[s].get("price") or 0),
+        "score":float(ignition.get("v15_ignition_score",0) or 0),
+        "stage":str(ignition.get("v15_ignition_stage","") or ""),
+        "accel":float(ignition.get("v15_ignition_accel",0) or 0),
+        "buy":float(ignition.get("buy_pressure",0) or 0),
+        "rs5":float(ignition.get("v15_ignition_rs5",0) or 0),
+        "rs15":float(ignition.get("v15_ignition_rs15",0) or 0),
+    })
+    cutoff=now-300.0
+    while len(window)>1 and window[0]["ts"]<cutoff:window.popleft()
+    samples=len(window);first=window[0];last=window[-1]
+    elapsed=max(last["ts"]-first["ts"],1.0)
+    score_delta=last["score"]-first["score"];accel_delta=last["accel"]-first["accel"]
+    buy_delta=last["buy"]-first["buy"];rs5_delta=last["rs5"]-first["rs5"]
+    price_change=((last["price"]/first["price"])-1.0)*100.0 if first["price"] else 0.0
+    seq=list(window)
+    rising=sum(1 for a,b in zip(seq,seq[1:]) if b["score"]>=a["score"]) / max(samples-1,1)
+    watch_samples=sum(1 for z in window if z["stage"] in ("IGNITION_WATCH","PRE_PUMP_IGNITION","EARLY_IGNITION"))
+    early_samples=sum(1 for z in window if z["stage"]=="EARLY_IGNITION")
+    persistence=watch_samples/samples if samples else 0.0
+    trend=min(max(score_delta/25.0,0),1)*35
+    accel_component=min(max(accel_delta/.75,0),1)*20
+    buy_component=min(max(buy_delta/.08,0),1)*15
+    rs_component=min(max(rs5_delta/.75,0),1)*10
+    persistence_component=min(max(persistence,0),1)*10
+    rising_component=min(max((rising-.50)/.50,0),1)*10
+    trajectory_score=max(0,min(round(trend+accel_component+buy_component+rs_component+persistence_component+rising_component),100))
+    confirmed=(samples>=12 and elapsed>=55 and trajectory_score>=65 and last["score"]>=62 and
+               score_delta>=8 and rising>=.60 and last["accel"]>=1.35 and last["buy"]>=.54 and
+               last["rs5"]>=.05 and price_change<3.5)
+    stage="EARLY_IGNITION_CONFIRMED" if confirmed else "BUILDING_5M" if samples>=6 and persistence>=.50 and last["score"]>=50 else "TRACKING_5M"
+    return {
+        "v15_ignition_samples_5m":samples,"v15_ignition_window_seconds":round(min(elapsed,300),1),
+        "v15_ignition_score_delta_5m":round(score_delta,1),"v15_trade_accel_delta_5m":round(accel_delta,2),
+        "v15_buy_pressure_delta_5m":round(buy_delta,4),"v15_ignition_rs5_delta_5m":round(rs5_delta,2),
+        "v15_ignition_price_change_5m":round(price_change,2),"v15_ignition_rising_ratio_5m":round(rising,2),
+        "v15_ignition_persistence_5m":round(persistence,2),"v15_ignition_early_samples_5m":early_samples,
+        "v15_ignition_trajectory_score":trajectory_score,"v15_ignition_trajectory_stage":stage,
+        "v15_ignition_trajectory_confirmed":confirmed,
+        "v15_ignition_alert":bool(ignition.get("v15_ignition_alert",False) or confirmed),
+    }
+
 def v15_early_ignition(s, eps, v12):
     """Fast lane for early pump ignition before aggregate volume catches up."""
     if not eps:return None
@@ -691,6 +738,8 @@ def score(s):
     v11=v11_signal(s,v4,eps)
     v12=v12_signal(s,v4,eps)
     ignition=v15_early_ignition(s,eps,v12)
+    if ignition:
+        ignition.update(track_v15_ignition_trajectory(s,ignition) or {})
     v15=v15_signal(s,v4,eps,v12)
     if not v15:v15={"v15_opportunity_score":0,"v15_confirmation_score":0,"v15_score":0,"v15_stage":"NEUTRAL","v15_early_candidate":False,"v15_confirmed":False,"v15_streak":0,"v15_btc_risk_off":False,"v15_relative_strength_5m":eps.get("relative_strength_5m",0) if eps else 0,"v15_relative_strength_15m":eps.get("relative_strength_15m",0) if eps else 0}
     v15.update(ignition or {})
@@ -813,7 +862,11 @@ async def main():
                         ignition_fields=[
     "symbol","price","v15_ignition_score","v15_ignition_stage","v15_ignition_alert","v15_ignition_signals",
     "v15_ignition_accel","v15_trade_accel_slope","buy_pressure","v15_buy_pressure_slope",
-    "v15_ignition_rs5","v15_ignition_rs15","v15_ignition_volume_ratio","v15_ignition_trades_10s"
+    "v15_ignition_rs5","v15_ignition_rs15","v15_ignition_volume_ratio","v15_ignition_trades_10s",
+    "v15_ignition_samples_5m","v15_ignition_window_seconds","v15_ignition_score_delta_5m","v15_trade_accel_delta_5m",
+    "v15_buy_pressure_delta_5m","v15_ignition_rs5_delta_5m","v15_ignition_price_change_5m","v15_ignition_rising_ratio_5m",
+    "v15_ignition_persistence_5m","v15_ignition_early_samples_5m","v15_ignition_trajectory_score",
+    "v15_ignition_trajectory_stage","v15_ignition_trajectory_confirmed"
 ]
                         ignition_rows=[
                             {key:r.get(key) for key in ignition_fields if key in r}
