@@ -142,7 +142,13 @@ jobs:
                   continue
 
           p.write_text("\n".join(compact_lines[-200:]) + ("\n" if compact_lines else ""))
-          print(f"Compacted history to {len(compact_lines[-200:])} records.")
+
+          # If compaction could not parse the current file, restore the last known-good copy.
+          if (not compact_lines) and backup.exists():
+              p.write_bytes(backup.read_bytes())
+              print("Compaction produced no valid records; restored previous V15 history.")
+          else:
+              print(f"Compacted history to {len(compact_lines[-200:])} records.")
           PY
 
       - name: Compact V15.1 ignition history
