@@ -3,6 +3,7 @@ from collections import defaultdict,deque
 from dotenv import load_dotenv
 from .orderbook import LocalOrderBook
 from .tradingview import fetch_tradingview_signals
+from .history_store import append_scan_history
 
 load_dotenv()
 WS=os.getenv("BINANCE_WS_BASE","wss://data-stream.binance.vision/stream")
@@ -804,7 +805,7 @@ async def main():
     global symbols,books,tv_cache,tv_last_refresh
     os.makedirs("data",exist_ok=True);start=time.time();timeout=aiohttp.ClientTimeout(total=20)
     async with aiohttp.ClientSession(timeout=timeout) as http:
-        symbols=await discover(http);books={s:LocalOrderBook(s,REST,LIMIT) for s in symbols};streams=[]
+        symbols=await discover(http);books={s:LocalOrderBook(s,REST,LIMIT) for s in symbols};streams=[];history_last_write=0.0
         for s in symbols:
             q=s.lower();streams += [f"{q}@aggTrade",f"{q}@bookTicker",f"{q}@depth@100ms",f"{q}@kline_1m"]
         url=WS+"?streams="+"/".join(streams)
@@ -903,20 +904,13 @@ async def main():
                                 old["last_accum_alert"]=now
                             old["last_accum_score"]=r["accumulation_score"];old["last_accum_stage"]=r["accumulation_stage"]
                         with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
-                        history_fields=[
-    "symbol","price","score","stage","entry","sell","price_1m","price_10s",
-    "volume_ratio","trade_accel","buy_pressure","book_imbalance",
-    "early_pump_score","early_pump_stage","relative_strength_5m","relative_strength_15m",
-    "v15_score","v15_stage","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_30m_rsi","tv_1h_rsi","tv_4h_rsi","tv_1d_rsi","tv_1w_rsi","tv_1m_rsi","v15_ignition_score","v15_ignition_stage","v15_ignition_alert","v15_ignition_signals","v15_trade_accel_slope","v15_buy_pressure_slope","v15_ignition_samples_5m","v15_ignition_window_seconds","v15_ignition_score_delta_5m","v15_trade_accel_delta_5m","v15_buy_pressure_delta_5m","v15_ignition_rs5_delta_5m","v15_ignition_price_change_5m","v15_ignition_rising_ratio_5m","v15_ignition_persistence_5m","v15_ignition_early_samples_5m","v15_ignition_trajectory_score","v15_ignition_trajectory_stage","v15_ignition_trajectory_confirmed",
-    "v12_score","v12_efficiency","hybrid_score","hybrid_path","hybrid_grade",
-    "exhaustion_score","exhaustion_state","exhaustion_alert","exhaustion_extension",
-    "exhaustion_rollover","exhaustion_symptoms"
-]
-                        compact_rows=[{key:r.get(key) for key in history_fields if key in r} for r in rows]
-                        with open("data/history.jsonl","a") as f:f.write(json.dumps({"ts":time.time(),"rows":compact_rows},separators=(",",":"))+"\n")
+                        now_history=time.time()
+                        if now_history-history_last_write >= HISTORY_SAMPLE_INTERVAL:
+                            append_scan_history(rows, ts=now_history)
+                            history_last_write=now_history
                         ignition_fields=[
-    "symbol","price","v15_ignition_score","v15_ignition_stage","v15_ignition_alert","v15_ignition_signals",
-    "v15_ignition_accel","v15_trade_accel_slope","buy_pressure","v15_buy_pressure_slope",
+    "symbol","price","v15_ignition_score","v15_ignition_stage","v15_ignition_alert","v15_ignition_signals","v15_ignition_confirmations",
+    "price_60s","v15_ignition_accel","v15_trade_accel_slope","buy_pressure","v15_buy_pressure_slope",
     "v15_ignition_rs5","v15_ignition_rs15","v15_ignition_volume_ratio","v15_ignition_trades_10s",
     "v15_ignition_samples_5m","v15_ignition_window_seconds","v15_ignition_score_delta_5m","v15_trade_accel_delta_5m",
     "v15_buy_pressure_delta_5m","v15_ignition_rs5_delta_5m","v15_ignition_price_change_5m","v15_ignition_rising_ratio_5m",

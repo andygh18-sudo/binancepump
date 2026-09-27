@@ -7,6 +7,8 @@ on:
   push:
     paths:
       - "scanner/worker.py"
+      - "scanner/history_store.py"
+      - "scripts/compact_v15_2_history.py"
       - "run_scanner.py"
       - "app.py"
       - ".github/workflows/binance_pump_v15.yml"
@@ -40,7 +42,7 @@ jobs:
         run: mkdir -p data
 
       - name: Validate V15 production scanner
-        run: python -m py_compile scanner/worker.py scanner/tradingview.py run_scanner.py app.py
+        run: python -m py_compile scanner/worker.py scanner/history_store.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py
 
       - name: Run V15 live scan
         env:
@@ -54,6 +56,7 @@ jobs:
           RUN_SECONDS: "540"
           DECISION_INTERVAL: "5"
           IGNITION_HISTORY_SAMPLES: "60"
+          HISTORY_SAMPLE_INTERVAL: "300"
           ALERT_COOLDOWN: "60"
           ORDERBOOK_LIMIT: "500"
           TOP_ALERTS: "5"
@@ -121,112 +124,43 @@ jobs:
           publish_live_snapshot || true
           git worktree remove --force /tmp/v15-live-publisher
 
-      - name: Protect and bound scan history
+      - name: Migrate and compact V15.2 symbol history
         run: |
-          set -e
-          python - <<'PY'
-          from pathlib import Path
-
-          p=Path("data/history.jsonl")
-          latest=Path("data/latest.json")
-          backup=Path("/tmp/v15-history-before-bound.jsonl")
-
-          # Never allow an empty current scan to erase previously retained history.
-          if p.exists() and p.stat().st_size > 0:
-              backup.write_bytes(p.read_bytes())
-
-          if p.exists():
-              lines=p.read_text(errors="ignore").splitlines()
-              if len(lines)>200:
-                  p.write_text("\n".join(lines[-200:])+"\n")
-
-          if (not p.exists() or p.stat().st_size == 0) and backup.exists():
-              p.write_bytes(backup.read_bytes())
-
-          if not p.exists() or p.stat().st_size == 0:
-              raise SystemExit("V15 history is empty; refusing to publish an empty history file.")
-          print(f"V15 history protected: {p.stat().st_size} bytes")
-          PY
-
-      - name: Compact scan history
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          p = Path("data/history.jsonl")
-          backup = Path("/tmp/v15-history-before-bound.jsonl")
-          if not p.exists():
-              raise SystemExit(0)
-
-          fields = [
-              "symbol","price","score","stage","entry","sell","price_1m","price_10s",
-              "volume_ratio","trade_accel","buy_pressure","book_imbalance",
-              "early_pump_score","early_pump_stage","relative_strength_5m","relative_strength_15m",
-              "v15_score","v15_stage","v15_opportunity_score","v15_confirmation_score","v15_tv_score","v15_tv_adjustment","tv_confirmation","tv_bullish_timeframes","tv_30m_rsi","tv_1h_rsi","tv_4h_rsi","tv_1d_rsi","tv_1w_rsi","tv_1m_rsi",
-              "v15_ignition_score","v15_ignition_stage","v15_ignition_alert","v15_ignition_signals","v15_trade_accel_slope","v15_buy_pressure_slope",
-              "v15_ignition_samples_5m","v15_ignition_window_seconds","v15_ignition_score_delta_5m","v15_trade_accel_delta_5m",
-              "v15_buy_pressure_delta_5m","v15_ignition_rs5_delta_5m","v15_ignition_price_change_5m","v15_ignition_rising_ratio_5m",
-              "v15_ignition_persistence_5m","v15_ignition_early_samples_5m","v15_ignition_trajectory_score","v15_ignition_trajectory_stage","v15_ignition_trajectory_confirmed",
-              "v12_score","v12_efficiency","hybrid_score","hybrid_path","hybrid_grade",
-              "exhaustion_score","exhaustion_state","exhaustion_alert","exhaustion_extension",
-              "exhaustion_rollover","exhaustion_symptoms"
-          ]
-
-          compact_lines = []
-          for line in p.read_text(errors="ignore").splitlines():
-              try:
-                  item = json.loads(line)
-                  rows = item.get("rows", [])
-                  compact_rows = [
-                      {k: row.get(k) for k in fields if k in row}
-                      for row in rows if isinstance(row, dict)
-                  ]
-                  if compact_rows:
-                      compact_lines.append(
-                          json.dumps(
-                              {"ts": item.get("ts"), "rows": compact_rows},
-                              separators=(",", ":")
-                          )
-                      )
-              except Exception:
-                  continue
-
-          p.write_text("\n".join(compact_lines[-200:]) + ("\n" if compact_lines else ""))
-
-          # If compaction could not parse the current file, restore the last known-good copy.
-          if (not compact_lines) and backup.exists():
-              p.write_bytes(backup.read_bytes())
-              print("Compaction produced no valid records; restored previous V15 history.")
-          else:
-              print(f"Compacted history to {len(compact_lines[-200:])} records.")
-          PY
+          python scripts/compact_v15_2_history.py
 
       - name: Compact V15.1 ignition history
         run: python scripts/compact_ignition_history.py
 
-      - name: Publish scan data
+      - name: Publish V15.2 scan data
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           cp data/latest.json /tmp/v15-latest.json
-          cp data/history.jsonl /tmp/v15-history.jsonl
           if [ -f data/ignition_history.jsonl ]; then cp data/ignition_history.jsonl /tmp/v15-ignition-history.jsonl; else : > /tmp/v15-ignition-history.jsonl; fi
-          # Reset to the current remote main before restoring ONLY the generated data.
-          # This prevents the Actions token from attempting to push workflow-file changes.
+          cp data/history_index.json /tmp/v15-history-index.json
+          rm -rf /tmp/v15-history
+          cp -R data/history /tmp/v15-history
+
+          # Reset to current remote main before restoring only generated data.
+          # The legacy monolithic history file is deliberately removed.
           git reset --hard origin/main
           mkdir -p data
+          rm -f data/history.jsonl
+          rm -rf data/history
           cp /tmp/v15-latest.json data/latest.json
-          cp /tmp/v15-history.jsonl data/history.jsonl
           cp /tmp/v15-ignition-history.jsonl data/ignition_history.jsonl
-          git add -f data/latest.json data/history.jsonl data/ignition_history.jsonl
+          cp /tmp/v15-history-index.json data/history_index.json
+          cp -R /tmp/v15-history data/history
+
+          git add -f data/latest.json data/ignition_history.jsonl data/history_index.json
+          git add -A data/history.jsonl data/history
           if git diff --cached --quiet; then
-            echo "Scan data already synchronized."
+            echo "V15.2 scan data already synchronized."
             exit 0
           fi
-          git commit -m "Update V15 production scanner data"
+          git commit -m "Update V15.2 historical scanner data"
           git push origin HEAD:main
 
       - name: Start next V15 scan after successful run

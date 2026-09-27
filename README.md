@@ -36,3 +36,16 @@ GitHub Actions is the scanner runtime here. Streamlit is the dashboard only.
 Because GitHub scheduled workflows can be delayed, do not interpret the dashboard as a guaranteed 5-second live feed. During each active job, the worker makes decisions every 5 seconds; between jobs there can be a gap.
 
 The scanner is decision support, not automatic trading advice.
+
+
+## V15.2 historical-data architecture
+
+V15.2 no longer writes the entire scan universe into one monolithic `data/history.jsonl`.
+
+Instead:
+- `data/history/<SYMBOL>.jsonl` stores compact 5-minute V15 samples per symbol, up to 1,000 samples.
+- `data/history_index.json` stores metadata and the most recent acceleration points for fast dashboard loading.
+- `data/ignition_history.jsonl` remains the compact microstructure/ignition stream, capped by the existing 60-sample-per-symbol compactor.
+- The legacy `data/history.jsonl` is migrated once and removed from the published data set.
+
+This makes targeted multi-day analysis practical: a request for GRTUSDT only needs the GRTUSDT history file rather than downloading the entire market history.

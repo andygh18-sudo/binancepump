@@ -102,71 +102,95 @@ if "volume_ratio" in view.columns:
 if only_book_ready and "book_ready" in view.columns:
     view = view[view["book_ready"] == True]
 
-history_path = "data/history.jsonl"
+history_index = {}
 history_records = []
-history_text = None
-if os.path.exists(history_path):
+history_path = "data/history.jsonl"
+
+def load_history_index():
+    local_path = "data/history_index.json"
     try:
-        with open(history_path, errors="ignore") as hf:
-            history_text = hf.read()
+        url = RAW_BASE + "history_index.json?t=" + str(int(pd.Timestamp.utcnow().timestamp()))
+        req = urllib.request.Request(url, headers={"Cache-Control": "no-cache", "User-Agent": "Binance-Pump-Radar"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
     except Exception:
-        history_text = None
-if history_text is None:
-    try:
-        with urllib.request.urlopen(RAW_BASE + "history.jsonl?t=" + str(int(pd.Timestamp.utcnow().timestamp())), timeout=10) as resp:
-            history_text = resp.read().decode("utf-8", errors="ignore")
-    except Exception:
-        history_text = None
-if history_text:
-    for line in history_text.splitlines():
+        if os.path.exists(local_path):
+            try:
+                with open(local_path) as f:
+                    return json.load(f)
+            except Exception:
+                pass
+    return {}
+
+def load_symbol_history(symbol, limit=1000):
+    symbol = str(symbol).upper()
+    local_path = os.path.join("data", "history", f"{symbol}.jsonl")
+    text_data = None
+    if os.path.exists(local_path):
         try:
-            item = json.loads(line)
-            if isinstance(item, dict) and item.get("rows"):
-                history_records.append(item)
+            with open(local_path, errors="ignore") as hf:
+                text_data = hf.read()
         except Exception:
-            continue
+            text_data = None
+    if text_data is None:
+        try:
+            url = RAW_BASE + f"history/{symbol}.jsonl?t=" + str(int(pd.Timestamp.utcnow().timestamp()))
+            req = urllib.request.Request(url, headers={"Cache-Control": "no-cache", "User-Agent": "Binance-Pump-Radar"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                text_data = resp.read().decode("utf-8", errors="ignore")
+        except Exception:
+            text_data = None
+    records = []
+    if text_data:
+        for line in text_data.splitlines()[-limit:]:
+            try:
+                row = json.loads(line)
+                if isinstance(row, dict):
+                    records.append(row)
+            except Exception:
+                continue
+    return records
+
+history_index = load_history_index()
+if not history_index:
+    legacy_text = None
+    if os.path.exists(history_path):
+        try:
+            with open(history_path, errors="ignore") as hf:
+                legacy_text = hf.read()
+        except Exception:
+            legacy_text = None
+    if legacy_text is None:
+        try:
+            with urllib.request.urlopen(RAW_BASE + "history.jsonl?t=" + str(int(pd.Timestamp.utcnow().timestamp())), timeout=10) as resp:
+                legacy_text = resp.read().decode("utf-8", errors="ignore")
+        except Exception:
+            legacy_text = None
+    if legacy_text:
+        for line in legacy_text.splitlines():
+            try:
+                item = json.loads(line)
+                if isinstance(item, dict) and item.get("rows"):
+                    history_records.append(item)
+            except Exception:
+                continue
 
 score_history = {}
-for item in history_records[-120:]:
-    ts = item.get("ts")
-    for r in item.get("rows", []):
-        sym = str(r.get("symbol", ""))
-        if sym:
-            score_history.setdefault(sym, []).append({
-                "ts": ts,
-                "score": float(r.get("score", 0) or 0),
-                "stage": r.get("stage", "")
-            })
+volume_lookup = {}
+if history_index.get("symbols"):
+    for sym, meta in history_index["symbols"].items():
+        recent = meta.get("recent", []) if isinstance(meta, dict) else []
+        score_history[sym] = [{"ts": p.get("ts"), "score": float(p.get("score", 0) or 0), "stage": p.get("stage", "")} for p in recent]
+        volume_lookup[sym] = [float(p.get("volume_ratio", 0) or 0) for p in recent]
+else:
+    for item in history_records[-120:]:
+        ts = item.get("ts")
+        for r in item.get("rows", []):
+            sym = str(r.get("symbol", ""))
+            if sym:
+                score_history.setdefault(sym, []).append({"ts": ts, "score": float(r.get("score", 0) or 0), "stage": r.get("stage", "")})
+                volume_lookup.setdefault(sym, []).append(float(r.get("volume_ratio", 0) or 0))
 
-def acceleration_for(symbol):
-    points = score_history.get(str(symbol), [])
-    if len(points) < 2:
-        return 0.0, 0.0, 0
-    current = points[-1]["score"]
-    previous = points[-2]["score"]
-    lookback = points[-7]["score"] if len(points) >= 7 else points[0]["score"]
-    return current - previous, current - lookback, len(points)
-
-def velocity_for(symbol):
-    points = score_history.get(str(symbol), [])
-    if len(points) < 2:
-        return 0.0
-    p0, p1 = points[-2], points[-1]
-    try:
-        hours = max((float(p1["ts"]) - float(p0["ts"])) / 3600.0, 1/60)
-    except Exception:
-        hours = 0.25
-    return (p1["score"] - p0["score"]) / hours
-
-def recent_signal_info(symbol):
-    points = score_history.get(str(symbol), [])
-    if len(points) < 2:
-        return 0.0, "", ""
-    prev, curr = points[-2], points[-1]
-    delta = curr["score"] - prev["score"]
-    prev_stage = str(prev.get("stage", ""))
-    curr_stage = str(curr.get("stage", ""))
-    return delta, prev_stage, curr_stage
 
 if "book_ready" in df.columns:
     def book_status(row):
@@ -188,13 +212,6 @@ if "symbol" in df.columns:
     df["acceleration"] = df["score_delta"].map(
         lambda x: "🔥 SURGING" if x >= 5 else "🟢 RISING" if x > 0 else "🟡 STABLE" if x == 0 else "🔴 FALLING"
     )
-    # Compare current volume ratio with the previous published scan.
-    volume_lookup = {}
-    for item in history_records[-120:]:
-        for r in item.get("rows", []):
-            sym = str(r.get("symbol", ""))
-            if sym:
-                volume_lookup.setdefault(sym, []).append(float(r.get("volume_ratio", 0) or 0))
     def volume_accel(symbol):
         vals = volume_lookup.get(str(symbol), [])
         if len(vals) < 2:
@@ -740,32 +757,49 @@ with tab5:
     st.dataframe(edf, use_container_width=True, hide_index=True)
 
 with tab6:
-    st.subheader("📜 Signal History")
-    history_path = "data/history.jsonl"
+    st.subheader("📜 V15.2 Historical Data")
+    st.caption("History is stored per symbol in small JSONL files. The index provides recent acceleration; the selected symbol file provides the deeper retained trajectory.")
 
-    if os.path.exists(history_path):
-        history = []
-        with open(history_path, errors="ignore") as f:
-            for line in f:
-                try:
-                    item = json.loads(line)
-                    history.extend(item.get("rows", []) if isinstance(item, dict) else [])
-                except Exception:
-                    continue
+    available_history = sorted((history_index.get("symbols") or {}).keys())
+    if not available_history:
+        available_history = sorted(df["symbol"].astype(str).tolist())
 
-        hdf = pd.DataFrame(history)
-        if not hdf.empty and "score" in hdf.columns:
-            hdf["score"] = pd.to_numeric(hdf["score"], errors="coerce")
-            if "symbol" in hdf.columns:
-                top_history = hdf.sort_values("score", ascending=False).head(100)
-                hcols = [c for c in ["symbol", "score", "stage", "price_1m", "volume_ratio", "buy_pressure"] if c in top_history.columns]
-                st.dataframe(top_history[hcols], use_container_width=True, height=650, hide_index=True)
-            else:
-                st.info("History is available but does not contain symbol data.")
+    history_symbol = st.selectbox("Select coin history", available_history, key="history_symbol")
+    selected_history = load_symbol_history(history_symbol, limit=1000)
+    hdf = pd.DataFrame(selected_history)
+
+    if not hdf.empty:
+        if "ts" in hdf.columns:
+            hdf["Time"] = pd.to_datetime(hdf["ts"], unit="s", errors="coerce")
+        for col in ["score","v15_score","v15_opportunity_score","v15_confirmation_score","price_60s","price_1m","price_10s","volume_ratio","trade_accel","buy_pressure","v15_ignition_score"]:
+            if col in hdf.columns:
+                hdf[col] = pd.to_numeric(hdf[col], errors="coerce")
+
+        hc1, hc2, hc3, hc4 = st.columns(4)
+        hc1.metric("History Samples", len(hdf))
+        if "Time" in hdf.columns and hdf["Time"].notna().any():
+            hc2.metric("First Sample", hdf["Time"].min().strftime("%Y-%m-%d %H:%M"))
+            hc3.metric("Last Sample", hdf["Time"].max().strftime("%Y-%m-%d %H:%M"))
         else:
-            st.info("No usable history data yet.")
+            hc2.metric("First Sample", "—")
+            hc3.metric("Last Sample", "—")
+        hc4.metric("Latest V15", f"{float(hdf.iloc[-1].get('v15_score', hdf.iloc[-1].get('score', 0)) or 0):.0f}")
+
+        if "Time" in hdf.columns and "v15_score" in hdf.columns:
+            chart = hdf.dropna(subset=["Time"]).set_index("Time")[["v15_score"]]
+            st.line_chart(chart, height=280)
+
+        display_cols = [
+            "Time","symbol","price","price_60s","price_1m","price_10s",
+            "v15_score","v15_stage","v15_ignition_score","v15_ignition_stage",
+            "v15_ignition_confirmations","volume_ratio","trade_accel","buy_pressure",
+            "v15_relative_strength_5m","v15_relative_strength_15m","exhaustion_state"
+        ]
+        display_cols = [c for c in display_cols if c in hdf.columns]
+        st.dataframe(hdf[display_cols].sort_values("Time", ascending=False).head(1000), use_container_width=True, height=650, hide_index=True)
     else:
-        st.info("No history file has been published yet.")
+        st.info(f"No V15.2 historical samples are available yet for {history_symbol}. The first samples will appear after the next 5-minute history write.")
+
 
 st.divider()
 st.caption(f"Dashboard runs on V15 as the primary model • V11/V12 are supporting diagnostics • Refreshes every 15 seconds • Showing {len(df)} scanned symbols • Historical acceleration uses the latest published scan records • Last scan: {last_scan}")
