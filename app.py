@@ -354,16 +354,22 @@ entry_view = entry_df[~entry_df["entry_signal"].eq("🔴 V15 AVOID")].copy()
 # Backward compatibility: older latest.json snapshots may not yet contain
 # the newly added BUY SETUP QUALITY fields.
 if "buy_setup_quality" not in entry_view.columns:
-    entry_view["buy_setup_quality"] = 0
+    entry_view["buy_setup_quality"] = np.nan
 if "buy_setup_quality_label" not in entry_view.columns:
-    entry_view["buy_setup_quality_label"] = "NO SETUP"
+    entry_view["buy_setup_quality_label"] = "N/A"
 if "buy_setup_quality_reasons" not in entry_view.columns:
     entry_view["buy_setup_quality_reasons"] = "Awaiting V15 scanner refresh"
 
-for _sort_col in ["buy_setup_quality", "v15_score", "v15_confirmation_score"]:
+# Keep missing BUY SETUP QUALITY visibly distinct from a genuine score of 0.
+entry_view["buy_setup_quality"] = pd.to_numeric(
+    entry_view["buy_setup_quality"], errors="coerce"
+)
+for _sort_col in ["v15_score", "v15_confirmation_score"]:
     if _sort_col not in entry_view.columns:
         entry_view[_sort_col] = 0
-    entry_view[_sort_col] = pd.to_numeric(entry_view[_sort_col], errors="coerce").fillna(0)
+    entry_view[_sort_col] = pd.to_numeric(
+        entry_view[_sort_col], errors="coerce"
+    ).fillna(0)
 
 entry_view = entry_view.sort_values(
     ["buy_setup_quality", "v15_score", "v15_confirmation_score"],
