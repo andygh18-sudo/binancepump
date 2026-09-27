@@ -92,14 +92,16 @@ jobs:
             fi
             cp "$GITHUB_WORKSPACE/data/latest.json" /tmp/v15-live-publisher/data/latest.json
             cd /tmp/v15-live-publisher
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git fetch origin main
+            git reset --hard origin/main
             git add -f data/latest.json
             if git diff --cached --quiet; then
               cd "$GITHUB_WORKSPACE"
               return 0
             fi
             git commit -m "Publish V15 live snapshot"
-            git fetch origin main
-            git rebase origin/main
             git push origin HEAD:main
             cd "$GITHUB_WORKSPACE"
           }
