@@ -129,6 +129,9 @@ jobs:
           print(f"Compacted history to {len(compact_lines[-200:])} records.")
           PY
 
+      - name: Compact V15.1 ignition history
+        run: python scripts/compact_ignition_history.py
+
       - name: Publish scan data
         run: |
           set -e
