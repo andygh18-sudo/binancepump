@@ -48,6 +48,7 @@ jobs:
           MOMENTUM_SYMBOLS: "40"
           RUN_SECONDS: "540"
           DECISION_INTERVAL: "5"
+          IGNITION_HISTORY_SAMPLES: "60"
           ALERT_COOLDOWN: "60"
           ORDERBOOK_LIMIT: "500"
           TOP_ALERTS: "5"
@@ -136,13 +137,15 @@ jobs:
           git fetch origin main
           cp data/latest.json /tmp/v15-latest.json
           cp data/history.jsonl /tmp/v15-history.jsonl
+          if [ -f data/ignition_history.jsonl ]; then cp data/ignition_history.jsonl /tmp/v15-ignition-history.jsonl; else : > /tmp/v15-ignition-history.jsonl; fi
           # Reset to the current remote main before restoring ONLY the generated data.
           # This prevents the Actions token from attempting to push workflow-file changes.
           git reset --hard origin/main
           mkdir -p data
           cp /tmp/v15-latest.json data/latest.json
           cp /tmp/v15-history.jsonl data/history.jsonl
-          git add data/latest.json data/history.jsonl
+          cp /tmp/v15-ignition-history.jsonl data/ignition_history.jsonl
+          git add data/latest.json data/history.jsonl data/ignition_history.jsonl
           if git diff --cached --quiet; then
             echo "Scan data already synchronized."
             exit 0
