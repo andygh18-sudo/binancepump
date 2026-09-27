@@ -1200,8 +1200,7 @@ async def main():
                         ]
                         if ignition_rows:
                             with open("data/ignition_history.jsonl","a") as f:
-                                f.write(json.dumps({"ts":time.time(),"rows":ignition_rows},separators=(",",":"))+"
-")
+                                f.write(json.dumps({"ts":time.time(),"rows":ignition_rows},separators=(",",":"))+"\n")
                         await asyncio.sleep(1)
             finally:
                 if not sync.done():
