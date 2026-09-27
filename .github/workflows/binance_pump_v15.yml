@@ -1,6 +1,9 @@
 name: Binance Pump Scanner V15 Live
 
 on:
+  schedule:
+    # Run every 15 minutes, offset from the top of the hour to reduce GitHub scheduling congestion.
+    - cron: "7,22,37,52 * * * *"
   push:
     paths:
       - "scanner/worker.py"
