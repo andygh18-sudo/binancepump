@@ -732,6 +732,65 @@ def v15_signal(s,v4,eps,v12):
                and b10>=.55 and rs5>0 and efficiency>=.25 and not btc_risk)
     return {"v15_opportunity_score":opportunity,"v15_confirmation_score":confirmation_score,"v15_score":max(opportunity,confirmation_score),"v15_tv_adjustment":tv_adj,"v15_tv_score":tv_score,"v15_stage":stage,"v15_early_candidate":early_candidate,"v15_confirmed":confirmed,"v15_streak":streak,"v15_btc_risk_off":btc_risk,"v15_relative_strength_5m":rs5,"v15_relative_strength_15m":rs15}
 
+def buy_setup_quality(v15, tv, exhaustion, v12, volume_ratio, trade_accel, buy_pressure, btc_risk=False):
+    """Composite setup-quality layer; does not modify the underlying V15 score."""
+    v15=v15 or {}; tv=tv or {}; exhaustion=exhaustion or {}; v12=v12 or {}
+    opportunity=float(v15.get("v15_opportunity_score",0) or 0)
+    confirmation=float(v15.get("v15_confirmation_score",0) or 0)
+    reignition=float(v15.get("v15_reignition_score",0) or 0)
+    tv_score=float(tv.get("tv_score",0) or 0)
+    bull_tf=float(tv.get("tv_bullish_timeframes",0) or 0)
+    rsi_1d=float(tv.get("tv_1d_rsi",0) or 0)
+    rsi_1w=float(tv.get("tv_1w_rsi",0) or 0)
+    vr=float(volume_ratio or 0); accel=float(trade_accel or 0); buy=float(buy_pressure or 0)
+    rs5=float(v15.get("v15_relative_strength_5m",0) or 0)
+    rs15=float(v15.get("v15_relative_strength_15m",0) or 0)
+    exhaustion_score=float(exhaustion.get("exhaustion_score",0) or 0)
+    v12_confirmation=bool(v12.get("v12_confirmation",False))
+    v12_eff=float(v12.get("v12_efficiency",0) or 0)
+
+    htf=(min(max((tv_score-50)/35,0),1)*15 +
+         min(max((bull_tf-2)/4,0),1)*5 +
+         min(max((rsi_1d-50)/30,0),1)*2.5 +
+         min(max((rsi_1w-50)/30,0),1)*2.5)
+    momentum=opportunity*0.15 + confirmation*0.10
+    participation=(min(max((vr-0.75)/2.25,0),1)*5 +
+                   min(max((accel-0.75)/2.25,0),1)*5 +
+                   min(max((buy-.48)/.22,0),1)*3 +
+                   min(max((rs5+.50)/1.50,0),1)*2)
+    confirmation_bonus=(5 if v12_confirmation else 0) + min(max(v12_eff/.60,0),1)*3
+    quality=htf+momentum+reignition*0.15+participation+confirmation_bonus
+    penalty=0.0; reasons=[]
+    if btc_risk or bool(v15.get("v15_btc_risk_off",False)):
+        penalty+=25; reasons.append("BTC RISK-OFF")
+    if v15.get("v15_stage")=="AVOID":
+        penalty+=35; reasons.append("V15 AVOID")
+    if exhaustion_score>=72:
+        penalty+=20; reasons.append("EXHAUSTION ALERT")
+    elif exhaustion_score>=58:
+        penalty+=10; reasons.append("EXHAUSTION WATCH")
+    if rs15 < -1.0:
+        penalty+=8; reasons.append("WEAK RS")
+    quality=max(0,min(round(quality-penalty),100))
+    if v15.get("v15_stage")=="AVOID" or btc_risk:
+        label="NO SETUP"
+    elif quality>=80:
+        label="HIGH-QUALITY SETUP"
+    elif quality>=65:
+        label="SETUP DEVELOPING"
+    elif quality>=50:
+        label="WATCH / WAIT"
+    elif quality>=35:
+        label="WEAK SETUP"
+    else:
+        label="NO SETUP"
+    if not reasons:
+        if quality>=65: reasons.append("MULTI-FACTOR CONFLUENCE")
+        elif reignition>=60 and tv_score>=70: reasons.append("RE-IGNITION WATCH")
+        else: reasons.append("WAIT FOR MOMENTUM")
+    return {"buy_setup_quality":quality,"buy_setup_quality_label":label,
+            "buy_setup_quality_reasons":" | ".join(reasons[:3])}
+
 def v11_v12_hybrid(v11,v12):
     if not v11 or not v12:return None
     a_plus=bool(v12.get("v12_a_plus",False));confirmation=bool(v12.get("v12_confirmation",False));efficiency=float(v12.get("v12_efficiency",0) or 0)
@@ -799,6 +858,7 @@ def score(s):
     v15["v15_reignition_score"]=reignition_score
     v15["v15_reignition_watch"]=reset_condition
     exhaustion=exhaustion_momentum(s,eps,v12,v15)
+    buy_quality=buy_setup_quality(v15,tv,exhaustion,v12,vr,acc,b10,bool(v15.get("v15_btc_risk_off",False)))
     hybrid=v11_v12_hybrid(v11,v12)
     hs=hybrid.get("hybrid_score",0) if hybrid else 0
     alert_tier="HIGH PRIORITY" if hs>=80 else "EARLY ACTION" if hs>=70 else "PRE-PUMP WATCH" if hs>=62 else "BELOW WATCH"
@@ -815,7 +875,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
+    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**buy_quality,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
