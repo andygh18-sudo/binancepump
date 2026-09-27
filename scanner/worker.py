@@ -1195,16 +1195,16 @@ async def main():
                                 label=str(r.get("pump_momentum_label","NORMAL") or "NORMAL")
                                 icon="🚀" if pm>=PUMP_MOMENTUM_ALERT_EXTREME else "🔥"
                                 await telegram(
-                                    f"{icon} PUMP MOMENTUM | {s} | {label} | {pm:.0f}/100\\n"
+                                    f"{icon} PUMP MOMENTUM | {s} | {label} | {pm:.0f}/100\n"
                                     f"V15: {r.get('v15_score',0):.0f}/100 | Stage: {r.get('v15_stage','')} | "
-                                    f"V15 Opportunity: {r.get('v15_opportunity_score',0):.0f} | Confirmation: {r.get('v15_confirmation_score',0):.0f}\\n"
+                                    f"V15 Opportunity: {r.get('v15_opportunity_score',0):.0f} | Confirmation: {r.get('v15_confirmation_score',0):.0f}\n"
                                     f"60s: {r.get('price_60s',0):+.2f}% | Volume: {r.get('volume_ratio',0):.2f}x | "
-                                    f"Trade accel: {r.get('trade_accel',0):.2f}x\\n"
+                                    f"Trade accel: {r.get('trade_accel',0):.2f}x\n"
                                     f"Buy pressure: {r.get('buy_pressure',0)*100:.1f}% | RS 5m: {r.get('v15_relative_strength_5m',0):+.2f}% | "
-                                    f"RS 15m: {r.get('v15_relative_strength_15m',0):+.2f}%\\n"
+                                    f"RS 15m: {r.get('v15_relative_strength_15m',0):+.2f}%\n"
                                     f"Momentum change: {r.get('_pump_momentum_delta',0):+.0f} points | "
-                                    f"Price: {r.get('price',0)}\\n"
-                                    f"Drivers: {r.get('pump_momentum_reasons','MOMENTUM BUILDING')}\\n"
+                                    f"Price: {r.get('price',0)}\n"
+                                    f"Drivers: {r.get('pump_momentum_reasons','MOMENTUM BUILDING')}\n"
                                     "🚀 Pump-intensity alert — BUY confirmation is evaluated separately."
                                 )
                                 old["last_pump_momentum_alert"]=now
