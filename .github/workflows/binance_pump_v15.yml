@@ -75,15 +75,31 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python run_scanner.py
 
-      - name: Bound scan history
+      - name: Protect and bound scan history
         run: |
+          set -e
           python - <<'PY'
           from pathlib import Path
+
           p=Path("data/history.jsonl")
+          latest=Path("data/latest.json")
+          backup=Path("/tmp/v15-history-before-bound.jsonl")
+
+          # Never allow an empty current scan to erase previously retained history.
+          if p.exists() and p.stat().st_size > 0:
+              backup.write_bytes(p.read_bytes())
+
           if p.exists():
-              lines=p.read_text().splitlines()
+              lines=p.read_text(errors="ignore").splitlines()
               if len(lines)>200:
                   p.write_text("\n".join(lines[-200:])+"\n")
+
+          if (not p.exists() or p.stat().st_size == 0) and backup.exists():
+              p.write_bytes(backup.read_bytes())
+
+          if not p.exists() or p.stat().st_size == 0:
+              raise SystemExit("V15 history is empty; refusing to publish an empty history file.")
+          print(f"V15 history protected: {p.stat().st_size} bytes")
           PY
 
       - name: Compact scan history
@@ -148,7 +164,7 @@ jobs:
           cp /tmp/v15-latest.json data/latest.json
           cp /tmp/v15-history.jsonl data/history.jsonl
           cp /tmp/v15-ignition-history.jsonl data/ignition_history.jsonl
-          git add data/latest.json data/history.jsonl data/ignition_history.jsonl
+          git add -f data/latest.json data/history.jsonl data/ignition_history.jsonl
           if git diff --cached --quiet; then
             echo "Scan data already synchronized."
             exit 0
