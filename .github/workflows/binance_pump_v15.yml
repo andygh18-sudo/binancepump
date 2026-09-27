@@ -78,7 +78,47 @@ jobs:
           V8_MIN_PERSISTENCE: "2"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python run_scanner.py
+        run: |
+          set -e
+          rm -rf /tmp/v15-live-publisher
+          git worktree add --detach /tmp/v15-live-publisher HEAD
+
+          publish_live_snapshot() {
+            if [ ! -f "$GITHUB_WORKSPACE/data/latest.json" ]; then
+              return 0
+            fi
+            cp "$GITHUB_WORKSPACE/data/latest.json" /tmp/v15-live-publisher/data/latest.json
+            cd /tmp/v15-live-publisher
+            git add -f data/latest.json
+            if git diff --cached --quiet; then
+              cd "$GITHUB_WORKSPACE"
+              return 0
+            fi
+            git commit -m "Publish V15 live snapshot"
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+            cd "$GITHUB_WORKSPACE"
+          }
+
+          (
+            while kill -0 "$V15_PID" 2>/dev/null; do
+              sleep 30
+              publish_live_snapshot || true
+            done
+          ) &
+          PUBLISHER_PID=$!
+
+          python run_scanner.py &
+          V15_PID=$!
+          export V15_PID
+          wait $V15_PID
+          wait $PUBLISHER_PID || true
+
+          # Publish the final snapshot here as well; the existing publish step
+          # remains responsible for the complete history files.
+          publish_live_snapshot || true
+          git worktree remove --force /tmp/v15-live-publisher
 
       - name: Protect and bound scan history
         run: |
