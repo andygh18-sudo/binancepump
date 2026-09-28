@@ -1117,6 +1117,10 @@ def score(s):
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
     if not token or not chat:return
+    # Normalize all scanner alerts to one Telegram line.
+    # This prevents literal \\n / \\ artifacts from reaching Telegram.
+    msg=str(msg).replace("\\\\n"," | ").replace("\\r"," | ").replace("\\n"," | ").replace("\\\\","")
+    msg=msg.replace("\r"," | ").replace("\n"," | ").replace("\\","")
     try:
         async with aiohttp.ClientSession() as s:
             await s.post(f"https://api.telegram.org/bot{token}/sendMessage",json={"chat_id":chat,"text":msg},timeout=8)
