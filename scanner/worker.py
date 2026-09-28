@@ -1280,10 +1280,10 @@ async def main():
                             changed=(r.get("exhaustion_state")!=old.get("last_exhaustion_state") or r.get("exhaustion_score",0)-float(old.get("last_exhaustion_score",0))>=5)
                             if changed and now-old["last_exhaustion_alert"]>=EXHAUSTION_COOLDOWN:
                                 await telegram(
-                                    f"⚠️ EXHAUSTION MOMENTUM | {s} | {r['exhaustion_state']} | Exhaustion {r['exhaustion_score']}/100\\n"
-                                    f"V15 {r['v15_score']}/100 | Stage: {r['v15_stage']} | Extension: {r['exhaustion_extension']:.2f}% | Rollover: {r['exhaustion_rollover']:.0f}\\n"
-                                    f"Buy pressure: {r['buy_pressure']*100:.1f}% | Vol: {r['volume_ratio']:.2f}x | Trade accel: {r['trade_accel']:.2f}x\\n"
-                                    f"Book imbalance: {r['book_imbalance']:+.2f} | RS 5m: {r['v15_relative_strength_5m']:+.2f}% | RS 15m: {r['v15_relative_strength_15m']:+.2f}%\\n"
+                                    f"⚠️ EXHAUSTION MOMENTUM | {s} | {r['exhaustion_state']} | Exhaustion {r['exhaustion_score']}/100\n"
+                                    f"V15 {r['v15_score']}/100 | Stage: {r['v15_stage']} | Extension: {r['exhaustion_extension']:.2f}% | Rollover: {r['exhaustion_rollover']:.0f}\n"
+                                    f"Buy pressure: {r['buy_pressure']*100:.1f}% | Vol: {r['volume_ratio']:.2f}x | Trade accel: {r['trade_accel']:.2f}x\n"
+                                    f"Book imbalance: {r['book_imbalance']:+.2f} | RS 5m: {r['v15_relative_strength_5m']:+.2f}% | RS 15m: {r['v15_relative_strength_15m']:+.2f}%\n"
                                     "⚠️ Momentum is extended and showing deterioration signals; confirmation of reversal is still required."
                                 )
                                 old["last_exhaustion_alert"]=now
@@ -1295,11 +1295,11 @@ async def main():
                             changed=(r["accumulation_score"]-prev>=5 or old.get("last_accum_stage")!=r["accumulation_stage"])
                             if changed and now-old["last_accum_alert"]>=COOLDOWN:
                                 await telegram(
-                                    f"🟣 ACCUMULATION / PRE-PUMP | {s} | {r['accumulation_stage']} | Accum {r['accumulation_score']}/100\\n"
-                                    f"Pump score: {r['score']}/100 | 1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}%\\n"
-                                    f"Buy pressure: {r['accum_buy_pressure']*100:.1f}% | Trade accel: {r['accum_trade_accel']:.2f}x | Vol ratio: {r['accum_volume_ratio']:.2f}x\\n"
-                                    f"Book imbalance: {r['accum_book_imbalance']:+.2f} | Trades/10s: {r['accum_trades_10s']}\\n"
-                                    f"Price: {r['price']}\\n"
+                                    f"🟣 ACCUMULATION / PRE-PUMP | {s} | {r['accumulation_stage']} | Accum {r['accumulation_score']}/100\n"
+                                    f"Pump score: {r['score']}/100 | 1m: {r['price_1m']:.2f}% | 10s: {r['price_10s']:.2f}%\n"
+                                    f"Buy pressure: {r['accum_buy_pressure']*100:.1f}% | Trade accel: {r['accum_trade_accel']:.2f}x | Vol ratio: {r['accum_volume_ratio']:.2f}x\n"
+                                    f"Book imbalance: {r['accum_book_imbalance']:+.2f} | Trades/10s: {r['accum_trades_10s']}\n"
+                                    f"Price: {r['price']}\n"
                                     "⚠️ Early signal — confirmation still required."
                                 )
                                 old["last_accum_alert"]=now
