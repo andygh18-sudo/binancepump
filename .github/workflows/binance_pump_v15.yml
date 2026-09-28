@@ -155,9 +155,11 @@ jobs:
           cp /tmp/v15-ignition-history.jsonl data/ignition_history.jsonl
           cp /tmp/v15-history-index.json data/history_index.json
           cp -R /tmp/v15-history data/history
+          rm -rf data/microstructure
+          if [ -d /tmp/v15-microstructure ]; then cp -R /tmp/v15-microstructure data/microstructure; fi
 
           git add -f data/latest.json data/ignition_history.jsonl data/history_index.json
-          git add -A data/history
+          git add -A data/history data/microstructure
           if git diff --cached --quiet; then
             echo "V15.2 scan data already synchronized."
             exit 0
