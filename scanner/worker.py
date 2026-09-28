@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from .orderbook import LocalOrderBook
 from .tradingview import fetch_tradingview_signals
 from .history_store import append_scan_history, append_microstructure_history
+from .v154 import evaluate as v154_evaluate
 
 load_dotenv()
 WS=os.getenv("BINANCE_WS_BASE","wss://data-stream.binance.vision/stream")
@@ -1114,6 +1115,24 @@ def score(s):
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
     return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,**pump_momentum,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**reignition_bridge,**buy_quality,**buy_decision,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
 
+def apply_v154(rows):
+    """Evaluate V15.4 in parallel with V15; never changes V15 fields."""
+    events=[]
+    for r in rows:
+        s=str(r.get("symbol","")).upper()
+        if not s: continue
+        result,event_record=v154_evaluate(r,state[s].setdefault("v154",{}))
+        r.update(result)
+        if event_record: events.append(event_record)
+    return events
+
+def persist_v154_events(events):
+    if not events:return
+    os.makedirs("data",exist_ok=True)
+    with open("data/v154_events.jsonl","a",encoding="utf-8") as f:
+        for event in events:
+            f.write(json.dumps(event,separators=(",",":"))+"\\n")
+
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
     if not token or not chat:return
@@ -1159,7 +1178,7 @@ async def main():
                                 tv_cache,tv_last_refresh=await fetch_tradingview_signals(http,symbols)
                             except Exception:
                                 tv_cache={};tv_last_refresh=time.time()
-                        rows=[r for s in symbols if (r:=score(s))]
+                        rows=[r for s in symbols if (r:=score(s))]\n            v154_events=apply_v154(rows)\n            persist_v154_events(v154_events)\n                        v154_events=apply_v154(rows)\n                        persist_v154_events(v154_events)
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
                         # Legacy V15 TOP alerts are intentionally disabled here.
                         # Early Telegram alerts are governed exclusively by the three-stage V15.1 ignition model below.
