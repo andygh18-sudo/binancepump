@@ -39,7 +39,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Prepare data
-        run: mkdir -p data
+        run: |\n          mkdir -p data\n          touch data/v154_events.jsonl
 
       - name: Validate V15 production scanner
         run: python -m py_compile scanner/worker.py scanner/history_store.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py
@@ -163,10 +163,10 @@ jobs:
           git add -f data/latest.json data/ignition_history.jsonl data/history_index.json
           git add -A data/history data/microstructure
           if git diff --cached --quiet; then
-            echo "V15.2 scan data already synchronized."
+            echo "V15.2/V15.4 scan data already synchronized."
             exit 0
           fi
-          git commit -m "Update V15.2 historical scanner data"
+          git commit -m "Update V15.2 and V15.4 historical scanner data"
           git push origin HEAD:main
 
       - name: Start next V15 scan after successful run
