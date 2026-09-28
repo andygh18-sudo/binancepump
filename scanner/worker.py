@@ -1411,7 +1411,9 @@ async def main():
     "v15_ignition_rs5","v15_ignition_rs15","v15_ignition_volume_ratio","v15_ignition_trades_10s",
     "v15_ignition_samples_5m","v15_ignition_window_seconds","v15_ignition_score_delta_5m","v15_trade_accel_delta_5m",
     "v15_buy_pressure_delta_5m","v15_ignition_rs5_delta_5m","v15_ignition_price_change_5m","v15_ignition_rising_ratio_5m",
-    "v15_ignition_persistence_5m","v15_ignition_early_samples_5m","v15_ignition_trajectory_score",\n    "v15_reignition_bridge_score","v15_reignition_bridge_stage","v15_reignition_bridge_armed","v15_reignition_bridge_trigger",\n    "v15_reignition_bridge_price_60s","v15_reignition_bridge_accel","v15_reignition_bridge_volume_ratio","v15_reignition_bridge_buy_pressure","v15_reignition_bridge_accel_slope",
+    "v15_ignition_persistence_5m","v15_ignition_early_samples_5m","v15_ignition_trajectory_score",
+    "v15_reignition_bridge_score","v15_reignition_bridge_stage","v15_reignition_bridge_armed","v15_reignition_bridge_trigger",
+    "v15_reignition_bridge_price_60s","v15_reignition_bridge_accel","v15_reignition_bridge_volume_ratio","v15_reignition_bridge_buy_pressure","v15_reignition_bridge_accel_slope",
     "v15_ignition_trajectory_stage","v15_ignition_trajectory_confirmed"
 ]
                         ignition_rows=[
