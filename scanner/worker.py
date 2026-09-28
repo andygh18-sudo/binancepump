@@ -1212,6 +1212,46 @@ async def main():
                                 await telegram(msg)
                                 old["last_ignition_alert"]=now
                             old["last_ignition_score"]=r.get("v15_ignition_score",0);old["last_ignition_stage"]=stage
+                        # V15.3 Re-Ignition Bridge: preserve strong structure while short-term momentum resets,
+                        # then alert when momentum returns. This does not alter the V15 score.
+                        bridge_candidates=[]
+                        for r in rows:
+                            stage=str(r.get("v15_reignition_bridge_stage","") or "")
+                            bs=float(r.get("v15_reignition_bridge_score",0) or 0)
+                            trigger=bool(r.get("v15_reignition_bridge_trigger",False))
+                            btc_off=bool(r.get("v15_btc_risk_off",False))
+                            if btc_off or stage!="REIGNITION" or not trigger or bs<65:
+                                continue
+                            rr=dict(r);rr["_bridge_score"]=bs
+                            bridge_candidates.append(rr)
+                        bridge_candidates=sorted(
+                            bridge_candidates,
+                            key=lambda r:(r.get("_bridge_score",0),r.get("v15_score",0),r.get("v15_confirmation_score",0)),
+                            reverse=True
+                        )[:TOP_ALERTS]
+                        for r in bridge_candidates:
+                            s=r["symbol"];old=state[s];now=time.time()
+                            bs=float(r.get("_bridge_score",0) or 0)
+                            changed=(old.get("last_reignition_stage")!="REIGNITION" or
+                                     bs-float(old.get("last_reignition_score",0) or 0)>=5)
+                            if changed and now-float(old.get("last_reignition_alert",0) or 0)>=COOLDOWN:
+                                await telegram(
+                                    f"🔵 V15.3 RE-IGNITION | {s} | Bridge {bs:.0f}/100\\n"
+                                    f"V15: {r.get('v15_score',0):.0f}/100 | Opportunity: {r.get('v15_opportunity_score',0):.0f} | "
+                                    f"Confirmation: {r.get('v15_confirmation_score',0):.0f}\\n"
+                                    f"Accumulation: {r.get('accumulation_score',0):.0f} | TradingView: {r.get('tv_score',0):.1f} | "
+                                    f"Bullish TFs: {r.get('tv_bullish_timeframes',0)}\\n"
+                                    f"60s: {r.get('v15_reignition_bridge_price_60s',0):+.2f}% | "
+                                    f"Trade accel: {r.get('v15_reignition_bridge_accel',0):.2f}x | "
+                                    f"Vol: {r.get('v15_reignition_bridge_volume_ratio',0):.2f}x\\n"
+                                    f"Buy pressure: {r.get('v15_reignition_bridge_buy_pressure',0)*100:.1f}% | "
+                                    f"Accel slope: {r.get('v15_reignition_bridge_accel_slope',0):+.2f}x | Price: {r.get('price',0)}\\n"
+                                    "🔵 Structure remained strong and short-term momentum has re-ignited — ignition confirmation follows separately."
+                                )
+                                old["last_reignition_alert"]=now
+                            old["last_reignition_score"]=bs
+                            old["last_reignition_stage"]=str(r.get("v15_reignition_bridge_stage","") or "")
+
                         # Dedicated PUMP MOMENTUM Telegram alerts sit between Ignition and BUY.
                         # They measure live pump intensity, not entry quality. This keeps a strong
                         # short-term mover visible even when BUY SETUP QUALITY is intentionally lower.
