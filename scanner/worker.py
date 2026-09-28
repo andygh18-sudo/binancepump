@@ -42,8 +42,6 @@ def persist_v154_events(events):
 
 async def telegram(msg):'''
 )
-needle="rows=[r for s in symbols if (r:=score(s))]"
-src=src.replace(needle,needle+"\n                        v154_events=apply_v154(rows)\n                        persist_v154_events(v154_events)")
 src=src.replace(
     'rows=[r for s in symbols if (r:=score(s))];rows.sort(key=lambda z:z["score"],reverse=True)',
     'rows=[r for s in symbols if (r:=score(s))]\n            v154_events=apply_v154(rows)\n            persist_v154_events(v154_events)\n            rows.sort(key=lambda z:z["score"],reverse=True)'
