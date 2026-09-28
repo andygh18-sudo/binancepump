@@ -35,7 +35,8 @@ HISTORY_FIELDS = [
     "v15_ignition_trajectory_confirmed",
     "v12_score","v12_efficiency","hybrid_score","hybrid_path","hybrid_grade",
     "exhaustion_score","exhaustion_state","exhaustion_alert","exhaustion_extension",
-    "exhaustion_rollover","exhaustion_symptoms"
+    "exhaustion_rollover","exhaustion_symptoms",
+    "v154_score","v154_early_buy","v154_stage","v154_participation_gate","v154_price_gate","v154_structure_gate","v154_persistence_status","v154_persistence_failures","v154_persistence_seconds","v154_exhaustion_veto","v154_disqualifiers","v154_book_imbalance","v154_spread_bps","v154_reignition_bonus","v154_alert","v154_event_id"
 ]
 
 def _record(row, ts):
@@ -56,7 +57,8 @@ def append_microstructure_history(rows, ts=None):
         "v15_ignition_score","v15_ignition_stage","v15_ignition_signals","v15_ignition_confirmations",
         "v15_ignition_accel","v15_trade_accel_slope","v15_buy_pressure_slope","v15_ignition_rs5",
         "v15_ignition_rs15","v15_ignition_trades_10s","v15_ignition_trajectory_score",
-        "accumulation_score","tv_confirmation","tv_bullish_timeframes"
+        "accumulation_score","tv_confirmation","tv_bullish_timeframes",
+        "v154_score","v154_early_buy","v154_stage","v154_participation_gate","v154_price_gate","v154_structure_gate","v154_persistence_status","v154_persistence_failures","v154_persistence_seconds","v154_exhaustion_veto","v154_disqualifiers","v154_book_imbalance","v154_spread_bps","v154_reignition_bonus","v154_alert","v154_event_id"
     ]
     for row in rows or []:
         if not isinstance(row, dict):
