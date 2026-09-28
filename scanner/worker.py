@@ -1004,7 +1004,12 @@ def v15_reignition_bridge(s, v15, ac, eps, tv):
     armed=float(x.get("reignition_armed_until",0) or 0)>=now and not btc_off
     # Re-ignition must include genuine short-term price/buy-pressure confirmation.
     # Trade acceleration is supporting evidence only; it cannot trigger RE-IGNITION by itself.
-    trigger=armed and (\n        p60>=0.50 or\n        (p60>=0.30 and accel>=1.35) or\n        (p60>=0.20 and b10>=0.55) or\n        (ignition_score>=45 and p60>0)\n    )
+    trigger=armed and (
+        p60>=0.50 or
+        (p60>=0.30 and accel>=1.35) or
+        (p60>=0.20 and b10>=0.55) or
+        (ignition_score>=45 and p60>0)
+    )
     if btc_off: stage="OFF"
     elif trigger: stage="REIGNITION"
     elif armed: stage="HIGH-TF IGNITION WATCH"
