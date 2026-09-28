@@ -1134,6 +1134,7 @@ async def main():
     os.makedirs("data",exist_ok=True);start=time.time();timeout=aiohttp.ClientTimeout(total=20)
     async with aiohttp.ClientSession(timeout=timeout) as http:
         symbols=await discover(http);books={s:LocalOrderBook(s,REST,LIMIT) for s in symbols};streams=[];history_last_write=0.0
+micro_history_last_write=time.time()-15.0
         for s in symbols:
             q=s.lower();streams += [f"{q}@aggTrade",f"{q}@bookTicker",f"{q}@depth@100ms",f"{q}@kline_1m"]
         url=WS+"?streams="+"/".join(streams)
@@ -1410,6 +1411,11 @@ async def main():
                         if now_history-history_last_write >= HISTORY_SAMPLE_INTERVAL:
                             append_scan_history(rows, ts=now_history)
                             history_last_write=now_history
+                        # V15.3 microstructure history: retain 15s data only for armed/high-score candidates.
+                        now_micro=time.time()
+                        if now_micro-micro_history_last_write >= 15.0:
+                            append_microstructure_history(rows, ts=now_micro)
+                            micro_history_last_write=now_micro
                         ignition_fields=[
     "symbol","price","v15_ignition_score","v15_ignition_stage","v15_ignition_alert","v15_ignition_signals","v15_ignition_confirmations",
     "price_60s","v15_ignition_accel","v15_trade_accel_slope","buy_pressure","v15_buy_pressure_slope",
