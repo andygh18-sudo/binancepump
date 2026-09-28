@@ -72,7 +72,7 @@ def append_microstructure_history(rows, ts=None):
         record = {"ts": stamp, **{k: row.get(k) for k in fields if k in row}}
         path = MICROSTRUCTURE_ROOT / f"{symbol}.jsonl"
         with path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, separators=(",", ":")) + "\\n")
+            f.write(json.dumps(record, separators=(",", ":")) + "\n")
 
 
 def append_scan_history(rows, ts=None):
