@@ -1178,7 +1178,7 @@ async def main():
                                 tv_cache,tv_last_refresh=await fetch_tradingview_signals(http,symbols)
                             except Exception:
                                 tv_cache={};tv_last_refresh=time.time()
-                        rows=[r for s in symbols if (r:=score(s))]\n            v154_events=apply_v154(rows)\n            persist_v154_events(v154_events)\n                        v154_events=apply_v154(rows)\n                        persist_v154_events(v154_events)
+                        rows=[r for s in symbols if (r:=score(s))]\n                        v154_events=apply_v154(rows)\n                        persist_v154_events(v154_events)\n            v154_events=apply_v154(rows)\n            persist_v154_events(v154_events)\n                        v154_events=apply_v154(rows)\n                        persist_v154_events(v154_events)
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
                         # Legacy V15 TOP alerts are intentionally disabled here.
                         # Early Telegram alerts are governed exclusively by the three-stage V15.1 ignition model below.
@@ -1462,7 +1462,7 @@ async def main():
                     sync.cancel()
                     try:await sync
                     except asyncio.CancelledError:pass
-            rows=[r for s in symbols if (r:=score(s))];rows.sort(key=lambda z:z["score"],reverse=True)
+            rows=[r for s in symbols if (r:=score(s))]\n            v154_events=apply_v154(rows)\n            persist_v154_events(v154_events);rows.sort(key=lambda z:z["score"],reverse=True)
             with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
 
 # V15 production deployment active
