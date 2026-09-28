@@ -1242,16 +1242,16 @@ async def main():
                                      bs-float(old.get("last_reignition_score",0) or 0)>=5)
                             if changed and now-float(old.get("last_reignition_alert",0) or 0)>=COOLDOWN:
                                 await telegram(
-                                    f"🔵 V15.3 RE-IGNITION | {s} | Bridge {bs:.0f}/100\\n"
+                                    f"🔵 V15.3 RE-IGNITION | {s} | Bridge {bs:.0f}/100 | "
                                     f"V15: {r.get('v15_score',0):.0f}/100 | Opportunity: {r.get('v15_opportunity_score',0):.0f} | "
-                                    f"Confirmation: {r.get('v15_confirmation_score',0):.0f}\\n"
+                                    f"Confirmation: {r.get('v15_confirmation_score',0):.0f} | "
                                     f"Accumulation: {r.get('accumulation_score',0):.0f} | TradingView: {r.get('tv_score',0):.1f} | "
-                                    f"Bullish TFs: {r.get('tv_bullish_timeframes',0)}\\n"
+                                    f"Bullish TFs: {r.get('tv_bullish_timeframes',0)} | "
                                     f"60s: {r.get('v15_reignition_bridge_price_60s',0):+.2f}% | "
                                     f"Trade accel: {r.get('v15_reignition_bridge_accel',0):.2f}x | "
-                                    f"Vol: {r.get('v15_reignition_bridge_volume_ratio',0):.2f}x\\n"
+                                    f"Vol: {r.get('v15_reignition_bridge_volume_ratio',0):.2f}x | "
                                     f"Buy pressure: {r.get('v15_reignition_bridge_buy_pressure',0)*100:.1f}% | "
-                                    f"Accel slope: {r.get('v15_reignition_bridge_accel_slope',0):+.2f}x | Price: {r.get('price',0)}\\n"
+                                    f"Accel slope: {r.get('v15_reignition_bridge_accel_slope',0):+.2f}x | Price: {r.get('price',0)} | "
                                     "🔵 Structure remained strong and short-term momentum has re-ignited — ignition confirmation follows separately."
                                 )
                                 old["last_reignition_alert"]=now
