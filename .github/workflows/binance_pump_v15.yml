@@ -144,6 +144,8 @@ jobs:
           cp data/history_index.json /tmp/v15-history-index.json
           rm -rf /tmp/v15-history
           cp -R data/history /tmp/v15-history
+          rm -rf /tmp/v15-microstructure
+          if [ -d data/microstructure ]; then cp -R data/microstructure /tmp/v15-microstructure; fi
 
           # Reset to current remote main before restoring only generated data.
           # The legacy monolithic history file is deliberately removed.
