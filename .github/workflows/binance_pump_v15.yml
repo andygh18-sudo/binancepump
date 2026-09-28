@@ -39,7 +39,9 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Prepare data
-        run: |\n          mkdir -p data\n          touch data/v154_events.jsonl
+        run: |
+          mkdir -p data
+          touch data/v154_events.jsonl
 
       - name: Validate V15 production scanner
         run: python -m py_compile scanner/worker.py scanner/history_store.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py
@@ -146,6 +148,7 @@ jobs:
           cp -R data/history /tmp/v15-history
           rm -rf /tmp/v15-microstructure
           if [ -d data/microstructure ]; then cp -R data/microstructure /tmp/v15-microstructure; fi
+          if [ -f data/v154_events.jsonl ]; then cp data/v154_events.jsonl /tmp/v15-v154-events.jsonl; else : > /tmp/v15-v154-events.jsonl; fi
 
           # Reset to current remote main before restoring only generated data.
           # The legacy monolithic history file is deliberately removed.
@@ -159,8 +162,9 @@ jobs:
           cp -R /tmp/v15-history data/history
           rm -rf data/microstructure
           if [ -d /tmp/v15-microstructure ]; then cp -R /tmp/v15-microstructure data/microstructure; fi
+          cp /tmp/v15-v154-events.jsonl data/v154_events.jsonl
 
-          git add -f data/latest.json data/ignition_history.jsonl data/history_index.json
+          git add -f data/latest.json data/ignition_history.jsonl data/history_index.json data/v154_events.jsonl
           git add -A data/history data/microstructure
           if git diff --cached --quiet; then
             echo "V15.2/V15.4 scan data already synchronized."
