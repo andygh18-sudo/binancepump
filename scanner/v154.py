@@ -27,9 +27,13 @@ V154 = {
     "tv_bull_tf_min": int(os.getenv("V154_TV_BULL_TF_MIN", "3")),
     "persistence_seconds": float(os.getenv("V154_PERSISTENCE_SECONDS", "30")),
     "persistence_min_seconds": float(os.getenv("V154_PERSISTENCE_MIN_SECONDS", "15")),
-    "persistence_volume_min": float(os.getenv("V154_PERSISTENCE_VOLUME_MIN", "1.50")),
-    "persistence_accel_min": float(os.getenv("V154_PERSISTENCE_ACCEL_MIN", "1.00")),
-    "persistence_buy_min": float(os.getenv("V154_PERSISTENCE_BUY_MIN", "0.50")),
+    "persistence_volume_min": float(os.getenv("V154_PERSISTENCE_VOLUME_MIN", "1.25")),
+    "persistence_accel_min": float(os.getenv("V154_PERSISTENCE_ACCEL_MIN", "1.50")),
+    "persistence_buy_min": float(os.getenv("V154_PERSISTENCE_BUY_MIN", "0.55")),
+    "persistence_price_60s_min": float(os.getenv("V154_PERSISTENCE_PRICE_60S_MIN", "0.00")),
+    "persistence_rs5_min": float(os.getenv("V154_PERSISTENCE_RS5_MIN", "0.00")),
+    "persistence_v15_min": float(os.getenv("V154_PERSISTENCE_V15_MIN", "70")),
+    "persistence_tv_bull_tf_min": int(os.getenv("V154_PERSISTENCE_TV_BULL_TF_MIN", "3")),
     "persistence_fail_count": int(os.getenv("V154_PERSISTENCE_FAIL_COUNT", "2")),
     "alert_cooldown": float(os.getenv("V154_ALERT_COOLDOWN", "180")),
     "exhaustion_price_60s": float(os.getenv("V154_EXHAUSTION_PRICE_60S", "1.50")),
@@ -104,6 +108,12 @@ def evaluate(row, memory, now=None):
         failures.append("ACCEL_COLLAPSE")
     if buy < V154["persistence_buy_min"]:
         failures.append("BUY_PRESSURE_COLLAPSE")
+    if p60 <= V154["persistence_price_60s_min"]:
+        failures.append("PRICE_60S_LOST")
+    if rs5 <= V154["persistence_rs5_min"]:
+        failures.append("RS5_LOST")
+    if v15 < V154["persistence_v15_min"]:
+        failures.append("V15_CONFIRMATION_LOST")
 
     trigger_v15 = memory.get("trigger_v15")
     if trigger_v15 is not None and v15 < trigger_v15 - 20:
@@ -208,7 +218,7 @@ def evaluate(row, memory, now=None):
                 "max_price_60s": p60,
                 "v154_score": score,
             }
-        elif age >= V154["persistence_seconds"] and confirmation and not extension:
+        elif age >= V154["persistence_seconds"] and confirmation and tvtf >= V154["persistence_tv_bull_tf_min"] and not extension and len(current_failures) == 0:
             memory["status"] = "PERSISTENCE_CONFIRMED"
             memory["stage"] = "CONFIRMED IGNITION"
             event_record = {
@@ -223,6 +233,8 @@ def evaluate(row, memory, now=None):
                 "max_price_60s": p60,
                 "v154_score": score,
                 "tv_bullish_timeframes": tvtf,
+                "confirmation_gate": True,
+                "high_confidence": True,
             }
 
     status = memory.get("status", status)
@@ -247,8 +259,11 @@ def evaluate(row, memory, now=None):
         "v154_price_gate": price,
         "v154_structure_gate": structure,
         "v154_confirmation_gate": confirmation,
+        "v154_high_confidence": bool(confirmed),
+        "v154_tv_confirmation_gate": bool(tvtf >= V154["persistence_tv_bull_tf_min"]),
         "v154_persistence_status": memory.get("status", "IDLE"),
         "v154_persistence_failures": "|".join(memory.get("failures", failures)),
+        "v154_persistence_gate": bool(memory.get("status") == "PERSISTENCE_CONFIRMED"),
         "v154_persistence_seconds": round(
             max(0, now - float(memory.get("trigger_ts", now)))
             if memory.get("status") == "PENDING" else 0,
