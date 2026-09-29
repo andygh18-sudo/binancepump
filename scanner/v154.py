@@ -402,6 +402,14 @@ def evaluate(row, memory, now=None):
         "v154_reignition_bonus": 5 if bridge_trigger else 3 if bridge >= 60 else 0,
         "v154_alert": bool(event_record and event_record.get("event") == "TRIGGER"),
         "v154_event_id": memory.get("event_id", ""),
+        "v155_stage": (
+            "CONFIRMED IGNITION" if confirmed
+            else "PERSISTENCE" if memory.get("status") == "PENDING"
+            else "PRE-IGNITION WATCH" if memory.get("status") == "PRE_IGNITION_WATCH"
+            else "RE-IGNITION WATCH" if memory.get("status") == "REIGNITION_WATCH"
+            else "EARLY IGNITION" if early_stage
+            else "WATCH"
+        ),
         "v155_reignition_watch": bool(memory.get("status") == "REIGNITION_WATCH"),
         "v155_reignition_active": bool(reignition_active),
         "v155_reignition_source_event_id": memory.get("reignition_source_event_id", ""),
