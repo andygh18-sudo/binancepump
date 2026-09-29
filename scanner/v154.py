@@ -50,6 +50,14 @@ V155 = {
     "min_price_60s": float(os.getenv("V155_MIN_PRICE_60S", "0.35")),
     "min_rs5": float(os.getenv("V155_MIN_RS5", "0.20")),
     "min_tv_bull_tf": int(os.getenv("V155_MIN_TV_BULL_TF", "3")),
+    "pre_watch_seconds": float(os.getenv("V155_PRE_WATCH_SECONDS", "1800")),
+    "pre_min_v15": float(os.getenv("V155_PRE_MIN_V15", "45")),
+    "pre_min_opp": float(os.getenv("V155_PRE_MIN_OPP", "40")),
+    "pre_min_acc": float(os.getenv("V155_PRE_MIN_ACC", "45")),
+    "pre_min_price_60s": float(os.getenv("V155_PRE_MIN_PRICE_60S", "0.15")),
+    "pre_min_rs5": float(os.getenv("V155_PRE_MIN_RS5", "0.00")),
+    "pre_min_tv_bull_tf": int(os.getenv("V155_PRE_MIN_TV_BULL_TF", "3")),
+    "pre_min_volume": float(os.getenv("V155_PRE_MIN_VOLUME", "0.75")),
 }
 
 def _f(row, k, d=0.0):
@@ -77,6 +85,23 @@ def _arm_reignition(memory):
         and _i(memory, "trigger_tv_bull_tf") >= V155["min_tv_bull_tf"]
     )
 
+def _pre_ignition_setup(row, btc_off, early, extension):
+    """Non-alerting setup watch for PUMP/PHA-like pre-pump conditions."""
+    if btc_off or early or extension:
+        return False
+    v15 = _f(row, "v15_score")
+    opp = _f(row, "v15_opportunity_score")
+    acc = _f(row, "accumulation_score")
+    p60 = _f(row, "price_60s")
+    rs5 = _f(row, "relative_strength_5m")
+    vol = _f(row, "volume_ratio")
+    tvtf = _i(row, "tv_bullish_timeframes")
+    # Require either strong higher-timeframe alignment or meaningful V15
+    # structure, plus early price/flow improvement. This state never alerts.
+    higher_tf = tvtf >= V155["pre_min_tv_bull_tf"]
+    structure = v15 >= V155["pre_min_v15"] and opp >= V155["pre_min_opp"] and acc >= V155["pre_min_acc"]
+    price_flow = p60 >= V155["pre_min_price_60s"] and rs5 >= V155["pre_min_rs5"] and vol >= V155["pre_min_volume"]
+    return price_flow and (higher_tf or structure)
 def evaluate(row, memory, now=None):
     now = time.time() if now is None else float(now)
     symbol = str(row.get("symbol", "")).upper()
@@ -167,6 +192,7 @@ def evaluate(row, memory, now=None):
         failures.append("EXHAUSTION")
 
     early = participation and price and structure
+    pre_watch = _pre_ignition_setup(row, btc_off, early, extension)
 
     score = 0
     score += 25 if participation else (15 if vol >= 1.25 and accel >= 1.5 and buy >= 0.60 else 0)
@@ -181,8 +207,41 @@ def evaluate(row, memory, now=None):
     status = memory.get("status", "IDLE")
     event_record = None
 
+    # PRE-IGNITION WATCH is intentionally non-alerting. It records a setup
+    # and keeps it warm while short-term participation catches up.
+    if pre_watch and status in ("IDLE", "FAILED", "FAILED_PERSISTENCE", "CANCELLED", "COMPLETED"):
+        last_pre = float(memory.get("pre_watch_ts", 0) or 0)
+        if status != "PRE_IGNITION_WATCH" or now - last_pre >= 300:
+            memory["status"] = "PRE_IGNITION_WATCH"
+            memory["stage"] = "PRE-IGNITION WATCH"
+            memory["pre_watch_ts"] = now
+            memory["pre_watch_expires"] = now + V155["pre_watch_seconds"]
+            memory["pre_watch_price"] = _f(row, "price")
+            memory["pre_watch_v15"] = v15
+            memory["pre_watch_volume"] = vol
+            memory["pre_watch_accel"] = accel
+            memory["pre_watch_buy"] = buy
+            memory["pre_watch_p60"] = p60
+            memory["pre_watch_rs5"] = rs5
+            memory["pre_watch_tv_bull_tf"] = tvtf
+            event_record = {
+                "event": "PRE_WATCH",
+                "event_id": memory.get("event_id") or uuid.uuid4().hex[:12],
+                "symbol": symbol,
+                "ts": now,
+                "stage": "PRE-IGNITION WATCH",
+                "alert": False,
+                "price": _f(row, "price"),
+                "v15_score": v15,
+                "volume_ratio": vol,
+                "trade_accel": accel,
+                "buy_pressure": buy,
+                "price_60s": p60,
+                "rs5": rs5,
+                "tv_bullish_timeframes": tvtf,
+            }
     # Stage 1 -> Stage 2: create a pending ignition event.
-    if early and not extension and status in ("IDLE", "FAILED", "FAILED_PERSISTENCE", "CANCELLED", "COMPLETED", "REIGNITION_WATCH"):
+    if early and not extension and status in ("IDLE", "PRE_IGNITION_WATCH", "FAILED", "FAILED_PERSISTENCE", "CANCELLED", "COMPLETED", "REIGNITION_WATCH"):
         last_alert = float(memory.get("last_alert", 0) or 0)
         if now - last_alert >= V154["alert_cooldown"]:
             was_reignition = reignition_active
@@ -287,6 +346,12 @@ def evaluate(row, memory, now=None):
                 "high_confidence": True,
             }
 
+    if memory.get("status") == "PRE_IGNITION_WATCH":
+        if btc_off or now >= float(memory.get("pre_watch_expires", 0) or 0):
+            memory["status"] = "FAILED_PERSISTENCE"
+            memory["stage"] = "WATCH"
+            memory["pre_watch_expired"] = True
+            memory["last_update"] = now
     if memory.get("status") == "REIGNITION_WATCH":
         if btc_off or now >= float(memory.get("reignition_expires", 0) or 0):
             memory["status"] = "FAILED_PERSISTENCE"
@@ -302,6 +367,8 @@ def evaluate(row, memory, now=None):
         stage = "CONFIRMED IGNITION"
     elif early_stage:
         stage = "REIGNITION EARLY IGNITION" if memory.get("v155_reignition") else "EARLY IGNITION"
+    elif memory.get("status") == "PRE_IGNITION_WATCH":
+        stage = "PRE-IGNITION WATCH"
     elif memory.get("status") == "REIGNITION_WATCH":
         stage = "RE-IGNITION WATCH"
     else:
@@ -341,6 +408,10 @@ def evaluate(row, memory, now=None):
         "v155_reignition_expires": memory.get("reignition_expires", 0),
         "v155_reignition_armed": bool(memory.get("reignition_reason") == "FAILED_HIGH_QUALITY_IGNITION"),
         "v155_reignition_trigger": bool(event_record and event_record.get("event") == "TRIGGER" and memory.get("v155_reignition")),
+        "v155_pre_ignition_watch": bool(memory.get("status") == "PRE_IGNITION_WATCH"),
+        "v155_pre_ignition_active": bool(pre_watch),
+        "v155_pre_ignition_expires": memory.get("pre_watch_expires", 0),
+        "v155_pre_ignition_event": bool(event_record and event_record.get("event") == "PRE_WATCH"),
 
     }
     return out, event_record
