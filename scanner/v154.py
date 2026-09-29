@@ -3,8 +3,11 @@
 V15.4 deliberately exposes exactly three actionable stages:
     WATCH -> EARLY IGNITION -> CONFIRMED IGNITION
 
-Exhaustion and disqualifiers are veto/diagnostic conditions, not additional
-signal stages. V15 remains unchanged; this engine runs alongside it.
+Early Ignition prioritizes short-term participation and price/flow structure.
+TradingView multi-timeframe alignment is confirmation for Stage 3 rather than
+a hard Stage-2 gate. Exhaustion and disqualifiers are veto/diagnostic
+conditions, not additional signal stages. V15 remains unchanged; this engine
+runs alongside it.
 """
 import time
 import uuid
@@ -12,11 +15,11 @@ import os
 
 V154 = {
     "price_10s_min": float(os.getenv("V154_PRICE_10S_MIN", "0.10")),
-    "price_60s_min": float(os.getenv("V154_PRICE_60S_MIN", "0.40")),
-    "volume_ratio_min": float(os.getenv("V154_VOLUME_MIN", "2.50")),
+    "price_60s_min": float(os.getenv("V154_PRICE_60S_MIN", "0.35")),
+    "volume_ratio_min": float(os.getenv("V154_VOLUME_MIN", "1.50")),
     "trade_accel_min": float(os.getenv("V154_ACCEL_MIN", "2.00")),
     "buy_pressure_min": float(os.getenv("V154_BUY_MIN", "0.65")),
-    "rs5_min": float(os.getenv("V154_RS5_MIN", "0.25")),
+    "rs5_min": float(os.getenv("V154_RS5_MIN", "0.20")),
     "v15_min": float(os.getenv("V154_V15_MIN", "75")),
     "opportunity_min": float(os.getenv("V154_OPPORTUNITY_MIN", "65")),
     "confirmation_min": float(os.getenv("V154_CONFIRMATION_MIN", "70")),
@@ -78,14 +81,19 @@ def evaluate(row, memory, now=None):
         and p60 >= V154["price_60s_min"]
         and rs5 >= V154["rs5_min"]
     )
+
+    # Stage 2 structure: deliberately excludes TV so early ignition can fire
+    # before higher-timeframe confirmation catches up.
     structure = (
         v15 >= V154["v15_min"]
         and opp >= V154["opportunity_min"]
         and conf >= V154["confirmation_min"]
         and acc >= V154["accumulation_min"]
-        and tvtf >= V154["tv_bull_tf_min"]
         and not btc_off
     )
+
+    # Stage 3 confirmation: all Stage-2 gates plus TV alignment.
+    confirmation = structure and tvtf >= V154["tv_bull_tf_min"]
 
     failures = []
     if p10 <= 0:
@@ -119,9 +127,9 @@ def evaluate(row, memory, now=None):
     early = participation and price and structure
 
     score = 0
-    score += 25 if participation else (15 if vol >= 2 and accel >= 1.5 and buy >= 0.60 else 0)
+    score += 25 if participation else (15 if vol >= 1.25 and accel >= 1.5 and buy >= 0.60 else 0)
     score += 25 if price else (15 if p60 >= 0.30 and rs5 >= 0 else 0)
-    score += 25 if structure else (15 if v15 >= 70 and conf >= 65 and acc >= 60 and tvtf >= 2 and not btc_off else 0)
+    score += 25 if structure else (15 if v15 >= 70 and conf >= 65 and acc >= 60 and not btc_off else 0)
     score += 10 if tvtf >= 4 else 5 if tvtf >= 3 else 0
     score += 5 if rs5 >= 0.50 else 3 if rs5 >= 0.25 else 0
     score += 5 if bridge_trigger else 3 if bridge >= 60 else 0
@@ -200,7 +208,7 @@ def evaluate(row, memory, now=None):
                 "max_price_60s": p60,
                 "v154_score": score,
             }
-        elif age >= V154["persistence_seconds"]:
+        elif age >= V154["persistence_seconds"] and confirmation and not extension:
             memory["status"] = "PERSISTENCE_CONFIRMED"
             memory["stage"] = "CONFIRMED IGNITION"
             event_record = {
@@ -214,10 +222,9 @@ def evaluate(row, memory, now=None):
                 "failures": current_failures,
                 "max_price_60s": p60,
                 "v154_score": score,
+                "tv_bullish_timeframes": tvtf,
             }
 
-    # A confirmed event stays confirmed in the state machine unless a new
-    # event is created. Exhaustion is surfaced as a veto, not a fourth stage.
     confirmed = status == "PERSISTENCE_CONFIRMED" and not extension
     early_stage = status == "PENDING" and early and not extension
 
@@ -228,7 +235,6 @@ def evaluate(row, memory, now=None):
     else:
         stage = "WATCH"
 
-    # If the live observation is exhausted, do not advertise a buy stage.
     if extension:
         stage = "WATCH"
 
@@ -239,6 +245,7 @@ def evaluate(row, memory, now=None):
         "v154_participation_gate": participation,
         "v154_price_gate": price,
         "v154_structure_gate": structure,
+        "v154_confirmation_gate": confirmation,
         "v154_persistence_status": memory.get("status", "IDLE"),
         "v154_persistence_failures": "|".join(memory.get("failures", failures)),
         "v154_persistence_seconds": round(
