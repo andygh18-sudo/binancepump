@@ -40,6 +40,18 @@ V154 = {
     "exhaustion_accel_drop": float(os.getenv("V154_EXHAUSTION_ACCEL_DROP", "0.50")),
 }
 
+V155 = {
+    "enabled": os.getenv("V155_REIGNITION_ENABLED", "1") == "1",
+    "watch_seconds": float(os.getenv("V155_REIGNITION_WATCH_SECONDS", "7200")),
+    "min_v15": float(os.getenv("V155_MIN_V15", "80")),
+    "min_volume": float(os.getenv("V155_MIN_VOLUME", "2.00")),
+    "min_accel": float(os.getenv("V155_MIN_ACCEL", "2.00")),
+    "min_buy": float(os.getenv("V155_MIN_BUY", "0.75")),
+    "min_price_60s": float(os.getenv("V155_MIN_PRICE_60S", "0.35")),
+    "min_rs5": float(os.getenv("V155_MIN_RS5", "0.20")),
+    "min_tv_bull_tf": int(os.getenv("V155_MIN_TV_BULL_TF", "3")),
+}
+
 def _f(row, k, d=0.0):
     try:
         return float(row.get(k, d) or d)
@@ -51,6 +63,19 @@ def _i(row, k, d=0):
         return int(row.get(k, d) or d)
     except (TypeError, ValueError):
         return d
+
+def _arm_reignition(memory):
+    if not V155["enabled"]:
+        return False
+    return (
+        _f(memory, "trigger_v15") >= V155["min_v15"]
+        and _f(memory, "trigger_volume") >= V155["min_volume"]
+        and _f(memory, "trigger_accel") >= V155["min_accel"]
+        and _f(memory, "trigger_buy") >= V155["min_buy"]
+        and _f(memory, "trigger_p60") >= V155["min_price_60s"]
+        and _f(memory, "trigger_rs5") >= V155["min_rs5"]
+        and _i(memory, "trigger_tv_bull_tf") >= V155["min_tv_bull_tf"]
+    )
 
 def evaluate(row, memory, now=None):
     now = time.time() if now is None else float(now)
@@ -74,6 +99,13 @@ def evaluate(row, memory, now=None):
     bridge_trigger = bool(row.get("v15_reignition_bridge_trigger", False))
     exhaustion = _f(row, "exhaustion_score")
     pump = _f(row, "pump_momentum_score")
+
+    reignition_active = (
+        V155["enabled"]
+        and memory.get("status") == "REIGNITION_WATCH"
+        and now < float(memory.get("reignition_expires", 0) or 0)
+        and not btc_off
+    )
 
     participation = (
         vol >= V154["volume_ratio_min"]
@@ -150,9 +182,11 @@ def evaluate(row, memory, now=None):
     event_record = None
 
     # Stage 1 -> Stage 2: create a pending ignition event.
-    if early and not extension and status in ("IDLE", "FAILED", "FAILED_PERSISTENCE", "CANCELLED", "COMPLETED"):
+    if early and not extension and status in ("IDLE", "FAILED", "FAILED_PERSISTENCE", "CANCELLED", "COMPLETED", "REIGNITION_WATCH"):
         last_alert = float(memory.get("last_alert", 0) or 0)
         if now - last_alert >= V154["alert_cooldown"]:
+            was_reignition = reignition_active
+            prior_event_id = memory.get("reignition_source_event_id", "")
             event_id = uuid.uuid4().hex[:12]
             memory.clear()
             memory.update({
@@ -181,6 +215,8 @@ def evaluate(row, memory, now=None):
                 "trigger_rs5": rs5,
                 "trigger_exhaustion": exhaustion,
                 "trigger_pump": pump,
+                "v155_reignition": was_reignition,
+                "v155_reignition_source_event_id": prior_event_id,
                 "failures": [],
                 "last_update": now,
             })
@@ -190,8 +226,10 @@ def evaluate(row, memory, now=None):
                 "symbol": symbol,
                 "ts": now,
                 "v154_score": score,
-                "stage": "EARLY IGNITION",
+                "stage": "REIGNITION EARLY IGNITION" if was_reignition else "EARLY IGNITION",
                 "persistence_status": "PENDING",
+                "v155_reignition": was_reignition,
+                "v155_reignition_source_event_id": prior_event_id,
                 "price": _f(row, "price"),
                 "trigger_fields": dict(memory),
             }
@@ -204,19 +242,31 @@ def evaluate(row, memory, now=None):
         memory["last_update"] = now
 
         if len(current_failures) >= V154["persistence_fail_count"] and age >= V154["persistence_min_seconds"]:
-            memory["status"] = "FAILED_PERSISTENCE"
-            memory["stage"] = "WATCH"
+            old_event_id = memory.get("event_id", "")
+            high_quality = _arm_reignition(memory)
+            if high_quality:
+                memory["status"] = "REIGNITION_WATCH"
+                memory["stage"] = "RE-IGNITION WATCH"
+                memory["reignition_started"] = now
+                memory["reignition_expires"] = now + V155["watch_seconds"]
+                memory["reignition_source_event_id"] = old_event_id
+                memory["reignition_reason"] = "FAILED_HIGH_QUALITY_IGNITION"
+            else:
+                memory["status"] = "FAILED_PERSISTENCE"
+                memory["stage"] = "WATCH"
             event_record = {
                 "event": "RESOLVED",
-                "event_id": memory.get("event_id"),
+                "event_id": old_event_id,
                 "symbol": symbol,
                 "ts": now,
-                "outcome": "FAILED_PERSISTENCE",
-                "stage": "WATCH",
+                "outcome": "FAILED_PERSISTENCE_REIGNITION_WATCH" if high_quality else "FAILED_PERSISTENCE",
+                "stage": "RE-IGNITION WATCH" if high_quality else "WATCH",
                 "persistence_seconds": round(age, 1),
                 "failures": current_failures,
                 "max_price_60s": p60,
                 "v154_score": score,
+                "v155_reignition_armed": high_quality,
+                "v155_reignition_expires": memory.get("reignition_expires", 0),
             }
         elif age >= V154["persistence_seconds"] and confirmation and tvtf >= V154["persistence_tv_bull_tf_min"] and not extension and len(current_failures) == 0:
             memory["status"] = "PERSISTENCE_CONFIRMED"
@@ -237,6 +287,13 @@ def evaluate(row, memory, now=None):
                 "high_confidence": True,
             }
 
+    if memory.get("status") == "REIGNITION_WATCH":
+        if btc_off or now >= float(memory.get("reignition_expires", 0) or 0):
+            memory["status"] = "FAILED_PERSISTENCE"
+            memory["stage"] = "WATCH"
+            memory["reignition_expired"] = True
+            memory["last_update"] = now
+
     status = memory.get("status", status)
     confirmed = status == "PERSISTENCE_CONFIRMED" and not extension
     early_stage = status == "PENDING" and early and not extension
@@ -244,7 +301,9 @@ def evaluate(row, memory, now=None):
     if confirmed:
         stage = "CONFIRMED IGNITION"
     elif early_stage:
-        stage = "EARLY IGNITION"
+        stage = "REIGNITION EARLY IGNITION" if memory.get("v155_reignition") else "EARLY IGNITION"
+    elif memory.get("status") == "REIGNITION_WATCH":
+        stage = "RE-IGNITION WATCH"
     else:
         stage = "WATCH"
 
@@ -276,5 +335,12 @@ def evaluate(row, memory, now=None):
         "v154_reignition_bonus": 5 if bridge_trigger else 3 if bridge >= 60 else 0,
         "v154_alert": bool(event_record and event_record.get("event") == "TRIGGER"),
         "v154_event_id": memory.get("event_id", ""),
+        "v155_reignition_watch": bool(memory.get("status") == "REIGNITION_WATCH"),
+        "v155_reignition_active": bool(reignition_active),
+        "v155_reignition_source_event_id": memory.get("reignition_source_event_id", ""),
+        "v155_reignition_expires": memory.get("reignition_expires", 0),
+        "v155_reignition_armed": bool(memory.get("reignition_reason") == "FAILED_HIGH_QUALITY_IGNITION"),
+        "v155_reignition_trigger": bool(event_record and event_record.get("event") == "TRIGGER" and memory.get("v155_reignition")),
+
     }
     return out, event_record
