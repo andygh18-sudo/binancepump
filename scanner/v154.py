@@ -225,6 +225,7 @@ def evaluate(row, memory, now=None):
                 "tv_bullish_timeframes": tvtf,
             }
 
+    status = memory.get("status", status)
     confirmed = status == "PERSISTENCE_CONFIRMED" and not extension
     early_stage = status == "PENDING" and early and not extension
 
