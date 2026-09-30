@@ -28,8 +28,9 @@ class OutcomeEngine:
                     elif eid in self.events and typ=="OBS":
                         e=self.events[eid]
                         e["last_obs_ts"]=r.get("ts",e.get("last_obs_ts")); e["last_price"]=r.get("price",e.get("last_price"))
-                        e["mfe_pct"]=max(float(e.get("mfe_pct",0) or 0),float(r.get("return_pct",0) or 0))
-                        e["mae_pct"]=min(float(e.get("mae_pct",0) or 0),float(r.get("return_pct",0) or 0))
+                        e["mfe_pct"]=max(float(e.get("mfe_pct",0) or 0),float(r.get("mfe_pct",r.get("return_pct",0)) or 0))
+                        e["mae_pct"]=min(float(e.get("mae_pct",0) or 0),float(r.get("mae_pct",r.get("return_pct",0)) or 0))
+                        e.setdefault("first_hit_seconds",{}).update(r.get("first_hit_seconds",{}))
                     elif eid in self.events and typ=="CHECKPOINT":
                         self.events[eid].setdefault("checkpoints",{})[str(r.get("checkpoint"))]=r
                     elif eid in self.events and typ=="RESOLVED":
