@@ -49,6 +49,7 @@ class OutcomeEngine:
         if not event or event.get("event")!="TRIGGER":return None
         eid=str(event.get("event_id") or uuid.uuid4().hex[:12])
         if eid in self.events:return eid
+        overlaps=[x for x in self.events.values() if not x.get("resolved") and str(x.get("symbol","")).upper()==str(event.get("symbol") or row.get("symbol") or "").upper()]
         p=self._price(row)
         if p is None:return None
         ts=float(event.get("ts",now or time.time()))
@@ -61,7 +62,7 @@ class OutcomeEngine:
              "rs5":event.get("rs5"),"tv_bullish_timeframes":event.get("tv_bullish_timeframes"),
              "fast_score":row.get("v156_fast_score"),"signature_score":row.get("v156_signature_score"),
              "signature_signals":row.get("v156_signature_signals"),"mfe_pct":0.0,"mae_pct":0.0,
-             "last_obs_ts":ts,"last_price":p,"checkpoints":{},"resolved":False}
+             "last_obs_ts":ts,"last_price":p,"checkpoints":{},"resolved":False,"overlap_event_id":(overlaps[-1].get("event_id") if overlaps else None),"independent_episode":not bool(overlaps),"first_hit_seconds":{}}
         self.events[eid]=rec; self._append(rec); return eid
 
     def observe(self,rows,now=None):
@@ -81,6 +82,10 @@ class OutcomeEngine:
             e["last_obs_ts"]=now;e["last_price"]=p
             e["mfe_pct"]=max(float(e.get("mfe_pct",0) or 0),ret)
             e["mae_pct"]=min(float(e.get("mae_pct",0) or 0),ret)
+            for target in (1,2,3,5,10):
+                key=str(target)
+                if key not in e.get("first_hit_seconds",{}) and ret>=target:
+                    e.setdefault("first_hit_seconds",{})[key]=round(age,2)
             pending={}
             for cp in CHECKPOINTS:
                 key=str(cp)
@@ -95,15 +100,16 @@ class OutcomeEngine:
                     self._append({"event":"CHECKPOINT","event_id":eid,"symbol":e["symbol"],"ts":now,"checkpoint":int(key),**val});writes+=1
             last=float(e.get("last_persist_ts",0) or 0)
             if now-last>=OBS_INTERVAL:
-                self._append({"event":"OBS","event_id":eid,"symbol":e["symbol"],"ts":now,"price":p,"return_pct":round(ret,4)});e["last_persist_ts"]=now;writes+=1
+                self._append({"event":"OBS","event_id":eid,"symbol":e["symbol"],"ts":now,"price":p,"return_pct":round(ret,4),"mfe_pct":round(e["mfe_pct"],4),"mae_pct":round(e["mae_pct"],4),"first_hit_seconds":e.get("first_hit_seconds",{})});e["last_persist_ts"]=now;writes+=1
             if age>=CHECKPOINTS[-1]:
                 e["resolved"]=True;e["resolved_ts"]=now;e["final_return_pct"]=round(ret,4)
                 e["mfe_pct"]=round(float(e.get("mfe_pct",0)),4);e["mae_pct"]=round(float(e.get("mae_pct",0)),4)
                 c10=e.get("checkpoints",{}).get("600",{})
                 e["confirmed_3pct_10m"]=bool(c10.get("hit_3pct",False))
+                e["persistence_1m_10m"]=all(float(e.get("checkpoints",{}).get(str(cp),{}).get("return_pct",-999))>=0 for cp in (60,180,300,600))
                 self._append({"event":"RESOLVED","event_id":eid,"symbol":e["symbol"],"ts":now,"resolved":True,
                               "final_return_pct":e["final_return_pct"],"mfe_pct":e["mfe_pct"],"mae_pct":e["mae_pct"],
-                              "confirmed_3pct_10m":e["confirmed_3pct_10m"]});writes+=1
+                              "confirmed_3pct_10m":e["confirmed_3pct_10m"],"persistence_1m_10m":e["persistence_1m_10m"],"first_hit_seconds":e.get("first_hit_seconds",{})});writes+=1
         return writes
 
     def summary(self):
@@ -116,8 +122,13 @@ class OutcomeEngine:
                     "avg_return_pct":round(sum(float(v.get("return_pct",0)) for v in vals)/len(vals),4),
                     "hit_1pct":sum(bool(v.get("hit_1pct")) for v in vals),"hit_2pct":sum(bool(v.get("hit_2pct")) for v in vals),
                     "hit_3pct":sum(bool(v.get("hit_3pct")) for v in vals),"hit_5pct":sum(bool(v.get("hit_5pct")) for v in vals),
-                    "hit_10pct":sum(bool(v.get("hit_10pct")) for v in vals)}
-        return {"version":"V15.6","signals":len(events),"resolved":len(resolved),"open":len(events)-len(resolved),
+                    "hit_10pct":sum(bool(v.get("hit_10pct")) for v in vals),
+                    "hit_1pct_rate":round(100*sum(bool(v.get("hit_1pct")) for v in vals)/len(vals),2),
+                    "hit_2pct_rate":round(100*sum(bool(v.get("hit_2pct")) for v in vals)/len(vals),2),
+                    "hit_3pct_rate":round(100*sum(bool(v.get("hit_3pct")) for v in vals)/len(vals),2),
+                    "hit_5pct_rate":round(100*sum(bool(v.get("hit_5pct")) for v in vals)/len(vals),
+                    "hit_10pct_rate":round(100*sum(bool(v.get("hit_10pct")) for v in vals)/len(vals),2)}
+        return {"version":"V15.6","signals":len(events),"resolved":len(resolved),"open":len(events)-len(resolved),"independent_signals":sum(bool(e.get("independent_episode")) for e in events),"overlapping_signals":sum(not bool(e.get("independent_episode",True)) for e in events),
                 "checkpoints":{"1m":cp_stats(60),"3m":cp_stats(180),"5m":cp_stats(300),"10m":cp_stats(600),
                                "30m":cp_stats(1800),"60m":cp_stats(3600)},
                 "resolved_mfe_avg_pct":round(sum(float(e.get("mfe_pct",0)) for e in resolved)/len(resolved),4) if resolved else None,
