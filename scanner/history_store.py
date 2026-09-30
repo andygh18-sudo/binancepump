@@ -36,6 +36,7 @@ HISTORY_FIELDS = [
     "v12_score","v12_efficiency","hybrid_score","hybrid_path","hybrid_grade",
     "exhaustion_score","exhaustion_state","exhaustion_alert","exhaustion_extension",
     "exhaustion_rollover","exhaustion_symptoms",
+    "v156_signature_score","v156_signature_alert","v156_signature_price_volume","v156_signature_order_flow","v156_signature_trade_accel","v156_signature_signals",
     "v154_score","v154_early_buy","v154_stage","v154_participation_gate","v154_price_gate","v154_structure_gate","v154_persistence_status","v154_persistence_failures","v154_persistence_seconds","v154_exhaustion_veto","v154_disqualifiers","v154_book_imbalance","v154_spread_bps","v154_reignition_bonus","v154_alert","v154_event_id"
 ]
 
@@ -58,6 +59,7 @@ def append_microstructure_history(rows, ts=None):
         "v15_ignition_accel","v15_trade_accel_slope","v15_buy_pressure_slope","v15_ignition_rs5",
         "v15_ignition_rs15","v15_ignition_trades_10s","v15_ignition_trajectory_score",
         "accumulation_score","tv_confirmation","tv_bullish_timeframes",
+        "v156_signature_score","v156_signature_alert","v156_signature_price_volume","v156_signature_order_flow","v156_signature_trade_accel","v156_signature_signals",
         "v154_score","v154_early_buy","v154_stage","v154_participation_gate","v154_price_gate","v154_structure_gate","v154_persistence_status","v154_persistence_failures","v154_persistence_seconds","v154_exhaustion_veto","v154_disqualifiers","v154_book_imbalance","v154_spread_bps","v154_reignition_bonus","v154_alert","v154_event_id"
     ]
     for row in rows or []:
