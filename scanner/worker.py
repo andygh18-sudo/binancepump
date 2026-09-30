@@ -1193,15 +1193,18 @@ async def main():
                         for r in rows:
                             if bool(r.get("v15_btc_risk_off",False)):
                                 continue
+                            buy=bool(r.get("v156_buy_alert",False))
                             fast=bool(r.get("v156_fast_alert",False))
                             sig=bool(r.get("v156_signature_alert",False))
-                            if not (fast or sig):
+                            if not (buy or fast or sig):
                                 continue
-                            rr=dict(r);rr["_v156_fast"]=fast;rr["_v156_sig"]=sig
+                            rr=dict(r);rr["_v156_buy"]=buy;rr["_v156_fast"]=fast;rr["_v156_sig"]=sig
                             v156_candidates.append(rr)
                         v156_candidates=sorted(
                             v156_candidates,
-                            key=lambda r:(int(bool(r.get("_v156_fast"))),
+                            key=lambda r:(int(bool(r.get("_v156_buy"))),
+                                          int(bool(r.get("_v156_fast"))),
+                                          r.get("v156_buy_score",0),
                                           r.get("v156_fast_score",0),
                                           r.get("v156_signature_score",0),
                                           r.get("v154_score",0)),
@@ -1209,9 +1212,11 @@ async def main():
                         )[:TOP_ALERTS]
                         for r in v156_candidates:
                             s=r["symbol"];old=state[s];now=time.time()
-                            mode="FAST-IGNITION" if r.get("_v156_fast") else "SIGNATURE"
+                            mode="BUY-SIGNAL" if r.get("_v156_buy") else ("FAST-IGNITION" if r.get("_v156_fast") else "SIGNATURE")
                             stage=str(r.get("v155_stage") or r.get("v154_stage") or "WATCH")
-                            score=float(r.get("v156_fast_score",0) or 0) if r.get("_v156_fast") else float(r.get("v156_signature_score",0) or 0)
+                            score=(float(r.get("v156_buy_score",0) or 0) if r.get("_v156_buy")
+                                   else float(r.get("v156_fast_score",0) or 0) if r.get("_v156_fast")
+                                   else float(r.get("v156_signature_score",0) or 0))
                             previous=float(old.get("last_v156_telegram_score",0) or 0)
                             previous_mode=str(old.get("last_v156_telegram_mode","") or "")
                             changed=(mode!=previous_mode or score-previous>=5)
@@ -1222,7 +1227,8 @@ async def main():
                                     f"Trade accel: {r.get('trade_accel',0):.2f}x | Buy: {r.get('buy_pressure',0)*100:.1f}% | "
                                     f"RS 5m: {r.get('v15_relative_strength_5m',0):+.2f}% | RS 15m: {r.get('v15_relative_strength_15m',0):+.2f}% | "
                                     f"V15: {r.get('v15_score',r.get('v154_score',0)):.0f}/100 | "
-                                    f"Signature: {r.get('v156_signature_score',0):.0f} | Drivers: {r.get('v156_fast_reason','') or r.get('v156_signature_signals','')}"
+                                    f"BUY SCORE: {r.get('v156_buy_score',0):.0f} | Signature: {r.get('v156_signature_score',0):.0f} | "
+                                    f"Drivers: {r.get('v156_buy_reason','') or r.get('v156_fast_reason','') or r.get('v156_signature_signals','')}"
                                 )
                                 old["last_v156_telegram_alert"]=now
                             old["last_v156_telegram_score"]=score
