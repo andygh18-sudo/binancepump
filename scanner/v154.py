@@ -380,6 +380,11 @@ def evaluate(row, memory, now=None):
     # 1-second microstructure updates; this flag tells it when to retain a
     # 10-second evidence stream around PRE/REIGNITION/near-ignition candidates.
     adaptive_reason = []
+    adaptive_existing = (
+        V156_ADAPTIVE["enabled"]
+        and not btc_off
+        and now < float(memory.get("v156_adaptive_until", 0) or 0)
+    )
     if V156_ADAPTIVE["enabled"] and not btc_off:
         if pre_watch:
             adaptive_reason.append("PRE_IGNITION_WATCH")
@@ -404,12 +409,15 @@ def evaluate(row, memory, now=None):
             adaptive_reason.append("EARLY_IGNITION")
         if confirmed:
             adaptive_reason.append("CONFIRMED_IGNITION")
+        if adaptive_existing:
+            adaptive_reason.append("ACTIVE_CAPTURE_WINDOW")
 
     adaptive_capture = bool(adaptive_reason)
     adaptive_status = "ACTIVE" if adaptive_capture else "OFF"
     adaptive_until = 0.0
     if adaptive_capture:
         adaptive_until = now + V156_ADAPTIVE["capture_window"]
+        memory["v156_adaptive_until"] = adaptive_until
 
 
     if confirmed:
