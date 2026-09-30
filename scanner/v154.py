@@ -14,25 +14,25 @@ import uuid
 import os
 
 V154 = {
-    "price_10s_min": float(os.getenv("V154_PRICE_10S_MIN", "0.10")),
-    "price_60s_min": float(os.getenv("V154_PRICE_60S_MIN", "0.35")),
-    "volume_ratio_min": float(os.getenv("V154_VOLUME_MIN", "1.50")),
-    "trade_accel_min": float(os.getenv("V154_ACCEL_MIN", "2.00")),
-    "buy_pressure_min": float(os.getenv("V154_BUY_MIN", "0.65")),
-    "rs5_min": float(os.getenv("V154_RS5_MIN", "0.20")),
-    "v15_min": float(os.getenv("V154_V15_MIN", "75")),
-    "opportunity_min": float(os.getenv("V154_OPPORTUNITY_MIN", "65")),
-    "confirmation_min": float(os.getenv("V154_CONFIRMATION_MIN", "70")),
-    "accumulation_min": float(os.getenv("V154_ACCUMULATION_MIN", "65")),
+    "price_10s_min": float(os.getenv("V154_PRICE_10S_MIN", "0.15")),
+    "price_60s_min": float(os.getenv("V154_PRICE_60S_MIN", "0.30")),
+    "volume_ratio_min": float(os.getenv("V154_VOLUME_MIN", "1.80")),
+    "trade_accel_min": float(os.getenv("V154_ACCEL_MIN", "1.80")),
+    "buy_pressure_min": float(os.getenv("V154_BUY_MIN", "0.62")),
+    "rs5_min": float(os.getenv("V154_RS5_MIN", "0.00")),
+    "v15_min": float(os.getenv("V154_V15_MIN", "65")),
+    "opportunity_min": float(os.getenv("V154_OPPORTUNITY_MIN", "60")),
+    "confirmation_min": float(os.getenv("V154_CONFIRMATION_MIN", "60")),
+    "accumulation_min": float(os.getenv("V154_ACCUMULATION_MIN", "60")),
     "tv_bull_tf_min": int(os.getenv("V154_TV_BULL_TF_MIN", "3")),
     "persistence_seconds": float(os.getenv("V154_PERSISTENCE_SECONDS", "30")),
     "persistence_min_seconds": float(os.getenv("V154_PERSISTENCE_MIN_SECONDS", "15")),
     "persistence_volume_min": float(os.getenv("V154_PERSISTENCE_VOLUME_MIN", "1.25")),
     "persistence_accel_min": float(os.getenv("V154_PERSISTENCE_ACCEL_MIN", "1.50")),
-    "persistence_buy_min": float(os.getenv("V154_PERSISTENCE_BUY_MIN", "0.55")),
+    "persistence_buy_min": float(os.getenv("V154_PERSISTENCE_BUY_MIN", "0.58")),
     "persistence_price_60s_min": float(os.getenv("V154_PERSISTENCE_PRICE_60S_MIN", "0.00")),
     "persistence_rs5_min": float(os.getenv("V154_PERSISTENCE_RS5_MIN", "0.00")),
-    "persistence_v15_min": float(os.getenv("V154_PERSISTENCE_V15_MIN", "70")),
+    "persistence_v15_min": float(os.getenv("V154_PERSISTENCE_V15_MIN", "65")),
     "persistence_tv_bull_tf_min": int(os.getenv("V154_PERSISTENCE_TV_BULL_TF_MIN", "3")),
     "persistence_fail_count": int(os.getenv("V154_PERSISTENCE_FAIL_COUNT", "2")),
     "alert_cooldown": float(os.getenv("V154_ALERT_COOLDOWN", "180")),
@@ -179,18 +179,60 @@ def evaluate(row, memory, now=None):
         and rs5 >= V154["rs5_min"]
     )
 
-    # Stage 2 structure: deliberately excludes TV so early ignition can fire
-    # before higher-timeframe confirmation catches up.
-    structure = (
+    # V15.6 evidence-based early-pump structure.
+    # Accumulation OR a live re-ignition bridge can qualify the setup; requiring
+    # both was too restrictive for early discovery.
+    structure_metrics = (
         v15 >= V154["v15_min"]
         and opp >= V154["opportunity_min"]
         and conf >= V154["confirmation_min"]
-        and acc >= V154["accumulation_min"]
         and not btc_off
     )
+    structure_support = (
+        acc >= V154["accumulation_min"]
+        or (bridge >= 30 and bridge_trigger)
+    )
 
-    # Stage 3 confirmation: all Stage-2 gates plus TV alignment.
-    confirmation = structure and tvtf >= V154["tv_bull_tf_min"]
+    # Composite Pump Entry Score (0-100). This is intentionally independent
+    # of the legacy V15 score so microstructure can identify an early move.
+    def _band(v, bands):
+        for threshold, points in bands:
+            if v >= threshold:
+                return points
+        return 0
+
+    price_points = _band(p10, [(0.50,20),(0.30,15),(0.15,10),(0.0,5)])
+    volume_points = _band(vol, [(4.0,15),(2.5,14),(1.8,11),(1.5,7),(1.0,4)])
+    accel_points = _band(accel, [(5.0,20),(3.0,18),(2.0,15),(1.5,10),(1.0,5)])
+    buy_points = _band(buy, [(0.85,15),(0.70,13),(0.62,10),(0.55,7),(0.45,4)])
+    v15_points = _band(v15, [(80,10),(70,9),(65,7),(60,5),(50,3)])
+    acc_points = _band(acc, [(80,5),(70,4),(60,3),(40,2)])
+    bridge_points = 5 if bridge >= 60 and bridge_trigger else 4 if bridge >= 40 else 3 if bridge >= 30 and bridge_trigger else 1 if bridge >= 20 else 0
+    tv_points = 5 if tvtf >= 4 else 4 if tvtf >= 3 else 2 if tvtf >= 2 else 0
+    rs_points = 5 if rs5 >= 0.30 else 3 if rs5 >= 0.15 else 1 if rs5 > 0 else 0
+    pump_entry_score = max(0, min(100, round(
+        price_points + volume_points + accel_points + buy_points + v15_points +
+        acc_points + bridge_points + tv_points + rs_points
+    )))
+
+    hard_veto = (
+        btc_off
+        or p10 <= 0
+        or p60 <= 0
+        or buy < 0.45
+        or rs5 < 0
+        or (vol < 1.20 and accel < 1.50)
+    )
+    spread_penalty = spread > 50
+    structure = structure_metrics and structure_support and not hard_veto
+    # Stage 3 confirmation keeps the 3-TF gate and requires the early-pump
+    # score to have actually earned its way above the 72/100 threshold.
+    confirmation = (
+        structure
+        and tvtf >= V154["tv_bull_tf_min"]
+        and pump_entry_score >= 72
+        and not spread_penalty
+    )
 
     failures = []
     if p10 <= 0:
@@ -226,19 +268,28 @@ def evaluate(row, memory, now=None):
     )
     if extension:
         failures.append("EXHAUSTION")
+    if hard_veto:
+        if btc_off: failures.append("BTC_RISK_OFF")
+        if p10 <= 0: failures.append("PRICE_10S_NONPOSITIVE")
+        if p60 <= 0: failures.append("PRICE_60S_NONPOSITIVE")
+        if buy < 0.45: failures.append("BUY_PRESSURE_HARD_VETO")
+        if rs5 < 0: failures.append("RS5_NEGATIVE_HARD_VETO")
+    if spread_penalty:
+        failures.append("WIDE_SPREAD")
 
-    early = participation and price and structure
+    # EARLY_PUMP_BUY = microstructure + V15 structure + either accumulation
+    # or a triggered re-ignition bridge, with a 72/100 composite gate.
+    early = (
+        participation
+        and price
+        and structure
+        and pump_entry_score >= 72
+        and not extension
+        and not hard_veto
+        and not spread_penalty
+    )
     pre_watch = _pre_ignition_setup(row, btc_off, early, extension)
-
-    score = 0
-    score += 25 if participation else (15 if vol >= 1.25 and accel >= 1.5 and buy >= 0.60 else 0)
-    score += 25 if price else (15 if p60 >= 0.30 and rs5 >= 0 else 0)
-    score += 25 if structure else (15 if v15 >= 70 and conf >= 65 and acc >= 60 and not btc_off else 0)
-    score += 10 if tvtf >= 4 else 5 if tvtf >= 3 else 0
-    score += 5 if rs5 >= 0.50 else 3 if rs5 >= 0.25 else 0
-    score += 5 if bridge_trigger else 3 if bridge >= 60 else 0
-    score += 5 if not btc_off else 0
-    score = max(0, min(100, round(score)))
+    score = pump_entry_score
 
     status = memory.get("status", "IDLE")
     event_record = None
@@ -321,6 +372,10 @@ def evaluate(row, memory, now=None):
                 "symbol": symbol,
                 "ts": now,
                 "v154_score": score,
+        "v154_pump_entry_score": pump_entry_score,
+        "v154_early_pump_buy": bool(early),
+        "v154_hard_veto": bool(hard_veto),
+        "v154_spread_penalty": bool(spread_penalty),
                 "stage": "REIGNITION EARLY IGNITION" if was_reignition else "EARLY IGNITION",
                 "persistence_status": "PENDING",
                 "v155_reignition": was_reignition,
@@ -531,7 +586,7 @@ def evaluate(row, memory, now=None):
         "v156_adaptive_capture_window": V156_ADAPTIVE["capture_window"],
         "v156_adaptive_until": adaptive_until,
         "v156_signature_score": int(signature["score"]),
-        "v156_signature_alert": bool(signature["alert"]),
+        "v156_signature_alert": bool(signature["alert"] and not early),
         "v156_signature_price_volume": bool(signature["price_volume"]),
         "v156_signature_order_flow": bool(signature["order_flow"]),
         "v156_signature_trade_accel": bool(signature["trade_accel"]),
