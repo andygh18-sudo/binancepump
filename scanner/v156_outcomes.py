@@ -126,7 +126,7 @@ class OutcomeEngine:
                     "hit_1pct_rate":round(100*sum(bool(v.get("hit_1pct")) for v in vals)/len(vals),2),
                     "hit_2pct_rate":round(100*sum(bool(v.get("hit_2pct")) for v in vals)/len(vals),2),
                     "hit_3pct_rate":round(100*sum(bool(v.get("hit_3pct")) for v in vals)/len(vals),2),
-                    "hit_5pct_rate":round(100*sum(bool(v.get("hit_5pct")) for v in vals)/len(vals),
+                    "hit_5pct_rate":round(100*sum(bool(v.get("hit_5pct")) for v in vals)/len(vals),2),
                     "hit_10pct_rate":round(100*sum(bool(v.get("hit_10pct")) for v in vals)/len(vals),2)}
         return {"version":"V15.6","signals":len(events),"resolved":len(resolved),"open":len(events)-len(resolved),"independent_signals":sum(bool(e.get("independent_episode")) for e in events),"overlapping_signals":sum(not bool(e.get("independent_episode",True)) for e in events),
                 "checkpoints":{"1m":cp_stats(60),"3m":cp_stats(180),"5m":cp_stats(300),"10m":cp_stats(600),
