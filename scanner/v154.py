@@ -523,7 +523,10 @@ def evaluate(row, memory, now=None):
     # Explicit V15.6 BUY SIGNAL: stricter entry-quality layer on top of
     # early ignition. This is a scanner signal, not a guaranteed outcome.
     buy_signal = bool(
-        not btc_off
+        # Explicitly require the V15.6 state machine to be in EARLY IGNITION.
+        # This prevents a strong standalone metric cluster from becoming a BUY.
+        early_stage
+        and not btc_off
         and not extension
         and not hard_veto
         and not spread_penalty
@@ -645,7 +648,7 @@ def evaluate(row, memory, now=None):
         "v156_buy_score": int(buy_score),
         "v156_buy_reason": "|".join([
             x for x, ok in [
-                ("EARLY", early),
+                ("EARLY_IGNITION", early_stage),
                 ("P60", p60 >= 0.35),
                 ("VOL", vol >= 2.00),
                 ("ACCEL", accel >= 2.00),
