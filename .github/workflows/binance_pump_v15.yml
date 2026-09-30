@@ -8,6 +8,7 @@ on:
     paths:
       - "scanner/worker.py"
       - "scanner/history_store.py"
+      - "scanner/v154.py"
       - "scripts/compact_v15_2_history.py"
       - "run_scanner.py"
       - "app.py"
@@ -44,7 +45,7 @@ jobs:
           touch data/v154_events.jsonl
 
       - name: Validate V15 production scanner
-        run: python -m py_compile scanner/worker.py scanner/history_store.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py scripts/pump_learner_v156.py
+        run: python -m py_compile scanner/worker.py scanner/v154.py scanner/history_store.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py scripts/pump_learner_v156.py
 
       - name: Validate generated V15 worker
         run: python scripts/validate_worker_bootstrap.py
