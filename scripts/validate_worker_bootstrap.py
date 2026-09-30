@@ -57,14 +57,28 @@ def persist_adaptive_capture(rows):
         with open(path,"a",encoding="utf-8") as f:
             for rec in records:f.write(json.dumps(rec,separators=(",",":"))+"\\n")
 
-async def send_v156_fast_alerts(rows):
-    for r in sorted([x for x in rows if isinstance(x,dict) and x.get("v156_fast_alert")],key=lambda x:(float(x.get("v156_fast_score",0) or 0),float(x.get("v15_score",0) or 0)),reverse=True)[:3]:
-        await telegram("⚡ V15.6 FAST IGNITION | {s} | Fast {q}/100 | P60 {p:.2f}% | Vol {v:.2f}x | Accel {a:.2f}x | Buy {b:.2f} | V15 {z:.0f}\\nEarly-warning only; confirmed BUY gate unchanged.".format(s=r.get("symbol","?"),q=r.get("v156_fast_score",0),p=float(r.get("price_60s",0) or 0),v=float(r.get("volume_ratio",0) or 0),a=float(r.get("trade_accel",0) or 0),b=float(r.get("buy_pressure",0) or 0),z=float(r.get("v15_score",0) or 0)))
+async def send_v156_main_alerts(rows):
+    candidates=[]
+    for r in rows:
+        if not isinstance(r,dict): continue
+        s=str(r.get("symbol"," ")).upper().strip()
+        if not s: continue
+        early=bool(r.get("v154_alert"))
+        confirmed=bool(r.get("v154_high_confidence"))
+        if not (early or confirmed): continue
+        mem=state[s].setdefault("v154",{})
+        level="CONFIRMED" if confirmed else "EARLY"
+        if mem.get("v156_main_alert_sent")==level: continue
+        mem["v156_main_alert_sent"]=level
+        candidates.append((level,r))
+    for level,r in sorted(candidates,key=lambda x:(x[0]=="CONFIRMED",float(x[1].get("v154_pump_entry_score",0) or 0)),reverse=True)[:5]:
+        tag="CONFIRMED PUMP BUY" if level=="CONFIRMED" else "EARLY PUMP BUY"
+        await telegram("V15.6 | %s | %s | Score %.0f | P10 %+.2f%% | P60 %+.2f%% | Vol %.2fx | Accel %.2fx | Buy %.2f | V15 %.0f | Opp %.0f | Conf %.0f | Accum %.0f | Bridge %.0f | TV %dTF | RS5 %+.2f%% | BTC %s | Exhaust %.0f | Stage %s | Persistence %s" % (tag,r.get("symbol","?"),float(r.get("v154_pump_entry_score",r.get("v154_score",0)) or 0),float(r.get("price_10s",0) or 0),float(r.get("price_60s",0) or 0),float(r.get("volume_ratio",0) or 0),float(r.get("trade_accel",0) or 0),float(r.get("buy_pressure",0) or 0),float(r.get("v15_score",0) or 0),float(r.get("v15_opportunity_score",0) or 0),float(r.get("v15_confirmation_score",0) or 0),float(r.get("accumulation_score",0) or 0),float(r.get("v15_reignition_bridge_score",0) or 0),int(r.get("tv_bullish_timeframes",0) or 0),float(r.get("relative_strength_5m",0) or 0),"RISK-OFF" if r.get("v15_btc_risk_off") else "OK",float(r.get("exhaustion_score",0) or 0),r.get("v154_stage","WATCH"),r.get("v154_persistence_status","IDLE")))
 
-async def send_v156_signature_alerts(rows):
-    for r in sorted([x for x in rows if isinstance(x,dict) and x.get("v156_signature_alert")],key=lambda x:(float(x.get("v156_signature_score",0) or 0),float(x.get("v15_score",0) or 0)),reverse=True)[:3]:
-        await telegram("🚨 V15.6 EARLY-PUMP | {s} | {sig} | Score {q}/100 | P60 {p:.2f}% | Vol {v:.2f}x | Accel {a:.2f}x | Buy {b:.2f} | Book {bo:+.2f} | V15 {z:.0f}\\n⚠️ Early-warning only — V15.4/V15.5 BUY gates unchanged.".format(s=r.get("symbol","?"),sig=r.get("v156_signature_signals","?"),q=r.get("v156_signature_score",0),p=float(r.get("price_60s",0) or 0),v=float(r.get("volume_ratio",0) or 0),a=float(r.get("trade_accel",0) or 0),b=float(r.get("buy_pressure",0) or 0),bo=float(r.get("book_imbalance",0) or 0),z=float(r.get("v15_score",0) or 0)))
+async def telegram(msg):
+    await legacy_telegram(msg)
 
+async def legacy_telegram(msg):
 async def telegram(msg):'''
     src = src.replace("async def telegram(msg):", injection)
 
@@ -72,8 +86,7 @@ async def telegram(msg):'''
             v154_events=apply_v154(rows)
             persist_v154_events(v154_events)
             persist_adaptive_capture(rows)
-            await send_v156_fast_alerts(rows)
-            await send_v156_signature_alerts(rows)
+            await send_v156_main_alerts(rows)
             rows.sort(key=lambda z:z["score"],reverse=True)'''
     src = src.replace(
         'rows=[r for s in symbols if (r:=score(s))];rows.sort(key=lambda z:z["score"],reverse=True)',
