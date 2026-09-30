@@ -60,6 +60,12 @@ async def telegram(msg):'''
 )
 src=src.replace(
     'rows=[r for s in symbols if (r:=score(s))];rows.sort(key=lambda z:z["score"],reverse=True)',
-    'rows=[r for s in symbols if (r:=score(s))]\\n            v154_events=apply_v154(rows)\\n            persist_v154_events(v154_events)\\n            persist_adaptive_capture(rows)\\n            await send_v156_fast_alerts(rows)\\n            await send_v156_signature_alerts(rows)\\n            rows.sort(key=lambda z:z["score"],reverse=True)'
+    '''rows=[r for s in symbols if (r:=score(s))]
+            v154_events=apply_v154(rows)
+            persist_v154_events(v154_events)
+            persist_adaptive_capture(rows)
+            await send_v156_fast_alerts(rows)
+            await send_v156_signature_alerts(rows)
+            rows.sort(key=lambda z:z["score"],reverse=True)'''
 )
 exec(compile(src,"scanner/worker.py","exec"),globals(),globals())
