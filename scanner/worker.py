@@ -70,8 +70,7 @@ async def send_v156_main_alerts(rows):
 async def telegram(msg):
     await legacy_telegram(msg)
 
-async def legacy_telegram(msg):
-async def telegram(msg):'''
+async def legacy_telegram(msg):'''
 )
 src=src.replace(
     'rows=[r for s in symbols if (r:=score(s))];rows.sort(key=lambda z:z["score"],reverse=True)',
