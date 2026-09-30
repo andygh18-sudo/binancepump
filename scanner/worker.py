@@ -1214,15 +1214,15 @@ async def main():
                             s=r["symbol"];old=state[s];now=time.time()
                             mode="BUY-SIGNAL" if r.get("_v156_buy") else ("FAST-IGNITION" if r.get("_v156_fast") else "SIGNATURE")
                             stage=str(r.get("v155_stage") or r.get("v154_stage") or "WATCH")
-                            score=(float(r.get("v156_buy_score",0) or 0) if r.get("_v156_buy")
-                                   else float(r.get("v156_fast_score",0) or 0) if r.get("_v156_fast")
-                                   else float(r.get("v156_signature_score",0) or 0))
+                            alert_score=(float(r.get("v156_buy_score",0) or 0) if r.get("_v156_buy")
+                                         else float(r.get("v156_fast_score",0) or 0) if r.get("_v156_fast")
+                                         else float(r.get("v156_signature_score",0) or 0))
                             previous=float(old.get("last_v156_telegram_score",0) or 0)
                             previous_mode=str(old.get("last_v156_telegram_mode","") or "")
-                            changed=(mode!=previous_mode or score-previous>=5)
+                            changed=(mode!=previous_mode or alert_score-previous>=5)
                             if changed and now-float(old.get("last_v156_telegram_alert",0) or 0)>=float(os.getenv("V156_TELEGRAM_COOLDOWN","180")):
                                 await telegram(
-                                    f"V15.6 {mode} | {s} | {stage} | Score {score:.0f}/100 | Price: {r.get('price',0)} | "
+                                    f"V15.6 {mode} | {s} | {stage} | Score {alert_score:.0f}/100 | Price: {r.get('price',0)} | "
                                     f"60s: {r.get('price_60s',0):+.2f}% | Vol: {r.get('volume_ratio',0):.2f}x | "
                                     f"Trade accel: {r.get('trade_accel',0):.2f}x | Buy: {r.get('buy_pressure',0)*100:.1f}% | "
                                     f"RS 5m: {r.get('v15_relative_strength_5m',0):+.2f}% | RS 15m: {r.get('v15_relative_strength_15m',0):+.2f}% | "
@@ -1231,7 +1231,7 @@ async def main():
                                     f"Drivers: {r.get('v156_buy_reason','') or r.get('v156_fast_reason','') or r.get('v156_signature_signals','')}"
                                 )
                                 old["last_v156_telegram_alert"]=now
-                            old["last_v156_telegram_score"]=score
+                            old["last_v156_telegram_score"]=alert_score
                             old["last_v156_telegram_mode"]=mode
                         # Legacy V15 TOP alerts are intentionally disabled here.
                         # Early Telegram alerts are governed exclusively by the three-stage V15.1 ignition model below.
