@@ -55,17 +55,27 @@ async def send_v156_main_alerts(rows):
         if not isinstance(r,dict): continue
         s=str(r.get("symbol"," ")).upper().strip()
         if not s: continue
-        early=bool(r.get("v154_alert"))
         confirmed=bool(r.get("v154_high_confidence"))
-        if not (early or confirmed): continue
+        early=bool(r.get("v154_alert"))
+        fast=bool(r.get("v156_fast_alert"))
+        signature=bool(r.get("v156_signature_alert"))
+        if not (confirmed or early or fast or signature): continue
         mem=state[s].setdefault("v154",{})
-        level="CONFIRMED" if confirmed else "EARLY"
+        if confirmed:
+            level="CONFIRMED"
+        elif early:
+            level="EARLY"
+        elif fast:
+            level="FAST"
+        else:
+            level="SIGNATURE"
         if mem.get("v156_main_alert_sent")==level: continue
         mem["v156_main_alert_sent"]=level
         candidates.append((level,r))
-    for level,r in sorted(candidates,key=lambda x:(x[0]=="CONFIRMED",float(x[1].get("v154_pump_entry_score",0) or 0)),reverse=True)[:5]:
-        tag="CONFIRMED PUMP BUY" if level=="CONFIRMED" else "EARLY PUMP BUY"
-        await telegram("V15.6 | %s | %s | Price %.10g | Score %.0f | P10 %+.2f%% | P60 %+.2f%% | Vol %.2fx | Accel %.2fx | Buy %.2f | V15 %.0f | Opp %.0f | Conf %.0f | Accum %.0f | Bridge %.0f | TV %dTF | RS5 %+.2f%% | BTC %s | Exhaust %.0f | Stage %s | Persistence %s" % (tag,r.get("symbol","?"),float(r.get("price",0) or 0),float(r.get("v154_pump_entry_score",r.get("v154_score",0)) or 0),float(r.get("price_10s",0) or 0),float(r.get("price_60s",0) or 0),float(r.get("volume_ratio",0) or 0),float(r.get("trade_accel",0) or 0),float(r.get("buy_pressure",0) or 0),float(r.get("v15_score",0) or 0),float(r.get("v15_opportunity_score",0) or 0),float(r.get("v15_confirmation_score",0) or 0),float(r.get("accumulation_score",0) or 0),float(r.get("v15_reignition_bridge_score",0) or 0),int(r.get("tv_bullish_timeframes",0) or 0),float(r.get("relative_strength_5m",0) or 0),"RISK-OFF" if r.get("v15_btc_risk_off") else "OK",float(r.get("exhaustion_score",0) or 0),r.get("v154_stage","WATCH"),r.get("v154_persistence_status","IDLE")))
+    priority={"SIGNATURE":1,"FAST":2,"EARLY":3,"CONFIRMED":4}
+    for level,r in sorted(candidates,key=lambda x:(priority.get(x[0],0),float(x[1].get("v156_fast_score",0) or 0),float(x[1].get("v156_signature_score",0) or 0),float(x[1].get("v154_pump_entry_score",0) or 0)),reverse=True)[:5]:
+        tag={"CONFIRMED":"CONFIRMED PUMP BUY","EARLY":"EARLY PUMP BUY","FAST":"V15.6 FAST EARLY","SIGNATURE":"V15.6 SIGNATURE"}[level]
+        await telegram("V15.6 | %s | %s | Price %.10g | Score %.0f | Fast %.0f | Sig %.0f | P10 %+.2f%% | P60 %+.2f%% | Vol %.2fx | Accel %.2fx | Buy %.2f | V15 %.0f | Opp %.0f | Conf %.0f | Accum %.0f | Bridge %.0f | TV %dTF | RS5 %+.2f%% | BTC %s | Exhaust %.0f | Stage %s | Persistence %s" % (tag,r.get("symbol","?"),float(r.get("price",0) or 0),float(r.get("v154_pump_entry_score",r.get("v154_score",0)) or 0),float(r.get("v156_fast_score",0) or 0),float(r.get("v156_signature_score",0) or 0),float(r.get("price_10s",0) or 0),float(r.get("price_60s",0) or 0),float(r.get("volume_ratio",0) or 0),float(r.get("trade_accel",0) or 0),float(r.get("buy_pressure",0) or 0),float(r.get("v15_score",0) or 0),float(r.get("v15_opportunity_score",0) or 0),float(r.get("v15_confirmation_score",0) or 0),float(r.get("accumulation_score",0) or 0),float(r.get("v15_reignition_bridge_score",0) or 0),int(r.get("tv_bullish_timeframes",0) or 0),float(r.get("relative_strength_5m",0) or 0),"RISK-OFF" if r.get("v15_btc_risk_off") else "OK",float(r.get("exhaustion_score",0) or 0),r.get("v154_stage","WATCH"),r.get("v154_persistence_status","IDLE")))
 
 async def telegram(msg):
     await v156_telegram(msg)
