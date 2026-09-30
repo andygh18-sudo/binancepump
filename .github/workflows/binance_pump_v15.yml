@@ -44,7 +44,7 @@ jobs:
           touch data/v154_events.jsonl
 
       - name: Validate V15 production scanner
-        run: python -m py_compile scanner/worker.py scanner/history_store.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py
+        run: python -m py_compile scanner/worker.py scanner/history_store.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py scripts/pump_learner_v156.py
 
       - name: Run V15 live scan
         env:
@@ -128,6 +128,9 @@ jobs:
           publish_live_snapshot || true
           git worktree remove --force /tmp/v15-live-publisher
 
+      - name: Run V15.6 pump learner
+        run: python scripts/pump_learner_v156.py
+
       - name: Migrate and compact V15.2 symbol history
         run: |
           python scripts/compact_v15_2_history.py
@@ -149,6 +152,8 @@ jobs:
           rm -rf /tmp/v15-microstructure
           if [ -d data/microstructure ]; then cp -R data/microstructure /tmp/v15-microstructure; fi
           if [ -f data/v154_events.jsonl ]; then cp data/v154_events.jsonl /tmp/v15-v154-events.jsonl; else : > /tmp/v15-v154-events.jsonl; fi
+          if [ -f data/adaptive_microstructure_history.jsonl ]; then cp data/adaptive_microstructure_history.jsonl /tmp/v15-adaptive-history.jsonl; else : > /tmp/v15-adaptive-history.jsonl; fi
+          if [ -f data/v156_signature_learning.json ]; then cp data/v156_signature_learning.json /tmp/v15-v156-learning.json; else printf "{}\n" > /tmp/v15-v156-learning.json; fi
 
           # Reset to current remote main before restoring only generated data.
           # The legacy monolithic history file is deliberately removed.
@@ -163,8 +168,10 @@ jobs:
           rm -rf data/microstructure
           if [ -d /tmp/v15-microstructure ]; then cp -R /tmp/v15-microstructure data/microstructure; fi
           cp /tmp/v15-v154-events.jsonl data/v154_events.jsonl
+          cp /tmp/v15-adaptive-history.jsonl data/adaptive_microstructure_history.jsonl
+          cp /tmp/v15-v156-learning.json data/v156_signature_learning.json
 
-          git add -f data/latest.json data/ignition_history.jsonl data/history_index.json data/v154_events.jsonl
+          git add -f data/latest.json data/ignition_history.jsonl data/history_index.json data/v154_events.jsonl data/adaptive_microstructure_history.jsonl data/v156_signature_learning.json
           git add -A data/history data/microstructure
           if git diff --cached --quiet; then
             echo "V15.2/V15.4 scan data already synchronized."
