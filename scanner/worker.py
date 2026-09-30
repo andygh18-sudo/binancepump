@@ -16,18 +16,26 @@ def _load():
 src=_load()
 src=src.replace(
     "from .history_store import append_scan_history, append_microstructure_history",
-    "from .history_store import append_scan_history, append_microstructure_history\nfrom .v154 import evaluate as v154_evaluate"
+    "from .history_store import append_scan_history, append_microstructure_history\nfrom .v154 import evaluate as v154_evaluate
+from .v156_outcomes import OutcomeEngine"
 )
 src=src.replace("await telegram(", "await legacy_telegram(")
 src=src.replace(
     "async def telegram(msg):",
-    '''def apply_v154(rows):
+    '''outcomes=OutcomeEngine()
+
+def apply_v154(rows):
     events=[]
     for r in rows:
         s=str(r.get("symbol","")).upper()
         if not s: continue
         result,event_record=v154_evaluate(r,state[s].setdefault("v154",{})); r.update(result)
-        if event_record: events.append(event_record)
+        if event_record:
+            events.append(event_record)
+            if event_record.get("event")=="TRIGGER" and event_record.get("stage","").endswith("EARLY IGNITION"):
+                outcomes.register_signal(event_record,r,event_record.get("ts"))
+    outcomes.observe(rows)
+    outcomes.write_summary()
     return events
 
 def persist_v154_events(events):
