@@ -51,6 +51,16 @@ V156_ADAPTIVE = {
     "min_v15": float(os.getenv("V156_CAPTURE_MIN_V15", "55")),
     "min_tv_bull_tf": int(os.getenv("V156_CAPTURE_MIN_TV_BULL_TF", "3")),
     "min_bridge": float(os.getenv("V156_CAPTURE_MIN_BRIDGE", "55")),
+    "fast_p60": float(os.getenv("V156_FAST_P60", "0.25")),
+    "fast_volume": float(os.getenv("V156_FAST_VOLUME", "2.00")),
+    "fast_accel": float(os.getenv("V156_FAST_ACCEL", "2.00")),
+    "fast_buy": float(os.getenv("V156_FAST_BUY", "0.60")),
+    "fast_v15": float(os.getenv("V156_FAST_V15", "70")),
+    "fast_opp": float(os.getenv("V156_FAST_OPP", "65")),
+    "fast_conf": float(os.getenv("V156_FAST_CONF", "65")),
+    "fast_acc": float(os.getenv("V156_FAST_ACC", "60")),
+    "fast_score_min": float(os.getenv("V156_FAST_SCORE_MIN", "85")),
+    "fast_cooldown": float(os.getenv("V156_FAST_COOLDOWN", "180")),
 }
 
 V155 = {
@@ -412,6 +422,28 @@ def evaluate(row, memory, now=None):
         if adaptive_existing:
             adaptive_reason.append("ACTIVE_CAPTURE_WINDOW")
 
+    # V15.6 FAST-IGNITION is an early-warning lane. It does not alter the
+    # V15.4/V15.5 confirmation or BUY gates.
+    fast_score = 0
+    fast_score += 20 if p60 >= V156_ADAPTIVE["fast_p60"] else 0
+    fast_score += 20 if vol >= V156_ADAPTIVE["fast_volume"] and accel >= V156_ADAPTIVE["fast_accel"] and buy >= V156_ADAPTIVE["fast_buy"] else 0
+    fast_score += 20 if v15 >= V156_ADAPTIVE["fast_v15"] else 0
+    fast_score += 15 if opp >= V156_ADAPTIVE["fast_opp"] else 0
+    fast_score += 15 if acc >= V156_ADAPTIVE["fast_acc"] else 0
+    fast_score += 10 if conf >= V156_ADAPTIVE["fast_conf"] else 0
+    fast_ignition = (
+        V156_ADAPTIVE["enabled"] and not btc_off and not extension
+        and p60 >= V156_ADAPTIVE["fast_p60"]
+        and vol >= V156_ADAPTIVE["fast_volume"]
+        and accel >= V156_ADAPTIVE["fast_accel"]
+        and buy >= V156_ADAPTIVE["fast_buy"]
+        and fast_score >= V156_ADAPTIVE["fast_score_min"]
+    )
+    fast_last = float(memory.get("v156_fast_last_alert", 0) or 0)
+    fast_alert = fast_ignition and (now - fast_last >= V156_ADAPTIVE["fast_cooldown"])
+    if fast_alert:
+        memory["v156_fast_last_alert"] = now
+
     adaptive_capture = bool(adaptive_reason)
     adaptive_status = "ACTIVE" if adaptive_capture else "OFF"
     adaptive_until = 0.0
@@ -483,6 +515,19 @@ def evaluate(row, memory, now=None):
         "v156_adaptive_capture_interval": V156_ADAPTIVE["capture_interval"],
         "v156_adaptive_capture_window": V156_ADAPTIVE["capture_window"],
         "v156_adaptive_until": adaptive_until,
+        "v156_fast_score": int(fast_score),
+        "v156_fast_ignition": bool(fast_ignition),
+        "v156_fast_alert": bool(fast_alert),
+        "v156_fast_reason": "|".join([
+            x for x, ok in [
+                ("P60", p60 >= V156_ADAPTIVE["fast_p60"]),
+                ("FLOW", vol >= V156_ADAPTIVE["fast_volume"] and accel >= V156_ADAPTIVE["fast_accel"] and buy >= V156_ADAPTIVE["fast_buy"]),
+                ("V15", v15 >= V156_ADAPTIVE["fast_v15"]),
+                ("OPP", opp >= V156_ADAPTIVE["fast_opp"]),
+                ("ACC", acc >= V156_ADAPTIVE["fast_acc"]),
+                ("CONF", conf >= V156_ADAPTIVE["fast_conf"]),
+            ] if ok
+        ]),
 
     }
     return out, event_record
