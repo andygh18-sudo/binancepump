@@ -78,8 +78,7 @@ async def send_v156_main_alerts(rows):
 async def telegram(msg):
     await legacy_telegram(msg)
 
-async def legacy_telegram(msg):
-async def telegram(msg):'''
+async def legacy_telegram(msg):'''
     src = src.replace("async def telegram(msg):", injection)
 
     execution_block = '''rows=[r for s in symbols if (r:=score(s))]
