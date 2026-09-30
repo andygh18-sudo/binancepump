@@ -65,13 +65,15 @@ async def send_v156_main_alerts(rows):
         candidates.append((level,r))
     for level,r in sorted(candidates,key=lambda x:(x[0]=="CONFIRMED",float(x[1].get("v154_pump_entry_score",0) or 0)),reverse=True)[:5]:
         tag="CONFIRMED PUMP BUY" if level=="CONFIRMED" else "EARLY PUMP BUY"
-        await telegram("V15.6 | %s | %s | Score %.0f | P10 %+.2f%% | P60 %+.2f%% | Vol %.2fx | Accel %.2fx | Buy %.2f | V15 %.0f | Opp %.0f | Conf %.0f | Accum %.0f | Bridge %.0f | TV %dTF | RS5 %+.2f%% | BTC %s | Exhaust %.0f | Stage %s | Persistence %s" % (tag,r.get("symbol","?"),float(r.get("v154_pump_entry_score",r.get("v154_score",0)) or 0),float(r.get("price_10s",0) or 0),float(r.get("price_60s",0) or 0),float(r.get("volume_ratio",0) or 0),float(r.get("trade_accel",0) or 0),float(r.get("buy_pressure",0) or 0),float(r.get("v15_score",0) or 0),float(r.get("v15_opportunity_score",0) or 0),float(r.get("v15_confirmation_score",0) or 0),float(r.get("accumulation_score",0) or 0),float(r.get("v15_reignition_bridge_score",0) or 0),int(r.get("tv_bullish_timeframes",0) or 0),float(r.get("relative_strength_5m",0) or 0),"RISK-OFF" if r.get("v15_btc_risk_off") else "OK",float(r.get("exhaustion_score",0) or 0),r.get("v154_stage","WATCH"),r.get("v154_persistence_status","IDLE")))
+        await telegram("V15.6 | %s | %s | Price %.10g | Score %.0f | P10 %+.2f%% | P60 %+.2f%% | Vol %.2fx | Accel %.2fx | Buy %.2f | V15 %.0f | Opp %.0f | Conf %.0f | Accum %.0f | Bridge %.0f | TV %dTF | RS5 %+.2f%% | BTC %s | Exhaust %.0f | Stage %s | Persistence %s" % (tag,r.get("symbol","?"),float(r.get("price",0) or 0),float(r.get("v154_pump_entry_score",r.get("v154_score",0)) or 0),float(r.get("price_10s",0) or 0),float(r.get("price_60s",0) or 0),float(r.get("volume_ratio",0) or 0),float(r.get("trade_accel",0) or 0),float(r.get("buy_pressure",0) or 0),float(r.get("v15_score",0) or 0),float(r.get("v15_opportunity_score",0) or 0),float(r.get("v15_confirmation_score",0) or 0),float(r.get("accumulation_score",0) or 0),float(r.get("v15_reignition_bridge_score",0) or 0),int(r.get("tv_bullish_timeframes",0) or 0),float(r.get("relative_strength_5m",0) or 0),"RISK-OFF" if r.get("v15_btc_risk_off") else "OK",float(r.get("exhaustion_score",0) or 0),r.get("v154_stage","WATCH"),r.get("v154_persistence_status","IDLE")))
 
 async def telegram(msg):
     await v156_telegram(msg)
 
 async def legacy_telegram(msg):
-    return
+    # V15.3/legacy Telegram alerts are permanently disabled.
+    if os.getenv("V153_ALERTS_ENABLED", "0") != "1":
+        return
 
 async def v156_telegram(msg):'''
 )
