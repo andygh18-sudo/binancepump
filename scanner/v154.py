@@ -40,6 +40,19 @@ V154 = {
     "exhaustion_accel_drop": float(os.getenv("V154_EXHAUSTION_ACCEL_DROP", "0.50")),
 }
 
+V156_ADAPTIVE = {
+    "enabled": os.getenv("V156_ADAPTIVE_CAPTURE_ENABLED", "1") == "1",
+    "capture_interval": float(os.getenv("V156_CAPTURE_INTERVAL", "10")),
+    "capture_window": float(os.getenv("V156_CAPTURE_WINDOW", "120")),
+    "min_p60": float(os.getenv("V156_CAPTURE_MIN_P60", "0.50")),
+    "min_volume": float(os.getenv("V156_CAPTURE_MIN_VOLUME", "1.50")),
+    "min_buy": float(os.getenv("V156_CAPTURE_MIN_BUY", "0.70")),
+    "min_accel": float(os.getenv("V156_CAPTURE_MIN_ACCEL", "1.50")),
+    "min_v15": float(os.getenv("V156_CAPTURE_MIN_V15", "55")),
+    "min_tv_bull_tf": int(os.getenv("V156_CAPTURE_MIN_TV_BULL_TF", "3")),
+    "min_bridge": float(os.getenv("V156_CAPTURE_MIN_BRIDGE", "55")),
+}
+
 V155 = {
     "enabled": os.getenv("V155_REIGNITION_ENABLED", "1") == "1",
     "watch_seconds": float(os.getenv("V155_REIGNITION_WATCH_SECONDS", "7200")),
@@ -360,6 +373,41 @@ def evaluate(row, memory, now=None):
             memory["last_update"] = now
 
     status = memory.get("status", status)
+    # V15.6 adaptive high-frequency retention. The live worker already receives
+    # 1-second microstructure updates; this flag tells it when to retain a
+    # 10-second evidence stream around PRE/REIGNITION/near-ignition candidates.
+    adaptive_reason = []
+    if V156_ADAPTIVE["enabled"] and not btc_off:
+        if pre_watch:
+            adaptive_reason.append("PRE_IGNITION_WATCH")
+        if reignition_active:
+            adaptive_reason.append("REIGNITION_WATCH")
+        if bridge_trigger and bridge >= V156_ADAPTIVE["min_bridge"]:
+            adaptive_reason.append("REIGNITION_BRIDGE")
+        if (
+            p60 >= V156_ADAPTIVE["min_p60"]
+            and (
+                vol >= V156_ADAPTIVE["min_volume"]
+                or buy >= V156_ADAPTIVE["min_buy"]
+                or accel >= V156_ADAPTIVE["min_accel"]
+            )
+            and (
+                v15 >= V156_ADAPTIVE["min_v15"]
+                or tvtf >= V156_ADAPTIVE["min_tv_bull_tf"]
+            )
+        ):
+            adaptive_reason.append("NEAR_IGNITION")
+        if early_stage:
+            adaptive_reason.append("EARLY_IGNITION")
+        if confirmed:
+            adaptive_reason.append("CONFIRMED_IGNITION")
+
+    adaptive_capture = bool(adaptive_reason)
+    adaptive_status = "ACTIVE" if adaptive_capture else "OFF"
+    adaptive_until = 0.0
+    if adaptive_capture:
+        adaptive_until = now + V156_ADAPTIVE["capture_window"]
+
     confirmed = status == "PERSISTENCE_CONFIRMED" and not extension
     early_stage = status == "PENDING" and early and not extension
 
@@ -420,6 +468,12 @@ def evaluate(row, memory, now=None):
         "v155_pre_ignition_active": bool(pre_watch),
         "v155_pre_ignition_expires": memory.get("pre_watch_expires", 0),
         "v155_pre_ignition_event": bool(event_record and event_record.get("event") == "PRE_WATCH"),
+        "v156_adaptive_capture": adaptive_capture,
+        "v156_adaptive_status": adaptive_status,
+        "v156_adaptive_reason": "|".join(adaptive_reason),
+        "v156_adaptive_capture_interval": V156_ADAPTIVE["capture_interval"],
+        "v156_adaptive_capture_window": V156_ADAPTIVE["capture_window"],
+        "v156_adaptive_until": adaptive_until,
 
     }
     return out, event_record
