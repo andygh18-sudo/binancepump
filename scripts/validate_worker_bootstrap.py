@@ -104,8 +104,7 @@ def main() -> None:
     required_markers = (
         "from .v154 import evaluate as v154_evaluate",
         "def apply_v154(rows):",
-        "async def send_v156_fast_alerts(rows):",
-        "async def send_v156_signature_alerts(rows):",
+        "async def send_v156_main_alerts(rows)",
         "v154_events=apply_v154(rows)",
     )
     missing = [marker for marker in required_markers if marker not in generated]
