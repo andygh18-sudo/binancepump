@@ -46,6 +46,17 @@ src=src.replace(
             for rec in records:
                 f.write(json.dumps(rec,separators=(",",":"))+"\n")
 
+async def send_v156_fast_alerts(rows):
+    candidates=[r for r in rows if isinstance(r,dict) and r.get("v156_fast_alert")]
+    candidates.sort(key=lambda r:(float(r.get("v156_fast_score",0) or 0),float(r.get("v15_score",0) or 0)),reverse=True)
+    for r in candidates[:3]:
+        await telegram("⚡ V15.6 FAST IGNITION | {symbol}\nPrice: {price} | Fast score: {fs}/100\nP60: {p60:.2f}% | Vol: {vol:.2f}x | Accel: {acc:.2f}x | Buy: {buy:.2f}\nV15: {v15:.0f} | Opp: {opp:.0f} | Conf: {conf:.0f} | Acc: {accum:.0f}\nTV bullish TF: {tv} | Reason: {reason}\nEarly-warning only; not the confirmed BUY gate.".format(
+            symbol=r.get("symbol","?"),price=r.get("price","?"),fs=r.get("v156_fast_score",0),
+            p60=float(r.get("price_60s",0) or 0),vol=float(r.get("volume_ratio",0) or 0),
+            acc=float(r.get("trade_accel",0) or 0),buy=float(r.get("buy_pressure",0) or 0),
+            v15=float(r.get("v15_score",0) or 0),opp=float(r.get("v15_opportunity_score",0) or 0),
+            conf=float(r.get("v15_confirmation_score",0) or 0),accum=float(r.get("accumulation_score",0) or 0),
+            tv=r.get("tv_bullish_timeframes",0),reason=r.get("v156_fast_reason","")))
 async def telegram(msg):",
     '''def apply_v154(rows):
     events=[]
@@ -96,7 +107,7 @@ def persist_adaptive_capture(rows):
 async def telegram(msg):'''
 )
 src=src.replace(
-    'rows=[r for s in symbols if (r:=score(s))]\n            v154_events=apply_v154(rows)\n            persist_v154_events(v154_events)\n            persist_adaptive_capture(rows)\n            rows.sort(key=lambda z:z["score"],reverse=True)',
-    'rows=[r for s in symbols if (r:=score(s))]\n            v154_events=apply_v154(rows)\n            persist_v154_events(v154_events)\n            rows.sort(key=lambda z:z["score"],reverse=True)'
+    'rows=[r for s in symbols if (r:=score(s))]\\n            v154_events=apply_v154(rows)\\n            persist_v154_events(v154_events)\\n            persist_adaptive_capture(rows)\\n            rows.sort(key=lambda z:z["score"],reverse=True)',
+    'rows=[r for s in symbols if (r:=score(s))]\\n            v154_events=apply_v154(rows)\\n            persist_v154_events(v154_events)\\n            persist_adaptive_capture(rows)\\n            await send_v156_fast_alerts(rows)\\n            rows.sort(key=lambda z:z["score"],reverse=True)'
 )
 exec(compile(src,"scanner/worker.py","exec"),globals(),globals())
