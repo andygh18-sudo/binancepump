@@ -1,4 +1,4 @@
-name: Binance Pump Scanner V15 Live
+name: Binance Pump Scanner V15.6 Live
 
 on:
   schedule:
@@ -18,7 +18,7 @@ permissions:
   contents: write
   actions: write
 
-# V15.1 five-minute trajectory retry trigger
+# V15.6 production early-pump learner + alert pipeline
 concurrency:
   group: binance-pump-v15-live
   cancel-in-progress: false
@@ -50,7 +50,7 @@ jobs:
       - name: Validate generated V15 worker
         run: python scripts/validate_worker_bootstrap.py
 
-      - name: Run V15 live scan
+      - name: Run V15.6 live scan
         env:
           BINANCE_WS_BASE: wss://data-stream.binance.vision/stream
           BINANCE_REST_BASE: https://data-api.binance.vision
@@ -87,6 +87,16 @@ jobs:
           V8_MIN_PERSISTENCE: "2"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # V15.6 production alert controls
+          V153_ALERTS_ENABLED: "0"
+          V156_ADAPTIVE_CAPTURE_ENABLED: "1"
+          V156_SIGNATURES_ENABLED: "1"
+          V156_FAST_SCORE_MIN: "85"
+          V156_FAST_COOLDOWN: "180"
+          V156_SIGNATURE_COOLDOWN: "240"
+          V156_LEARNER_TARGET_PCT: "3.0"
+          V156_LEARNER_HORIZON_SECONDS: "600"
+
         run: |
           set -e
           rm -rf /tmp/v15-live-publisher
@@ -107,7 +117,7 @@ jobs:
               cd "$GITHUB_WORKSPACE"
               return 0
             fi
-            git commit -m "Publish V15 live snapshot"
+            git commit -m "Publish V15.6 live snapshot"
             git push origin HEAD:main
             cd "$GITHUB_WORKSPACE"
           }
@@ -142,7 +152,7 @@ jobs:
       - name: Compact V15.1 ignition history
         run: python scripts/compact_ignition_history.py
 
-      - name: Publish V15.2 scan data
+      - name: Publish V15.6 scan data
         run: |
           set -e
           git config user.name "github-actions[bot]"
@@ -181,7 +191,7 @@ jobs:
             echo "V15.2/V15.4 scan data already synchronized."
             exit 0
           fi
-          git commit -m "Update V15.2 and V15.4 historical scanner data"
+          git commit -m "Update V15.6 historical scanner data"
           git push origin HEAD:main
 
       - name: Start next V15 scan after successful run
