@@ -63,6 +63,19 @@ V156_ADAPTIVE = {
     "fast_cooldown": float(os.getenv("V156_FAST_COOLDOWN", "180")),
 }
 
+V156_SIGNATURES={"enabled":os.getenv("V156_SIGNATURES_ENABLED","1")=="1","cooldown":float(os.getenv("V156_SIGNATURE_COOLDOWN","240")),"pv_p60":float(os.getenv("V156_PV_P60","0.20")),"pv_volume":float(os.getenv("V156_PV_VOLUME","1.50")),"pv_accel":float(os.getenv("V156_PV_ACCEL","1.50")),"pv_buy":float(os.getenv("V156_PV_BUY","0.55")),"pv_v15":float(os.getenv("V156_PV_V15","55")),"of_p60":float(os.getenv("V156_OF_P60","0.20")),"of_buy":float(os.getenv("V156_OF_BUY","0.60")),"of_book":float(os.getenv("V156_OF_BOOK","0.10")),"of_accel":float(os.getenv("V156_OF_ACCEL","1.75")),"of_v15":float(os.getenv("V156_OF_V15","55")),"ta_p60":float(os.getenv("V156_TA_P60","0.20")),"ta_accel":float(os.getenv("V156_TA_ACCEL","3.00")),"ta_volume":float(os.getenv("V156_TA_VOLUME","0.75")),"ta_buy":float(os.getenv("V156_TA_BUY","0.45")),"ta_v15":float(os.getenv("V156_TA_V15","55"))}
+
+def _early_pump_signatures(row,memory,now,btc_off=False,extension=False):
+    if not V156_SIGNATURES["enabled"] or btc_off or extension:return {"price_volume":False,"order_flow":False,"trade_accel":False,"score":0,"alert":False,"signals":""}
+    p60=_f(row,"price_60s");p10=_f(row,"price_10s");vol=_f(row,"volume_ratio");accel=_f(row,"trade_accel");buy=_f(row,"buy_pressure");v15=_f(row,"v15_score");book=_f(row,"book_imbalance");rs5=_f(row,"relative_strength_5m")
+    pv=p60>=V156_SIGNATURES["pv_p60"] and vol>=V156_SIGNATURES["pv_volume"] and accel>=V156_SIGNATURES["pv_accel"] and buy>=V156_SIGNATURES["pv_buy"] and v15>=V156_SIGNATURES["pv_v15"]
+    of=p60>=V156_SIGNATURES["of_p60"] and buy>=V156_SIGNATURES["of_buy"] and book>=V156_SIGNATURES["of_book"] and accel>=V156_SIGNATURES["of_accel"] and v15>=V156_SIGNATURES["of_v15"] and rs5>=0
+    ta=p60>=V156_SIGNATURES["ta_p60"] and accel>=V156_SIGNATURES["ta_accel"] and vol>=V156_SIGNATURES["ta_volume"] and buy>=V156_SIGNATURES["ta_buy"] and v15>=V156_SIGNATURES["ta_v15"] and p10>0
+    score=(35 if pv else 0)+(35 if of else 0)+(30 if ta else 0);signals="|".join(x for x,ok in [("PRICE_VOLUME",pv),("ORDER_FLOW",of),("TRADE_ACCEL",ta)] if ok)
+    last=float(memory.get("v156_signature_last_alert",0) or 0);alert=bool(signals) and now-last>=V156_SIGNATURES["cooldown"]
+    if alert:memory["v156_signature_last_alert"]=now
+    return {"price_volume":pv,"order_flow":of,"trade_accel":ta,"score":score,"alert":alert,"signals":signals}
+
 V155 = {
     "enabled": os.getenv("V155_REIGNITION_ENABLED", "1") == "1",
     "watch_seconds": float(os.getenv("V155_REIGNITION_WATCH_SECONDS", "7200")),
@@ -422,6 +435,8 @@ def evaluate(row, memory, now=None):
         if adaptive_existing:
             adaptive_reason.append("ACTIVE_CAPTURE_WINDOW")
 
+    signature = _early_pump_signatures(row,memory,now,btc_off,extension)
+
     # V15.6 FAST-IGNITION is an early-warning lane. It does not alter the
     # V15.4/V15.5 confirmation or BUY gates.
     fast_score = 0
@@ -515,6 +530,12 @@ def evaluate(row, memory, now=None):
         "v156_adaptive_capture_interval": V156_ADAPTIVE["capture_interval"],
         "v156_adaptive_capture_window": V156_ADAPTIVE["capture_window"],
         "v156_adaptive_until": adaptive_until,
+        "v156_signature_score": int(signature["score"]),
+        "v156_signature_alert": bool(signature["alert"]),
+        "v156_signature_price_volume": bool(signature["price_volume"]),
+        "v156_signature_order_flow": bool(signature["order_flow"]),
+        "v156_signature_trade_accel": bool(signature["trade_accel"]),
+        "v156_signature_signals": signature["signals"],
         "v156_fast_score": int(fast_score),
         "v156_fast_ignition": bool(fast_ignition),
         "v156_fast_alert": bool(fast_alert),
