@@ -1467,7 +1467,10 @@ async def main():
                     sync.cancel()
                     try:await sync
                     except asyncio.CancelledError:pass
-            rows=[r for s in symbols if (r:=score(s))]\n            v154_events=apply_v154(rows)\n            persist_v154_events(v154_events)\n            rows.sort(key=lambda z:z["score"],reverse=True)
+            rows=[r for s in symbols if (r:=score(s))]
+            v154_events=apply_v154(rows)
+            persist_v154_events(v154_events)
+            rows.sort(key=lambda z:z["score"],reverse=True)
             with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
 
 # V15 production deployment active
