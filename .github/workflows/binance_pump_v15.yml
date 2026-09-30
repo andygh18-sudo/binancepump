@@ -46,6 +46,9 @@ jobs:
       - name: Validate V15 production scanner
         run: python -m py_compile scanner/worker.py scanner/history_store.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py scripts/pump_learner_v156.py
 
+      - name: Validate generated V15 worker
+        run: python scripts/validate_worker_bootstrap.py
+
       - name: Run V15 live scan
         env:
           BINANCE_WS_BASE: wss://data-stream.binance.vision/stream
