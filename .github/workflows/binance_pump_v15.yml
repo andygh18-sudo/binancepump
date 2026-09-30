@@ -2,7 +2,6 @@ name: Binance Pump Scanner V15.6 Live
 
 on:
   schedule:
-    # Run every 15 minutes, offset from the top of the hour to reduce GitHub scheduling congestion.
     - cron: "2,12,22,32,42,52 * * * *"
   push:
     paths:
@@ -10,6 +9,7 @@ on:
       - "scanner/history_store.py"
       - "scanner/v154.py"
       - "scanner/v156_outcomes.py"
+      - "scripts/backfill_v156_outcomes.py"
       - "scripts/compact_v15_2_history.py"
       - "run_scanner.py"
       - "app.py"
@@ -19,7 +19,6 @@ permissions:
   contents: write
   actions: write
 
-# V15.6 production early-pump learner + alert pipeline
 concurrency:
   group: binance-pump-v15-live
   cancel-in-progress: false
@@ -31,26 +30,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
       - name: Prepare data
         run: |
           mkdir -p data
           touch data/v154_events.jsonl
-
       - name: Validate V15 production scanner
-        run: python -m py_compile scanner/worker.py scanner/v154.py scanner/v156_outcomes.py scanner/history_store.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py scripts/pump_learner_v156.py
-
+        run: python -m py_compile scanner/worker.py scanner/v154.py scanner/v156_outcomes.py scanner/history_store.py scripts/backfill_v156_outcomes.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py scripts/pump_learner_v156.py
       - name: Validate generated V15 worker
         run: python scripts/validate_worker_bootstrap.py
-
       - name: Run V15.6 live scan
         env:
           BINANCE_WS_BASE: wss://data-stream.binance.vision/stream
@@ -88,7 +81,6 @@ jobs:
           V8_MIN_PERSISTENCE: "2"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          # V15.6 production alert controls
           V153_ALERTS_ENABLED: "0"
           V156_ADAPTIVE_CAPTURE_ENABLED: "1"
           V156_SIGNATURES_ENABLED: "1"
@@ -97,16 +89,12 @@ jobs:
           V156_SIGNATURE_COOLDOWN: "240"
           V156_LEARNER_TARGET_PCT: "3.0"
           V156_LEARNER_HORIZON_SECONDS: "600"
-
         run: |
           set -e
           rm -rf /tmp/v15-live-publisher
           git worktree add --detach /tmp/v15-live-publisher HEAD
-
           publish_live_snapshot() {
-            if [ ! -f "$GITHUB_WORKSPACE/data/latest.json" ]; then
-              return 0
-            fi
+            if [ ! -f "$GITHUB_WORKSPACE/data/latest.json" ]; then return 0; fi
             cp "$GITHUB_WORKSPACE/data/latest.json" /tmp/v15-live-publisher/data/latest.json
             cd /tmp/v15-live-publisher
             git config user.name "github-actions[bot]"
@@ -114,19 +102,14 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             git add -f data/latest.json
-            if git diff --cached --quiet; then
-              cd "$GITHUB_WORKSPACE"
-              return 0
-            fi
+            if git diff --cached --quiet; then cd "$GITHUB_WORKSPACE"; return 0; fi
             git commit -m "Publish V15.6 live snapshot"
             git push origin HEAD:main
             cd "$GITHUB_WORKSPACE"
           }
-
           python run_scanner.py &
           V15_PID=$!
           export V15_PID
-
           (
             while kill -0 "$V15_PID" 2>/dev/null; do
               sleep 30
@@ -134,25 +117,23 @@ jobs:
             done
           ) &
           PUBLISHER_PID=$!
-
           wait $V15_PID
           wait $PUBLISHER_PID || true
-
-          # Publish the final snapshot here as well; the existing publish step
-          # remains responsible for the complete history files.
           publish_live_snapshot || true
           git worktree remove --force /tmp/v15-live-publisher
-
       - name: Run V15.6 pump learner
         run: python scripts/pump_learner_v156.py
-
+      - name: Backfill V15.6 outcomes from Binance 1m klines
+        env:
+          BINANCE_REST_BASE: https://data-api.binance.vision
+          V156_BACKFILL_MAX_SYMBOLS: "150"
+          V156_BACKFILL_ONLY_UNRESOLVED: "1"
+          V156_BACKFILL_SLEEP: "0.12"
+        run: python scripts/backfill_v156_outcomes.py
       - name: Migrate and compact V15.2 symbol history
-        run: |
-          python scripts/compact_v15_2_history.py
-
+        run: python scripts/compact_v15_2_history.py
       - name: Compact V15.1 ignition history
         run: python scripts/compact_ignition_history.py
-
       - name: Publish V15.6 scan data
         run: |
           set -e
@@ -171,9 +152,6 @@ jobs:
           if [ -f data/v156_signature_learning.json ]; then cp data/v156_signature_learning.json /tmp/v15-v156-learning.json; else printf "{}\n" > /tmp/v15-v156-learning.json; fi
           if [ -f data/v156_outcomes.jsonl ]; then cp data/v156_outcomes.jsonl /tmp/v15-v156-outcomes.jsonl; else : > /tmp/v15-v156-outcomes.jsonl; fi
           if [ -f data/v156_outcome_summary.json ]; then cp data/v156_outcome_summary.json /tmp/v15-v156-outcome-summary.json; else printf "{}\n" > /tmp/v15-v156-outcome-summary.json; fi
-
-          # Reset to current remote main before restoring only generated data.
-          # The legacy monolithic history file is deliberately removed.
           git reset --hard origin/main
           mkdir -p data
           rm -f data/history.jsonl
@@ -189,7 +167,6 @@ jobs:
           cp /tmp/v15-v156-learning.json data/v156_signature_learning.json
           cp /tmp/v15-v156-outcomes.jsonl data/v156_outcomes.jsonl
           cp /tmp/v15-v156-outcome-summary.json data/v156_outcome_summary.json
-
           git add -f data/latest.json data/ignition_history.jsonl data/history_index.json data/v154_events.jsonl data/adaptive_microstructure_history.jsonl data/v156_signature_learning.json data/v156_outcomes.jsonl data/v156_outcome_summary.json
           git add -A data/history data/microstructure
           if git diff --cached --quiet; then
