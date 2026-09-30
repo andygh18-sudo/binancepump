@@ -373,6 +373,9 @@ def evaluate(row, memory, now=None):
             memory["last_update"] = now
 
     status = memory.get("status", status)
+    confirmed = status == "PERSISTENCE_CONFIRMED" and not extension
+    early_stage = status == "PENDING" and early and not extension
+
     # V15.6 adaptive high-frequency retention. The live worker already receives
     # 1-second microstructure updates; this flag tells it when to retain a
     # 10-second evidence stream around PRE/REIGNITION/near-ignition candidates.
@@ -408,8 +411,6 @@ def evaluate(row, memory, now=None):
     if adaptive_capture:
         adaptive_until = now + V156_ADAPTIVE["capture_window"]
 
-    confirmed = status == "PERSISTENCE_CONFIRMED" and not extension
-    early_stage = status == "PENDING" and early and not extension
 
     if confirmed:
         stage = "CONFIRMED IGNITION"
