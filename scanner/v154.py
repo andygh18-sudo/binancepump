@@ -520,6 +520,36 @@ def evaluate(row, memory, now=None):
     if fast_alert:
         memory["v156_fast_last_alert"] = now
 
+    # Explicit V15.6 BUY SIGNAL: stricter entry-quality layer on top of
+    # early ignition. This is a scanner signal, not a guaranteed outcome.
+    buy_signal = bool(
+        not btc_off
+        and not extension
+        and not hard_veto
+        and not spread_penalty
+        and participation
+        and price
+        and structure
+        and pump_entry_score >= 82
+        and p60 >= 0.35
+        and vol >= 2.00
+        and accel >= 2.00
+        and buy >= 0.65
+        and rs5 >= 0.05
+        and v15 >= 70
+        and (tvtf >= 3 or acc >= 70 or (bridge_trigger and bridge >= 60))
+    )
+    buy_score = min(100, int(round(
+        pump_entry_score
+        + (5 if tvtf >= 4 else 3 if tvtf >= 3 else 0)
+        + (3 if buy >= 0.75 else 0)
+        + (2 if accel >= 3.0 else 0)
+    )))
+    buy_last = float(memory.get("v156_buy_last_alert", 0) or 0)
+    buy_alert = buy_signal and (now - buy_last >= V156_ADAPTIVE["fast_cooldown"])
+    if buy_alert:
+        memory["v156_buy_last_alert"] = now
+
     adaptive_capture = bool(adaptive_reason)
     adaptive_status = "ACTIVE" if adaptive_capture else "OFF"
     adaptive_until = 0.0
@@ -608,6 +638,23 @@ def evaluate(row, memory, now=None):
                 ("OPP", opp >= V156_ADAPTIVE["fast_opp"]),
                 ("ACC", acc >= V156_ADAPTIVE["fast_acc"]),
                 ("CONF", conf >= V156_ADAPTIVE["fast_conf"]),
+            ] if ok
+        ]),
+        "v156_buy_signal": bool(buy_signal),
+        "v156_buy_alert": bool(buy_alert),
+        "v156_buy_score": int(buy_score),
+        "v156_buy_reason": "|".join([
+            x for x, ok in [
+                ("EARLY", early),
+                ("P60", p60 >= 0.35),
+                ("VOL", vol >= 2.00),
+                ("ACCEL", accel >= 2.00),
+                ("BUY", buy >= 0.65),
+                ("RS5", rs5 >= 0.05),
+                ("V15", v15 >= 70),
+                ("TV", tvtf >= 3),
+                ("ACCUM", acc >= 70),
+                ("BRIDGE", bridge_trigger and bridge >= 60),
             ] if ok
         ]),
 
