@@ -26,16 +26,24 @@ def build_generated_source(src: str) -> str:
     src = src.replace(
         "from .history_store import append_scan_history, append_microstructure_history",
         "from .history_store import append_scan_history, append_microstructure_history\n"
-        "from .v154 import evaluate as v154_evaluate",
+        "from .v154 import evaluate as v154_evaluate\n"
+        "from .v156_outcomes import OutcomeEngine",
     )
 
-    injection = '''def apply_v154(rows):
+    injection = '''outcomes=OutcomeEngine()
+
+def apply_v154(rows):
     events=[]
     for r in rows:
         s=str(r.get("symbol","")).upper()
         if not s: continue
         result,event_record=v154_evaluate(r,state[s].setdefault("v154",{})); r.update(result)
-        if event_record: events.append(event_record)
+        if event_record:
+            events.append(event_record)
+            if event_record.get("event")=="TRIGGER" and event_record.get("stage","").endswith("EARLY IGNITION"):
+                outcomes.register_signal(event_record,r,event_record.get("ts"))
+    outcomes.observe(rows)
+    outcomes.write_summary()
     return events
 
 def persist_v154_events(events):
@@ -109,6 +117,8 @@ def main() -> None:
         "def apply_v154(rows):",
         "async def send_v156_main_alerts(rows)",
         "v154_events=apply_v154(rows)",
+        "from .v156_outcomes import OutcomeEngine",
+        "outcomes.observe(rows)",
     )
     missing = [marker for marker in required_markers if marker not in generated]
     if missing:
