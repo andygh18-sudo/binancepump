@@ -1140,6 +1140,9 @@ def persist_v154_events(events):
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
+    msg=str(msg)
+    # Only V15.6 messages may reach Telegram in production.
+    if not msg.startswith("V15.6 "): return
     if not token or not chat:return
     # Normalize all scanner alerts to one Telegram line.
     # This prevents literal \\n / \\ artifacts from reaching Telegram.
@@ -1185,6 +1188,45 @@ async def main():
                                 tv_cache={};tv_last_refresh=time.time()
                         rows=[r for s in symbols if (r:=score(s))]
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
+                        # V15.6-only Telegram lane.
+                        v156_candidates=[]
+                        for r in rows:
+                            if bool(r.get("v15_btc_risk_off",False)):
+                                continue
+                            fast=bool(r.get("v156_fast_alert",False))
+                            sig=bool(r.get("v156_signature_alert",False))
+                            if not (fast or sig):
+                                continue
+                            rr=dict(r);rr["_v156_fast"]=fast;rr["_v156_sig"]=sig
+                            v156_candidates.append(rr)
+                        v156_candidates=sorted(
+                            v156_candidates,
+                            key=lambda r:(int(bool(r.get("_v156_fast"))),
+                                          r.get("v156_fast_score",0),
+                                          r.get("v156_signature_score",0),
+                                          r.get("v154_score",0)),
+                            reverse=True
+                        )[:TOP_ALERTS]
+                        for r in v156_candidates:
+                            s=r["symbol"];old=state[s];now=time.time()
+                            mode="FAST-IGNITION" if r.get("_v156_fast") else "SIGNATURE"
+                            stage=str(r.get("v155_stage") or r.get("v154_stage") or "WATCH")
+                            score=float(r.get("v156_fast_score",0) or 0) if r.get("_v156_fast") else float(r.get("v156_signature_score",0) or 0)
+                            previous=float(old.get("last_v156_telegram_score",0) or 0)
+                            previous_mode=str(old.get("last_v156_telegram_mode","") or "")
+                            changed=(mode!=previous_mode or score-previous>=5)
+                            if changed and now-float(old.get("last_v156_telegram_alert",0) or 0)>=float(os.getenv("V156_TELEGRAM_COOLDOWN","180")):
+                                await telegram(
+                                    f"V15.6 {mode} | {s} | {stage} | Score {score:.0f}/100 | Price: {r.get('price',0)} | "
+                                    f"60s: {r.get('price_60s',0):+.2f}% | Vol: {r.get('volume_ratio',0):.2f}x | "
+                                    f"Trade accel: {r.get('trade_accel',0):.2f}x | Buy: {r.get('buy_pressure',0)*100:.1f}% | "
+                                    f"RS 5m: {r.get('v15_relative_strength_5m',0):+.2f}% | RS 15m: {r.get('v15_relative_strength_15m',0):+.2f}% | "
+                                    f"V15: {r.get('v15_score',r.get('v154_score',0)):.0f}/100 | "
+                                    f"Signature: {r.get('v156_signature_score',0):.0f} | Drivers: {r.get('v156_fast_reason','') or r.get('v156_signature_signals','')}"
+                                )
+                                old["last_v156_telegram_alert"]=now
+                            old["last_v156_telegram_score"]=score
+                            old["last_v156_telegram_mode"]=mode
                         # Legacy V15 TOP alerts are intentionally disabled here.
                         # Early Telegram alerts are governed exclusively by the three-stage V15.1 ignition model below.
                         # V15.1 Telegram uses a single three-stage ignition model:
