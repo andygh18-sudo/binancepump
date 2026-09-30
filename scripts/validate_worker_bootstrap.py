@@ -100,7 +100,7 @@ def main() -> None:
     if missing:
         raise RuntimeError("Generated V15 worker is missing expected injections: " + repr(missing))
 
-    if not re.search(r'if __name__\s*==\s*["\\']__main__["\\']\s*:', generated):
+    if not re.search(r"""if __name__\s*==\s*["\']__main__["\']\s*:""", generated):
         raise RuntimeError("Generated worker is missing its __main__ guard")
 
     print("V15 worker bootstrap: generated source compiled and injection markers validated")
