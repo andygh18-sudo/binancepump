@@ -1,6 +1,10 @@
-"""V15.4 Early-Ignition state machine.
+"""V15.6 production early-pump state machine.
 
-V15.4 deliberately exposes exactly three actionable stages:
+V15.6 builds on the V15.4 state machine and promotes the evidence-based
+microstructure signatures, adaptive capture, fast-ignition path, and
+forward-looking learner into the production signal layer.
+
+V15.6 preserves the staged architecture while adding an independent early-pump signal layer:
     WATCH -> EARLY IGNITION -> CONFIRMED IGNITION
 
 Early Ignition prioritizes short-term participation and price/flow structure.
@@ -12,6 +16,8 @@ runs alongside it.
 import time
 import uuid
 import os
+
+V156_VERSION = "15.6"
 
 V154 = {
     "price_10s_min": float(os.getenv("V154_PRICE_10S_MIN", "0.15")),
