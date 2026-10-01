@@ -1197,8 +1197,9 @@ async def main():
                         rows=[r for s in symbols if (r:=score(s))]
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
                         # Dedicated TOP-5 PRICE MOMENTUM Telegram lane.
-                        # This is a separate observational alert: it ranks the fastest
-                        # short-term price movers and does not alter V15.6 decisions.
+                        # One consolidated message lists the five fastest short-term
+                        # price movers. This lane is observational and does not alter
+                        # V15.6 decisions or BUY/IGNITION thresholds.
                         top5_price_candidates=[]
                         for r in rows:
                             p1=float(r.get("price_1m",0) or 0)
@@ -1206,39 +1207,49 @@ async def main():
                             p5=float(r.get("price_5m",0) or 0)
                             p10=float(r.get("price_10m",0) or 0)
                             p15=float(r.get("price_15m",0) or 0)
-                            p30=float(r.get("price_30m",0) or 0)
                             btc_off=bool(r.get("v15_btc_risk_off",False))
-                            if btc_off or (p1<TOP5_PRICE_MIN_1M and p5<TOP5_PRICE_MIN_5M):
+                            if p1<TOP5_PRICE_MIN_1M and p5<TOP5_PRICE_MIN_5M:
                                 continue
                             momentum=(p1*0.30)+(p3*0.25)+(p5*0.20)+(p10*0.15)+(p15*0.10)
-                            old=state[r["symbol"]]
-                            previous=float(old.get("last_top5_price_score",0) or 0)
-                            rr=dict(r);rr["_top5_price_score"]=momentum;rr["_top5_price_delta"]=momentum-previous
+                            rr=dict(r);rr["_top5_price_score"]=momentum
+                            rr["_top5_price_delta"]=momentum-float(state[r["symbol"]].get("last_top5_price_score",0) or 0)
                             top5_price_candidates.append(rr)
                         top5_price_candidates=sorted(
                             top5_price_candidates,
                             key=lambda r:(r.get("_top5_price_score",0),r.get("price_5m",0),r.get("price_1m",0)),
                             reverse=True
                         )[:TOP5_PRICE_TOP]
+
+                        top5_changed=False
                         for rank,r in enumerate(top5_price_candidates,1):
-                            s=r["symbol"];old=state[s];now=time.time()
-                            score5=float(r.get("_top5_price_score",0) or 0)
-                            p1=float(r.get("price_1m",0) or 0);p3=float(r.get("price_3m",0) or 0)
-                            p5=float(r.get("price_5m",0) or 0);p10=float(r.get("price_10m",0) or 0)
-                            p15=float(r.get("price_15m",0) or 0);p30=float(r.get("price_30m",0) or 0)
+                            old=state[r["symbol"]]
                             prior_rank=old.get("last_top5_price_rank")
-                            meaningful=(prior_rank is None or int(prior_rank)!=rank or score5-float(old.get("last_top5_price_score",0) or 0)>=1.0)
-                            if meaningful and now-float(old.get("last_top5_price_alert",0) or 0)>=TOP5_PRICE_ALERT_COOLDOWN:
-                                await telegram(
-                                    f"V15.6 TOP5-PRICE | #{rank} {s} | Momentum {score5:+.2f}% | Price: {r.get('price',0)} | "
-                                    f"1m {p1:+.2f}% | 3m {p3:+.2f}% | 5m {p5:+.2f}% | 10m {p10:+.2f}% | 15m {p15:+.2f}% | 30m {p30:+.2f}% | "
-                                    f"Vol {r.get('volume_ratio',0):.2f}x | Trade accel {r.get('trade_accel',0):.2f}x | Buy {r.get('buy_pressure',0)*100:.1f}% | "
-                                    f"RS5 {r.get('v15_relative_strength_5m',0):+.2f}% | V15 {r.get('v15_score',0):.0f}/100 | "
-                                    f"Stage {r.get('v15_stage','')} | BTC risk-off {'YES' if r.get('v15_btc_risk_off') else 'NO'}"
-                                )
-                                old["last_top5_price_alert"]=now
+                            score5=float(r.get("_top5_price_score",0) or 0)
+                            meaningful=(prior_rank is None or int(prior_rank)!=rank or
+                                        score5-float(old.get("last_top5_price_score",0) or 0)>=1.0)
+                            if meaningful:
+                                top5_changed=True
                             old["last_top5_price_rank"]=rank
                             old["last_top5_price_score"]=score5
+
+                        top5_global=state["__TOP5_PRICE__"]
+                        now=time.time()
+                        if top5_price_candidates and top5_changed and now-float(top5_global.get("last_top5_price_alert",0) or 0)>=TOP5_PRICE_ALERT_COOLDOWN:
+                            lines=["V15.6 TOP5-PRICE | Fastest short-term Binance USDT spot movers"]
+                            for rank,r in enumerate(top5_price_candidates,1):
+                                lines.append(
+                                    f"#{rank} {r['symbol']} | Price {r.get('price',0)} | "
+                                    f"1m {r.get('price_1m',0):+.2f}% | 3m {r.get('price_3m',0):+.2f}% | "
+                                    f"5m {r.get('price_5m',0):+.2f}% | 10m {r.get('price_10m',0):+.2f}% | "
+                                    f"15m {r.get('price_15m',0):+.2f}% | 30m {r.get('price_30m',0):+.2f}% | "
+                                    f"Vol {r.get('volume_ratio',0):.2f}x | Trade accel {r.get('trade_accel',0):.2f}x | "
+                                    f"Buy {r.get('buy_pressure',0)*100:.1f}% | RS5 {r.get('v15_relative_strength_5m',0):+.2f}% | "
+                                    f"V15 {r.get('v15_score',0):.0f}/100 | Stage {r.get('v15_stage','')} | "
+                                    f"BTC risk-off {'YES' if r.get('v15_btc_risk_off') else 'NO'}"
+                                )
+                            lines.append("Top-5 price momentum only — not a BUY signal.")
+                            await telegram("\n".join(lines))
+                            top5_global["last_top5_price_alert"]=now
 
                         # V15.6-only Telegram lane.
                         # Telegram has exactly two V15.6 alert levels:
