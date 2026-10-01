@@ -16,15 +16,15 @@ CFG = {
     "watch_volume": float(os.getenv("V156_WATCH_VOLUME", "1.50")),
     "watch_accel": float(os.getenv("V156_WATCH_ACCEL", "1.25")),
     "watch_buy": float(os.getenv("V156_WATCH_BUY", "0.55")),
-    "early_p10": float(os.getenv("V156_EARLY_P10", "0.20")),
-    "early_p60": float(os.getenv("V156_EARLY_P60", "0.35")),
+    "early_p10": float(os.getenv("V156_EARLY_P10", "0.15")),
+    "early_p60": float(os.getenv("V156_EARLY_P60", "0.30")),
     "early_volume": float(os.getenv("V156_EARLY_VOLUME", "2.00")),
-    "early_accel": float(os.getenv("V156_EARLY_ACCEL", "2.00")),
+    "early_accel": float(os.getenv("V156_EARLY_ACCEL", "1.75")),
     "early_buy": float(os.getenv("V156_EARLY_BUY", "0.65")),
     "early_rs5": float(os.getenv("V156_EARLY_RS5", "0.00")),
-    "early_v15": float(os.getenv("V156_EARLY_V15", "70")),
-    "early_opp": float(os.getenv("V156_EARLY_OPP", "65")),
-    "early_conf": float(os.getenv("V156_EARLY_CONF", "70")),
+    "early_v15": float(os.getenv("V156_EARLY_V15", "65")),
+    "early_opp": float(os.getenv("V156_EARLY_OPP", "60")),
+    "early_conf": float(os.getenv("V156_EARLY_CONF", "65")),
     "early_acc": float(os.getenv("V156_EARLY_ACC", "65")),
     "persist_min": float(os.getenv("V156_PERSIST_MIN_SECONDS", "10")),
     "persist_max": float(os.getenv("V156_PERSIST_MAX_SECONDS", "20")),
@@ -82,14 +82,40 @@ def evaluate(row, memory, now=None):
     exhaustion_veto = exhaustion > CFG["exhaustion_max"] and exhaustion > 0
     hard_veto = hard_veto or exhaustion_veto
 
-    watch = (not btc_off and not exhaustion_veto and p60 >= CFG["watch_p60"] and
-             vol >= CFG["watch_volume"] and accel >= CFG["watch_accel"] and buy >= CFG["watch_buy"])
+    watch_core = (not btc_off and not exhaustion_veto and p60 >= CFG["watch_p60"] and
+                  vol >= CFG["watch_volume"] and accel >= CFG["watch_accel"] and buy >= CFG["watch_buy"])
+    watch_confirmation = sum(bool(x) for x in [
+        v15 >= 55, opp >= 55, conf >= 60, tvtf >= 3, (bridge_trigger and bridge >= 15)
+    ])
+    watch = watch_core and watch_confirmation >= 2
 
-    structure = (v15 >= CFG["early_v15"] and opp >= CFG["early_opp"] and
-                 conf >= CFG["early_conf"] and (acc >= CFG["early_acc"] or (bridge_trigger and bridge >= 60)))
-    early = (not hard_veto and p10 >= CFG["early_p10"] and p60 >= CFG["early_p60"] and
-             vol >= CFG["early_volume"] and accel >= CFG["early_accel"] and buy >= CFG["early_buy"] and
-             rs5 >= CFG["early_rs5"] and structure)
+    # Structural confirmation is deliberately combination-based. This allows
+    # genuine reset/re-ignition sequences to trigger earlier without lowering
+    # the core price/flow requirements.
+    confirmation_flags = [
+        v15 >= CFG["early_v15"],
+        opp >= CFG["early_opp"],
+        conf >= CFG["early_conf"],
+        tvtf >= 3,
+        (bridge_trigger and bridge >= 15),
+    ]
+    confirmation_count = sum(bool(x) for x in confirmation_flags)
+    structure = (
+        acc >= CFG["early_acc"] and
+        confirmation_count >= 2
+    )
+    early = (not hard_veto and
+             p10 >= CFG["early_p10"] and p60 >= CFG["early_p60"] and
+             vol >= CFG["early_volume"] and accel >= CFG["early_accel"] and
+             buy >= CFG["early_buy"] and rs5 >= CFG["early_rs5"] and structure)
+
+    # Explicit price/participation divergence veto: a positive price move
+    # without fresh participation/acceleration is not an early pump.
+    participation_divergence = (
+        p60 > 0 and vol < 1.25 and accel < 1.50
+    )
+    if participation_divergence:
+        early = False
 
     sweet = _sweet_score(p10,p60,vol,accel,buy,v15,opp,conf,acc,rs5,bridge,tvtf)
     status = str(memory.get("status","IDLE"))
@@ -154,13 +180,13 @@ def evaluate(row, memory, now=None):
         "v156_event_id":memory.get("event_id",""),"v156_trigger_p10":_f(memory,"trigger_p10"),
         "v156_trigger_p60":_f(memory,"trigger_p60"),"v156_trigger_volume":_f(memory,"trigger_volume"),
         "v156_trigger_accel":_f(memory,"trigger_accel"),"v156_trigger_buy":_f(memory,"trigger_buy"),
-        "v156_trigger_v15":_f(memory,"trigger_v15"),"v156_bridge_bonus":5 if bridge_trigger and bridge>=60 else 3 if bridge>=60 else 0,
+        "v156_trigger_v15":_f(memory,"trigger_v15"),"v156_bridge_bonus":5 if bridge_trigger and bridge>=15 else 3 if bridge>=15 else 0,
         "v156_fast_score":sweet,"v156_fast_ignition":early,"v156_fast_alert":bool(event and event.get("event")=="TRIGGER"),
         "v156_fast_reason":"SWEET_SPOT" if early else "WATCH" if watch else "",
         "v156_signature_score":sweet,"v156_signature_alert":False,"v156_signature_signals":"SWEET_SPOT" if early else "",
         "v156_buy_alert":buy_signal,"v156_buy_score":sweet,
         "v156_buy_reason":"CONFIRMED_IGNITION" if buy_signal else "|".join([
-            x for x,ok in [("P10",p10>=.20),("P60",p60>=.35),("VOL",vol>=2.0),("ACCEL",accel>=2.0),
-                           ("BUY",buy>=.65),("V15",v15>=70),("OPP",opp>=65),("CONF",conf>=70),
-                           ("ACCUM",acc>=65),("TV",tvtf>=3)] if ok])
+            x for x,ok in [("P10",p10>=.15),("P60",p60>=.30),("VOL",vol>=2.0),("ACCEL",accel>=1.75),
+                           ("BUY",buy>=.65),("V15",v15>=65),("OPP",opp>=60),("CONF",conf>=65),
+                           ("ACCUM",acc>=65),("TV",tvtf>=3),("BRIDGE",bridge_trigger and bridge>=15)] if ok])
     }, event
