@@ -18,8 +18,8 @@ MOMENTUM_SYMBOLS=int(os.getenv("MOMENTUM_SYMBOLS","40"))
 LIQUID_SYMBOLS=int(os.getenv("LIQUID_SYMBOLS","80"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"));IGNITION_HISTORY_SAMPLES=int(os.getenv("IGNITION_HISTORY_SAMPLES","60"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"));HISTORY_SAMPLE_INTERVAL=float(os.getenv("HISTORY_SAMPLE_INTERVAL","300"))
-TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));BUY_ALERT_COOLDOWN=float(os.getenv("BUY_ALERT_COOLDOWN","1800"));BUY_ALERT_TOP=int(os.getenv("BUY_ALERT_TOP","3"));BUY_ALERT_MIN_QUALITY=float(os.getenv("BUY_ALERT_MIN_QUALITY","80"));BUY_ALERT_MIN_CONFIRMATION=float(os.getenv("BUY_ALERT_MIN_CONFIRMATION","70"));BUY_ALERT_MIN_OPPORTUNITY=float(os.getenv("BUY_ALERT_MIN_OPPORTUNITY","60"));BUY_ALERT_MIN_TV=float(os.getenv("BUY_ALERT_MIN_TV","70"));BUY_ALERT_MIN_BULL_TF=int(os.getenv("BUY_ALERT_MIN_BULL_TF","4"));BUY_ALERT_MAX_EXHAUSTION=float(os.getenv("BUY_ALERT_MAX_EXHAUSTION","58"));PUMP_MOMENTUM_ALERT_MIN=float(os.getenv("PUMP_MOMENTUM_ALERT_MIN","75"));PUMP_MOMENTUM_ALERT_EXTREME=float(os.getenv("PUMP_MOMENTUM_ALERT_EXTREME","90"));PUMP_MOMENTUM_ALERT_JUMP=float(os.getenv("PUMP_MOMENTUM_ALERT_JUMP","10"));PUMP_MOMENTUM_ALERT_COOLDOWN=float(os.getenv("PUMP_MOMENTUM_ALERT_COOLDOWN","300"));PUMP_MOMENTUM_ALERT_TOP=int(os.getenv("PUMP_MOMENTUM_ALERT_TOP","3"));TOP5_PRICE_MIN_1M=float(os.getenv("TOP5_PRICE_MIN_1M","0.15"));TOP5_PRICE_MIN_5M=float(os.getenv("TOP5_PRICE_MIN_5M","0.50"));TOP5_PRICE_TOP=int(os.getenv("TOP5_PRICE_TOP","5"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"));TRADINGVIEW_ENABLED=os.getenv("TRADINGVIEW_ENABLED","1")=="1";TRADINGVIEW_REFRESH_SECONDS=float(os.getenv("TRADINGVIEW_REFRESH_SECONDS","30"))
-symbols=[];books={};tv_cache={};tv_last_refresh=0.0;state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"ignition_window":deque(maxlen=60),"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":"","last_buy_alert":0,"last_buy_decision":"","last_buy_quality":0.0,"last_pump_momentum_alert":0,"last_pump_momentum_score":0.0,"last_pump_momentum_label":"","last_top5_price_alert":0,"last_top5_price_rank":None,"last_top5_price_score":0.0,"reignition_armed_until":0,"reignition_armed_score":0.0,"last_reignition_alert":0,"last_reignition_stage":"","last_reignition_score":0.0})
+TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));BUY_ALERT_COOLDOWN=float(os.getenv("BUY_ALERT_COOLDOWN","1800"));BUY_ALERT_TOP=int(os.getenv("BUY_ALERT_TOP","3"));BUY_ALERT_MIN_QUALITY=float(os.getenv("BUY_ALERT_MIN_QUALITY","80"));BUY_ALERT_MIN_CONFIRMATION=float(os.getenv("BUY_ALERT_MIN_CONFIRMATION","70"));BUY_ALERT_MIN_OPPORTUNITY=float(os.getenv("BUY_ALERT_MIN_OPPORTUNITY","60"));BUY_ALERT_MIN_TV=float(os.getenv("BUY_ALERT_MIN_TV","70"));BUY_ALERT_MIN_BULL_TF=int(os.getenv("BUY_ALERT_MIN_BULL_TF","4"));BUY_ALERT_MAX_EXHAUSTION=float(os.getenv("BUY_ALERT_MAX_EXHAUSTION","58"));PUMP_MOMENTUM_ALERT_MIN=float(os.getenv("PUMP_MOMENTUM_ALERT_MIN","75"));PUMP_MOMENTUM_ALERT_EXTREME=float(os.getenv("PUMP_MOMENTUM_ALERT_EXTREME","90"));PUMP_MOMENTUM_ALERT_JUMP=float(os.getenv("PUMP_MOMENTUM_ALERT_JUMP","10"));PUMP_MOMENTUM_ALERT_COOLDOWN=float(os.getenv("PUMP_MOMENTUM_ALERT_COOLDOWN","300"));PUMP_MOMENTUM_ALERT_TOP=int(os.getenv("PUMP_MOMENTUM_ALERT_TOP","3"));FAST_PUMP_MIN_1M=float(os.getenv("FAST_PUMP_MIN_1M","0.20"));FAST_PUMP_MIN_5M=float(os.getenv("FAST_PUMP_MIN_5M","0.75"));FAST_PUMP_MIN_VOLUME=float(os.getenv("FAST_PUMP_MIN_VOLUME","2.00"));FAST_PUMP_MIN_ACCEL=float(os.getenv("FAST_PUMP_MIN_ACCEL","1.75"));FAST_PUMP_MIN_BUY=float(os.getenv("FAST_PUMP_MIN_BUY","0.65"));FAST_PUMP_MIN_RS5=float(os.getenv("FAST_PUMP_MIN_RS5","0.00"));FAST_PUMP_MIN_SCORE=float(os.getenv("FAST_PUMP_MIN_SCORE","75"));FAST_PUMP_MAX_EXHAUSTION=float(os.getenv("FAST_PUMP_MAX_EXHAUSTION","35"));FAST_PUMP_ALERT_COOLDOWN=float(os.getenv("FAST_PUMP_ALERT_COOLDOWN","180"));FAST_PUMP_V15_PREFERENCE=float(os.getenv("FAST_PUMP_V15_PREFERENCE","60"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"));TRADINGVIEW_ENABLED=os.getenv("TRADINGVIEW_ENABLED","1")=="1";TRADINGVIEW_REFRESH_SECONDS=float(os.getenv("TRADINGVIEW_REFRESH_SECONDS","30"))
+symbols=[];books={};tv_cache={};tv_last_refresh=0.0;state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"ignition_window":deque(maxlen=60),"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":"","last_buy_alert":0,"last_buy_decision":"","last_buy_quality":0.0,"last_pump_momentum_alert":0,"last_pump_momentum_score":0.0,"last_pump_momentum_label":"","last_top5_price_alert":0,"last_top5_price_rank":None,"last_top5_price_score":0.0,"last_fast_pump_alert":0,"last_fast_pump_score":0.0,"last_fast_pump_symbol":"","reignition_armed_until":0,"reignition_armed_score":0.0,"last_reignition_alert":0,"last_reignition_stage":"","last_reignition_score":0.0})
 
 async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
@@ -1196,55 +1196,80 @@ async def main():
                                 tv_cache={};tv_last_refresh=time.time()
                         rows=[r for s in symbols if (r:=score(s))]
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
-                        # Dedicated TOP-5 PRICE MOMENTUM Telegram lane.
-                        # One consolidated message lists the five fastest short-term
-                        # price movers. This lane is observational and does not alter
-                        # V15.6 decisions or BUY/IGNITION thresholds.
-                        top5_price_candidates=[]
+                        # Dedicated TOP-1 FAST PUMP Telegram lane.
+                        # Select only the strongest currently accelerating Binance USDT
+                        # spot mover. This is observational and does not alter V15.6 decisions.
+                        fast_pump_candidates=[]
                         for r in rows:
                             p1=float(r.get("price_1m",0) or 0)
                             p3=float(r.get("price_3m",0) or 0)
                             p5=float(r.get("price_5m",0) or 0)
                             p10=float(r.get("price_10m",0) or 0)
                             p15=float(r.get("price_15m",0) or 0)
-                            btc_off=bool(r.get("v15_btc_risk_off",False))
-                            if p1<TOP5_PRICE_MIN_1M and p5<TOP5_PRICE_MIN_5M:
+                            vol=float(r.get("volume_ratio",0) or 0)
+                            accel=float(r.get("trade_accel",0) or 0)
+                            buy=float(r.get("buy_pressure",0) or 0)
+                            rs5=float(r.get("v15_relative_strength_5m",0) or 0)
+                            ex=float(r.get("exhaustion_score",0) or 0)
+                            v15=float(r.get("v15_score",0) or 0)
+                            if bool(r.get("v15_btc_risk_off",False)):
                                 continue
-                            momentum=(p1*0.30)+(p3*0.25)+(p5*0.20)+(p10*0.15)+(p15*0.10)
-                            rr=dict(r);rr["_top5_price_score"]=momentum
-                            rr["_top5_price_delta"]=momentum-float(state[r["symbol"]].get("last_top5_price_score",0) or 0)
-                            top5_price_candidates.append(rr)
-                        top5_price_candidates=sorted(
-                            top5_price_candidates,
-                            key=lambda r:(r.get("_top5_price_score",0),r.get("price_5m",0),r.get("price_1m",0)),
+                            if p1<FAST_PUMP_MIN_1M or p5<FAST_PUMP_MIN_5M:
+                                continue
+                            if vol<FAST_PUMP_MIN_VOLUME or accel<FAST_PUMP_MIN_ACCEL:
+                                continue
+                            if buy<FAST_PUMP_MIN_BUY or rs5<FAST_PUMP_MIN_RS5:
+                                continue
+                            if float(r.get("price_10s",0) or 0)<=0 or float(r.get("price_60s",0) or 0)<=0:
+                                continue
+                            if ex>FAST_PUMP_MAX_EXHAUSTION:
+                                continue
+                            fast_score=max(0,min(round(
+                                p1*20.0+p3*8.0+p5*5.0+
+                                max(accel-1.0,0)*10.0+
+                                max(vol-1.0,0)*6.0+
+                                max((buy-0.50)*100.0,0)*0.8+
+                                max(min(rs5,5.0),0)*2.0+
+                                (5.0 if v15>=FAST_PUMP_V15_PREFERENCE else 0.0)
+                            ),100))
+                            if fast_score<FAST_PUMP_MIN_SCORE:
+                                continue
+                            rr=dict(r);rr["_fast_pump_score"]=fast_score
+                            rr["_fast_pump_v15_preferred"]=v15>=FAST_PUMP_V15_PREFERENCE
+                            fast_pump_candidates.append(rr)
+                        fast_pump_candidates=sorted(
+                            fast_pump_candidates,
+                            key=lambda r:(r.get("_fast_pump_score",0),
+                                          int(bool(r.get("_fast_pump_v15_preferred"))),
+                                          r.get("price_1m",0),
+                                          r.get("price_5m",0),
+                                          r.get("trade_accel",0)),
                             reverse=True
-                        )[:TOP5_PRICE_TOP]
-
-                        # Loop-to-loop alerting: emit the current Top-5 once per
-                        # completed scanner loop. No global wall-clock cooldown and
-                        # no "changed ranking" gate; each loop is a fresh snapshot.
-                        for rank,r in enumerate(top5_price_candidates,1):
-                            old=state[r["symbol"]]
-                            old["last_top5_price_rank"]=rank
-                            old["last_top5_price_score"]=float(r.get("_top5_price_score",0) or 0)
-
-                        if top5_price_candidates:
-                            lines=["V15.6 TOP5-PRICE | Fastest short-term Binance USDT spot movers"]
-                            for rank,r in enumerate(top5_price_candidates,1):
-                                lines.append(
-                                    f"#{rank} {r['symbol']} | Price {r.get('price',0)} | "
-                                    f"1m {r.get('price_1m',0):+.2f}% | 3m {r.get('price_3m',0):+.2f}% | "
-                                    f"5m {r.get('price_5m',0):+.2f}% | 10m {r.get('price_10m',0):+.2f}% | "
-                                    f"15m {r.get('price_15m',0):+.2f}% | 30m {r.get('price_30m',0):+.2f}% | "
-                                    f"Vol {r.get('volume_ratio',0):.2f}x | Trade accel {r.get('trade_accel',0):.2f}x | "
-                                    f"Buy {r.get('buy_pressure',0)*100:.1f}% | RS5 {r.get('v15_relative_strength_5m',0):+.2f}% | "
-                                    f"V15 {r.get('v15_score',0):.0f}/100 | Stage {r.get('v15_stage','')} | "
-                                    f"BTC risk-off {'YES' if r.get('v15_btc_risk_off') else 'NO'}"
+                        )
+                        if fast_pump_candidates:
+                            r=fast_pump_candidates[0]
+                            s=r["symbol"];old=state[s];now=time.time()
+                            fp=float(r.get("_fast_pump_score",0) or 0)
+                            prev=float(old.get("last_fast_pump_score",0) or 0)
+                            previous_symbol=str(old.get("last_fast_pump_symbol","") or "")
+                            crossed=prev<FAST_PUMP_MIN_SCORE
+                            improved=(fp-prev)>=5
+                            new_leader=previous_symbol!=s
+                            cooldown_ok=now-float(old.get("last_fast_pump_alert",0) or 0)>=FAST_PUMP_ALERT_COOLDOWN
+                            if cooldown_ok and (crossed or improved or new_leader):
+                                await telegram(
+                                    f"V15.6 FASTEST-PUMP | {s} | Fast Pump Score {fp:.0f}/100 | Price: {r.get('price',0)} | "
+                                    f"1m: {r.get('price_1m',0):+.2f}% | 3m: {r.get('price_3m',0):+.2f}% | "
+                                    f"5m: {r.get('price_5m',0):+.2f}% | 10m: {r.get('price_10m',0):+.2f}% | "
+                                    f"15m: {r.get('price_15m',0):+.2f}% | Volume: {r.get('volume_ratio',0):.2f}x | "
+                                    f"Trade accel: {r.get('trade_accel',0):.2f}x | Buy pressure: {r.get('buy_pressure',0)*100:.1f}% | "
+                                    f"RS5: {r.get('v15_relative_strength_5m',0):+.2f}% | V15: {r.get('v15_score',0):.0f}/100 | "
+                                    f"Stage: {r.get('v15_stage','')} | Exhaustion: {r.get('exhaustion_score',0):.0f}"
                                 )
-                            lines.append("Top-5 price momentum only — not a BUY signal.")
-                            await telegram("\n".join(lines))
-
-                        # V15.6-only Telegram lane.
+                                old["last_fast_pump_alert"]=now
+                                old["last_fast_pump_symbol"]=s
+                            old["last_fast_pump_score"]=fp
+                                                # V15.6-only Telegram lane.
                         # Telegram has exactly two V15.6 alert levels:
                         # 1) EARLY-IGNITION: the V15.6 early trigger.
                         # 2) CONFIRMED-IGNITION: the V15.6 persistence-confirmed signal.
