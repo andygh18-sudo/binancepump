@@ -5,6 +5,7 @@ from .orderbook import LocalOrderBook
 from .tradingview import fetch_tradingview_signals
 from .history_store import append_scan_history, append_microstructure_history
 from .v154 import evaluate as v154_evaluate
+from .v156 import evaluate as v156_evaluate
 from .v156_outcomes import OutcomeEngine
 
 load_dotenv()
@@ -1104,6 +1105,7 @@ def score(s):
     alert_tier="HIGH PRIORITY" if hs>=80 else "EARLY ACTION" if hs>=70 else "PRE-PUMP WATCH" if hs>=62 else "BELOW WATCH"
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
+    v156, v156_event = v156_evaluate({"symbol":s,"price":x["price"],"price_10s":p10,"price_60s":p60,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"relative_strength_5m":eps.get("relative_strength_5m",0),"v15_score":v15.get("v15_score",0),"v15_opportunity_score":v15.get("v15_opportunity_score",0),"v15_confirmation_score":v15.get("v15_confirmation_score",0),"accumulation_score":ac.get("accumulation_score",0),"tv_bullish_timeframes":tv_bull_tf,"v15_reignition_bridge_score":reignition_bridge.get("v15_reignition_bridge_score",0),"v15_reignition_bridge_trigger":reignition_bridge.get("v15_reignition_bridge_trigger",False),"exhaustion_score":(exhaustion or {}).get("exhaustion_score",0),"spread_bps":ob["spread_bps"],"v15_btc_risk_off":v15.get("v15_btc_risk_off",False)},state[s].setdefault("v156",{}),time.time())
     raw=min(max(p10,0)*10,20)+min(max(vr-1,0)*14,28)+min(max(acc-1,0)*12,18)
     raw+=max(min((b10-.5)*50,12),-12)+max(min(imb*30,12),-12)
     sc=max(0,min(100,round(raw)))
@@ -1114,7 +1116,7 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,**pump_momentum,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition","v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**reignition_bridge,**buy_quality,**buy_decision,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
+    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,**pump_momentum,"price":x["price"],"score":sc,"stage":stage,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition",**v156,"v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**reignition_bridge,**buy_quality,**buy_decision,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
 
 outcomes=OutcomeEngine()
 
@@ -1131,6 +1133,12 @@ def apply_v154(rows):
     outcomes.observe(rows)
     outcomes.write_summary()
     return events
+
+def persist_v156_event(event):
+    if not event:return
+    os.makedirs("data",exist_ok=True)
+    with open("data/v156_events.jsonl","a",encoding="utf-8") as f:
+        f.write(json.dumps(event,separators=(",",":"))+"\n")
 
 def persist_v154_events(events):
     if not events:return
@@ -1518,6 +1526,9 @@ async def main():
             rows=[r for s in symbols if (r:=score(s))]
             v154_events=apply_v154(rows)
             persist_v154_events(v154_events)
+            for rr in rows:
+                if rr.get("v156_alert") and rr.get("v156_event_id"):
+                    persist_v156_event({"event":"TRIGGER","version":"15.6","event_id":rr.get("v156_event_id"),"symbol":rr.get("symbol"),"ts":time.time(),"stage":rr.get("v156_stage"),"sweet_score":rr.get("v156_sweet_score"),"price":rr.get("price")})
             rows.sort(key=lambda z:z["score"],reverse=True)
             with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
 
