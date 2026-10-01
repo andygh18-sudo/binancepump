@@ -2,7 +2,7 @@ name: Binance Pump Scanner V15.6 Live
 
 on:
   schedule:
-    - cron: "2,12,22,32,42,52 * * * *"
+    - cron: "2,32 * * * *"
   push:
     paths:
       - "scanner/worker.py"
@@ -134,6 +134,16 @@ jobs:
         run: python scripts/compact_v15_2_history.py
       - name: Compact V15.1 ignition history
         run: python scripts/compact_ignition_history.py
+      - name: Start next V15.6 cycle
+        if: ${{ success() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          echo "Dispatching next V15.6 monitoring cycle..."
+          gh workflow run .github/workflows/binance_pump_v15.yml --ref main
+          echo "Next V15.6 cycle dispatched."
+
       - name: Publish V15.6 scan data
         run: |
           set -e
