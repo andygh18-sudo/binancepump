@@ -1197,46 +1197,49 @@ async def main():
                         rows=[r for s in symbols if (r:=score(s))]
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
                         # V15.6-only Telegram lane.
+                        # Telegram has exactly two V15.6 alert levels:
+                        # 1) EARLY-IGNITION: the V15.6 early trigger.
+                        # 2) CONFIRMED-IGNITION: the V15.6 persistence-confirmed signal.
+                        # FAST-IGNITION and SIGNATURE are deliberately excluded from
+                        # Telegram to prevent duplicate/redundant early alerts.
                         v156_candidates=[]
                         for r in rows:
                             if bool(r.get("v15_btc_risk_off",False)):
                                 continue
                             buy=bool(r.get("v156_buy_alert",False))
-                            fast=bool(r.get("v156_fast_alert",False))
-                            sig=bool(r.get("v156_signature_alert",False))
-                            if not (buy or fast or sig):
+                            early=bool(r.get("v156_alert",False)) and not buy
+                            if not (buy or early):
                                 continue
-                            rr=dict(r);rr["_v156_buy"]=buy;rr["_v156_fast"]=fast;rr["_v156_sig"]=sig
+                            rr=dict(r);rr["_v156_buy"]=buy;rr["_v156_early"]=early
                             v156_candidates.append(rr)
                         v156_candidates=sorted(
                             v156_candidates,
                             key=lambda r:(int(bool(r.get("_v156_buy"))),
-                                          int(bool(r.get("_v156_fast"))),
+                                          int(bool(r.get("_v156_early"))),
                                           r.get("v156_buy_score",0),
-                                          r.get("v156_fast_score",0),
-                                          r.get("v156_signature_score",0),
-                                          r.get("v154_score",0)),
+                                          r.get("v156_sweet_score",0)),
                             reverse=True
                         )[:TOP_ALERTS]
                         for r in v156_candidates:
                             s=r["symbol"];old=state[s];now=time.time()
-                            mode="BUY-SIGNAL" if r.get("_v156_buy") else ("FAST-IGNITION" if r.get("_v156_fast") else "SIGNATURE")
-                            stage=str(r.get("v155_stage") or r.get("v154_stage") or "WATCH")
-                            alert_score=(float(r.get("v156_buy_score",0) or 0) if r.get("_v156_buy")
-                                         else float(r.get("v156_fast_score",0) or 0) if r.get("_v156_fast")
-                                         else float(r.get("v156_signature_score",0) or 0))
+                            mode="CONFIRMED-IGNITION" if r.get("_v156_buy") else "EARLY-IGNITION"
+                            stage=str(r.get("v156_stage") or "WATCH")
+                            alert_score=(float(r.get("v156_buy_score",0) or 0)
+                                         if r.get("_v156_buy")
+                                         else float(r.get("v156_sweet_score",0) or 0))
                             previous=float(old.get("last_v156_telegram_score",0) or 0)
                             previous_mode=str(old.get("last_v156_telegram_mode","") or "")
                             changed=(mode!=previous_mode or alert_score-previous>=5)
                             if changed and now-float(old.get("last_v156_telegram_alert",0) or 0)>=float(os.getenv("V156_TELEGRAM_COOLDOWN","180")):
+                                reason=(r.get("v156_buy_reason","") if r.get("_v156_buy")
+                                        else r.get("v156_fast_reason","") or "EARLY_IGNITION")
                                 await telegram(
                                     f"V15.6 {mode} | {s} | {stage} | Score {alert_score:.0f}/100 | Price: {r.get('price',0)} | "
                                     f"60s: {r.get('price_60s',0):+.2f}% | Vol: {r.get('volume_ratio',0):.2f}x | "
                                     f"Trade accel: {r.get('trade_accel',0):.2f}x | Buy: {r.get('buy_pressure',0)*100:.1f}% | "
                                     f"RS 5m: {r.get('v15_relative_strength_5m',0):+.2f}% | RS 15m: {r.get('v15_relative_strength_15m',0):+.2f}% | "
-                                    f"V15: {r.get('v15_score',r.get('v154_score',0)):.0f}/100 | "
-                                    f"BUY SCORE: {r.get('v156_buy_score',0):.0f} | Signature: {r.get('v156_signature_score',0):.0f} | "
-                                    f"Drivers: {r.get('v156_buy_reason','') or r.get('v156_fast_reason','') or r.get('v156_signature_signals','')}"
+                                    f"V15: {r.get('v15_score',0):.0f}/100 | BUY SCORE: {r.get('v156_buy_score',0):.0f} | "
+                                    f"Drivers: {reason}"
                                 )
                                 old["last_v156_telegram_alert"]=now
                             old["last_v156_telegram_score"]=alert_score
