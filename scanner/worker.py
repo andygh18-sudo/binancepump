@@ -1602,7 +1602,53 @@ async def main():
                             old=state[r["symbol"]]
                             old["last_buy_quality"]=float(r.get("buy_setup_quality",0) or 0)
                             old["last_buy_decision"]=str(r.get("buy_decision","") or "")
-                        # V15.6 post-BUY deterioration monitor. This is separate from\n                        # the BUY signal and Fastest-Pump lane. Telegram fires only after\n                        # deterioration persists across consecutive observations.\n                        for r in rows:\n                            s=r["symbol"];old=state[s];now=time.time()\n                            confirmed=bool(r.get("v156_buy_alert",False)) and not bool(r.get("v15_btc_risk_off",False))\n                            if confirmed and not bool(old.get("v156_postbuy_active",False)):\n                                old["v156_postbuy_active"]=True;old["v156_postbuy_started"]=now\n                                old["v156_postbuy_price"]=float(r.get("price",0) or 0)\n                                old["v156_postbuy_confirmation"]=float(r.get("v15_confirmation_score",r.get("v156_buy_score",0)) or 0)\n                                old["v156_postbuy_observations"]=0;old["v156_postbuy_bad_streak"]=0\n                                old["v156_postbuy_last_alert"]=0.0;old["v156_postbuy_state"]="CONFIRMED_BUY"\n                                continue\n                            if not bool(old.get("v156_postbuy_active",False)): continue\n                            if now-float(old.get("v156_postbuy_started",0) or 0)>V156_POSTBUY_WINDOW_SECONDS:\n                                old["v156_postbuy_active"]=False;old["v156_postbuy_state"]="CLOSED";continue\n                            p10=float(r.get("price_10s",0) or 0);p60=float(r.get("price_60s",0) or 0)\n                            buy=float(r.get("buy_pressure",0) or 0);accel=float(r.get("trade_accel",0) or 0)\n                            vol=float(r.get("volume_ratio",0) or 0);rs5=float(r.get("v15_relative_strength_5m",0) or 0)\n                            conf=float(r.get("v15_confirmation_score",0) or 0);ex=float(r.get("exhaustion_score",0) or 0)\n                            base_conf=float(old.get("v156_postbuy_confirmation",0) or 0)\n                            conditions=[p10<=0,p60<=0,buy<V156_POSTBUY_MIN_BUY,accel<V156_POSTBUY_MIN_ACCEL,\n                                        vol<V156_POSTBUY_MIN_VOLUME,rs5<V156_POSTBUY_MAX_RS5,\n                                        base_conf-conf>=V156_POSTBUY_CONFIRM_DROP,\n                                        ex>=V156_POSTBUY_MAX_EXHAUSTION and (buy<V156_POSTBUY_MIN_BUY or p60<=0)]\n                            severe=sum(bool(x) for x in conditions)\n                            old["v156_postbuy_observations"]=int(old.get("v156_postbuy_observations",0))+1\n                            confirmed_deterioration=severe>=3 or (severe>=2 and p10<0 and p60<0)\n                            if confirmed_deterioration: old["v156_postbuy_bad_streak"]=int(old.get("v156_postbuy_bad_streak",0))+1\n                            else: old["v156_postbuy_bad_streak"]=0\n                            if (old.get("v156_postbuy_bad_streak",0)>=V156_POSTBUY_CONFIRM_OBS and\n                                old.get("v156_postbuy_state")!="CONFIRMED_DETERIORATION"):\n                                old["v156_postbuy_state"]="CONFIRMED_DETERIORATION";old["v156_postbuy_last_alert"]=now\n                                await telegram(\n                                    f"🔴 V15.6 CONFIRMED DETERIORATION | {s} | BUY setup degrading\\n"\n                                    f"Price: {r.get('price',0)} | 10s: {p10:+.2f}% | 60s: {p60:+.2f}%\\n"\n                                    f"Volume: {vol:.2f}x | Trade accel: {accel:.2f}x | Buy pressure: {buy*100:.1f}%\\n"\n                                    f"RS 5m: {rs5:+.2f}% | V15 confirmation: {conf:.0f}/100 (from {base_conf:.0f}) | Exhaustion: {ex:.0f}/100\\n"\n                                    f"Deterioration conditions: {severe}/8 | Confirmed after {old.get('v156_postbuy_bad_streak',0)} consecutive observations\\n"\n                                    "⚠️ Post-BUY monitoring alert — persistent deterioration detected."\n                                )\n                        exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
+                        # V15.6 post-BUY deterioration monitor. This is separate from
+                        # the BUY signal and Fastest-Pump lane. Telegram fires only after
+                        # deterioration persists across consecutive observations.
+                        for r in rows:
+                            s=r["symbol"];old=state[s];now=time.time()
+                            confirmed=bool(r.get("v156_buy_alert",False)) and not bool(r.get("v15_btc_risk_off",False))
+                            if confirmed and not bool(old.get("v156_postbuy_active",False)):
+                                old["v156_postbuy_active"]=True;old["v156_postbuy_started"]=now
+                                old["v156_postbuy_price"]=float(r.get("price",0) or 0)
+                                old["v156_postbuy_confirmation"]=float(r.get("v15_confirmation_score",r.get("v156_buy_score",0)) or 0)
+                                old["v156_postbuy_observations"]=0;old["v156_postbuy_bad_streak"]=0
+                                old["v156_postbuy_last_alert"]=0.0;old["v156_postbuy_state"]="CONFIRMED_BUY"
+                                continue
+                            if not bool(old.get("v156_postbuy_active",False)): continue
+                            if now-float(old.get("v156_postbuy_started",0) or 0)>V156_POSTBUY_WINDOW_SECONDS:
+                                old["v156_postbuy_active"]=False;old["v156_postbuy_state"]="CLOSED";continue
+                            p10=float(r.get("price_10s",0) or 0);p60=float(r.get("price_60s",0) or 0)
+                            buy=float(r.get("buy_pressure",0) or 0);accel=float(r.get("trade_accel",0) or 0)
+                            vol=float(r.get("volume_ratio",0) or 0);rs5=float(r.get("v15_relative_strength_5m",0) or 0)
+                            conf=float(r.get("v15_confirmation_score",0) or 0);ex=float(r.get("exhaustion_score",0) or 0)
+                            base_conf=float(old.get("v156_postbuy_confirmation",0) or 0)
+                            conditions=[p10<=0,p60<=0,buy<V156_POSTBUY_MIN_BUY,accel<V156_POSTBUY_MIN_ACCEL,
+                                        vol<V156_POSTBUY_MIN_VOLUME,rs5<V156_POSTBUY_MAX_RS5,
+                                        base_conf-conf>=V156_POSTBUY_CONFIRM_DROP,
+                                        ex>=V156_POSTBUY_MAX_EXHAUSTION and (buy<V156_POSTBUY_MIN_BUY or p60<=0)]
+                            severe=sum(bool(x) for x in conditions)
+                            old["v156_postbuy_observations"]=int(old.get("v156_postbuy_observations",0))+1
+                            confirmed_deterioration=severe>=3 or (severe>=2 and p10<0 and p60<0)
+                            if confirmed_deterioration: old["v156_postbuy_bad_streak"]=int(old.get("v156_postbuy_bad_streak",0))+1
+                            else: old["v156_postbuy_bad_streak"]=0
+                            if (old.get("v156_postbuy_bad_streak",0)>=V156_POSTBUY_CONFIRM_OBS and
+                                old.get("v156_postbuy_state")!="CONFIRMED_DETERIORATION"):
+                                old["v156_postbuy_state"]="CONFIRMED_DETERIORATION";old["v156_postbuy_last_alert"]=now
+                                await telegram(
+                                    f"🔴 V15.6 CONFIRMED DETERIORATION | {s} | BUY setup degrading\
+"
+                                    f"Price: {r.get('price',0)} | 10s: {p10:+.2f}% | 60s: {p60:+.2f}%\
+"
+                                    f"Volume: {vol:.2f}x | Trade accel: {accel:.2f}x | Buy pressure: {buy*100:.1f}%\
+"
+                                    f"RS 5m: {rs5:+.2f}% | V15 confirmation: {conf:.0f}/100 (from {base_conf:.0f}) | Exhaustion: {ex:.0f}/100\
+"
+                                    f"Deterioration conditions: {severe}/8 | Confirmed after {old.get('v156_postbuy_bad_streak',0)} consecutive observations\
+"
+                                    "⚠️ Post-BUY monitoring alert — persistent deterioration detected."
+                                )
+                        exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
                         exhaustion_candidates=sorted(exhaustion_candidates,key=lambda r:(r.get("exhaustion_score",0),r.get("v15_score",0)),reverse=True)[:TOP_ALERTS]
                         for r in exhaustion_candidates:
                             s=r["symbol"];old=state[s];now=time.time()
