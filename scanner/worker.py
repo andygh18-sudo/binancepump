@@ -1345,7 +1345,7 @@ async def main():
                             fp_state["leader_symbol"]=leader_symbol
                             fp_state["leader_score"]=leader_score
 
-                         V15.6-only Telegram lane.
+                        # V15.6-only Telegram lane.
                         # Telegram has exactly two V15.6 alert levels:
                         # 1) EARLY-IGNITION: the V15.6 early trigger.
                         # 2) CONFIRMED-IGNITION: the V15.6 persistence-confirmed signal.
