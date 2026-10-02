@@ -1149,8 +1149,13 @@ def persist_v154_events(events):
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
     msg=str(msg)
-    # Only V15.6 messages may reach Telegram in production.
-    if not msg.startswith("V15.6 "): return
+    # Production Telegram policy:
+    # - Normal V15.6 lane: only CONFIRMED-IGNITION / BUY is allowed.
+    # - Dedicated FASTEST-PUMP lane: explicitly allowed as its own independent alert lane.
+    # This keeps legacy V15/early alerts disabled without blocking Fastest-Pump.
+    allowed_confirmed=msg.startswith("V15.6 CONFIRMED-IGNITION / BUY")
+    allowed_fastest=msg.startswith("🚀 V15.6 FASTEST-PUMP")
+    if not (allowed_confirmed or allowed_fastest): return
     if not token or not chat:return
     # Normalize all scanner alerts to one Telegram line.
     # This prevents literal \\n / \\ artifacts from reaching Telegram.
