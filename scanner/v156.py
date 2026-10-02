@@ -26,6 +26,21 @@ CFG = {
     "early_opp": float(os.getenv("V156_EARLY_OPP", "60")),
     "early_conf": float(os.getenv("V156_EARLY_CONF", "65")),
     "early_acc": float(os.getenv("V156_EARLY_ACC", "65")),
+    # Path B: delayed-price-confirmation / re-ignition route.
+    # Stricter price/structure confirmation permits buy pressure >=60%.
+    "path_b_p10": float(os.getenv("V156_PATH_B_P10", "0.30")),
+    "path_b_p60": float(os.getenv("V156_PATH_B_P60", "0.45")),
+    "path_b_volume": float(os.getenv("V156_PATH_B_VOLUME", "2.25")),
+    "path_b_accel": float(os.getenv("V156_PATH_B_ACCEL", "2.50")),
+    "path_b_buy": float(os.getenv("V156_PATH_B_BUY", "0.60")),
+    "path_b_v15": float(os.getenv("V156_PATH_B_V15", "75")),
+    "path_b_opp": float(os.getenv("V156_PATH_B_OPP", "65")),
+    "path_b_conf": float(os.getenv("V156_PATH_B_CONF", "75")),
+    "path_b_acc": float(os.getenv("V156_PATH_B_ACC", "70")),
+    "path_b_rs5": float(os.getenv("V156_PATH_B_RS5", "0.10")),
+    "path_b_tv_tf": int(os.getenv("V156_PATH_B_TV_TF", "4")),
+    "path_b_bridge": float(os.getenv("V156_PATH_B_BRIDGE", "15")),
+    "path_b_exhaustion": float(os.getenv("V156_PATH_B_EXHAUSTION", "30")),
     "persist_min": float(os.getenv("V156_PERSIST_MIN_SECONDS", "10")),
     "persist_max": float(os.getenv("V156_PERSIST_MAX_SECONDS", "20")),
     "persist_p10": float(os.getenv("V156_PERSIST_P10", "0.00")),
@@ -104,10 +119,25 @@ def evaluate(row, memory, now=None):
         acc >= CFG["early_acc"] and
         confirmation_count >= 2
     )
-    early = (not hard_veto and
-             p10 >= CFG["early_p10"] and p60 >= CFG["early_p60"] and
-             vol >= CFG["early_volume"] and accel >= CFG["early_accel"] and
-             buy >= CFG["early_buy"] and rs5 >= CFG["early_rs5"] and structure)
+    path_a = (not hard_veto and
+              p10 >= CFG["early_p10"] and p60 >= CFG["early_p60"] and
+              vol >= CFG["early_volume"] and accel >= CFG["early_accel"] and
+              buy >= CFG["early_buy"] and rs5 >= CFG["early_rs5"] and structure)
+
+    # Path B is an alternative to Path A, not a relaxation of it. It is designed
+    # for strong price-confirmed re-ignition where buy pressure is slightly below
+    # the normal 65% gate. Every Path B condition is required.
+    path_b = (not hard_veto and
+              p10 >= CFG["path_b_p10"] and p60 >= CFG["path_b_p60"] and
+              vol >= CFG["path_b_volume"] and accel >= CFG["path_b_accel"] and
+              buy >= CFG["path_b_buy"] and v15 >= CFG["path_b_v15"] and
+              opp >= CFG["path_b_opp"] and conf >= CFG["path_b_conf"] and
+              acc >= CFG["path_b_acc"] and rs5 >= CFG["path_b_rs5"] and
+              tvtf >= CFG["path_b_tv_tf"] and
+              bridge_trigger and bridge >= CFG["path_b_bridge"] and
+              exhaustion <= CFG["path_b_exhaustion"])
+
+    early = path_a or path_b
 
     # Explicit price/participation divergence veto: a positive price move
     # without fresh participation/acceleration is not an early pump.
@@ -115,6 +145,8 @@ def evaluate(row, memory, now=None):
         p60 > 0 and vol < 1.25 and accel < 1.50
     )
     if participation_divergence:
+        path_a = False
+        path_b = False
         early = False
 
     sweet = _sweet_score(p10,p60,vol,accel,buy,v15,opp,conf,acc,rs5,bridge,tvtf)
@@ -130,9 +162,10 @@ def evaluate(row, memory, now=None):
             memory.update({"status":"PENDING","stage":"EARLY IGNITION","event_id":eid,
                 "trigger_ts":now,"last_alert":now,"trigger_price":_f(row,"price"),
                 "trigger_p10":p10,"trigger_p60":p60,"trigger_volume":vol,"trigger_accel":accel,
-                "trigger_buy":buy,"trigger_rs5":rs5,"trigger_v15":v15,"trigger_sweet_score":sweet})
+                "trigger_buy":buy,"trigger_rs5":rs5,"trigger_v15":v15,"trigger_sweet_score":sweet,
+                "trigger_path":"B" if path_b else "A"})
             event={"event":"TRIGGER","version":V156_VERSION,"event_id":eid,"symbol":symbol,"ts":now,
-                   "stage":"EARLY IGNITION","alert":True,"sweet_score":sweet,"price":_f(row,"price"),
+                   "stage":"EARLY IGNITION","alert":True,"path":"B" if path_b else "A","sweet_score":sweet,"price":_f(row,"price"),
                    "p10":p10,"p60":p60,"volume":vol,"accel":accel,"buy":buy,"rs5":rs5,"v15":v15}
             status="PENDING"; age=0
 
@@ -174,17 +207,19 @@ def evaluate(row, memory, now=None):
     buy_signal = status == "CONFIRMED_IGNITION"
     return {
         "v156_version":V156_VERSION,"v156_watch":watch,"v156_early_ignition":early,
+        "v156_path_a":path_a,"v156_path_b":path_b,"v156_path":("B" if path_b else "A" if path_a else ""),
         "v156_stage":stage,"v156_status":status,"v156_sweet_score":sweet,
         "v156_persistence_seconds":round(age,1),"v156_persistence_failures":"|".join(memory.get("failures",[])),
         "v156_buy_signal":buy_signal,"v156_alert":bool(event and event.get("event")=="TRIGGER"),
         "v156_event_id":memory.get("event_id",""),"v156_trigger_p10":_f(memory,"trigger_p10"),
         "v156_trigger_p60":_f(memory,"trigger_p60"),"v156_trigger_volume":_f(memory,"trigger_volume"),
         "v156_trigger_accel":_f(memory,"trigger_accel"),"v156_trigger_buy":_f(memory,"trigger_buy"),
-        "v156_trigger_v15":_f(memory,"trigger_v15"),"v156_bridge_bonus":5 if bridge_trigger and bridge>=15 else 3 if bridge>=15 else 0,
+        "v156_trigger_v15":_f(memory,"trigger_v15"),"v156_trigger_path":str(memory.get("trigger_path","")),"v156_bridge_bonus":5 if bridge_trigger and bridge>=15 else 3 if bridge>=15 else 0,
         "v156_fast_score":sweet,"v156_fast_ignition":early,"v156_fast_alert":bool(event and event.get("event")=="TRIGGER"),
         "v156_fast_reason":"SWEET_SPOT" if early else "WATCH" if watch else "",
         "v156_signature_score":sweet,"v156_signature_alert":False,"v156_signature_signals":"SWEET_SPOT" if early else "",
         "v156_buy_alert":buy_signal,"v156_buy_score":sweet,
+        "v156_path_b_reason":"PATH_B_STRONG_PRICE_STRUCTURAL_CONFIRMATION" if path_b else "",
         "v156_buy_reason":"CONFIRMED_IGNITION" if buy_signal else "|".join([
             x for x,ok in [("P10",p10>=.15),("P60",p60>=.30),("VOL",vol>=2.0),("ACCEL",accel>=1.75),
                            ("BUY",buy>=.65),("V15",v15>=65),("OPP",opp>=60),("CONF",conf>=65),
