@@ -1346,44 +1346,36 @@ async def main():
                             fp_state["leader_score"]=leader_score
 
                         # V15.6-only Telegram lane.
-                        # Telegram has exactly two V15.6 alert levels:
-                        # 1) EARLY-IGNITION: the V15.6 early trigger.
-                        # 2) CONFIRMED-IGNITION: the V15.6 persistence-confirmed signal.
-                        # FAST-IGNITION and SIGNATURE are deliberately excluded from
-                        # Telegram to prevent duplicate/redundant early alerts.
+                        # Telegram sends ONLY the final V15.6 CONFIRMED-IGNITION / BUY signal.
+                        # EARLY-IGNITION, FAST-IGNITION, and SIGNATURE are intentionally
+                        # excluded here; they remain internal scanner states/signals.
                         v156_candidates=[]
                         for r in rows:
                             if bool(r.get("v15_btc_risk_off",False)):
                                 continue
-                            buy=bool(r.get("v156_buy_alert",False))
-                            early=bool(r.get("v156_alert",False)) and not buy
-                            if not (buy or early):
+                            if not bool(r.get("v156_buy_alert",False)):
                                 continue
-                            rr=dict(r);rr["_v156_buy"]=buy;rr["_v156_early"]=early
+                            rr=dict(r)
+                            rr["_v156_buy"]=True
                             v156_candidates.append(rr)
                         v156_candidates=sorted(
                             v156_candidates,
-                            key=lambda r:(int(bool(r.get("_v156_buy"))),
-                                          int(bool(r.get("_v156_early"))),
-                                          r.get("v156_buy_score",0),
+                            key=lambda r:(r.get("v156_buy_score",0),
                                           r.get("v156_sweet_score",0)),
                             reverse=True
                         )[:TOP_ALERTS]
                         for r in v156_candidates:
                             s=r["symbol"];old=state[s];now=time.time()
-                            mode="CONFIRMED-IGNITION" if r.get("_v156_buy") else "EARLY-IGNITION"
-                            stage=str(r.get("v156_stage") or "WATCH")
-                            alert_score=(float(r.get("v156_buy_score",0) or 0)
-                                         if r.get("_v156_buy")
-                                         else float(r.get("v156_sweet_score",0) or 0))
+                            mode="CONFIRMED-IGNITION"
+                            stage=str(r.get("v156_stage") or "CONFIRMED")
+                            alert_score=float(r.get("v156_buy_score",0) or 0)
                             previous=float(old.get("last_v156_telegram_score",0) or 0)
                             previous_mode=str(old.get("last_v156_telegram_mode","") or "")
                             changed=(mode!=previous_mode or alert_score-previous>=5)
                             if changed and now-float(old.get("last_v156_telegram_alert",0) or 0)>=float(os.getenv("V156_TELEGRAM_COOLDOWN","180")):
-                                reason=(r.get("v156_buy_reason","") if r.get("_v156_buy")
-                                        else r.get("v156_fast_reason","") or "EARLY_IGNITION")
+                                reason=r.get("v156_buy_reason","CONFIRMED_IGNITION_BUY")
                                 await telegram(
-                                    f"V15.6 {mode} | {s} | {stage} | Score {alert_score:.0f}/100 | Price: {r.get('price',0)} | "
+                                    f"V15.6 {mode} / BUY | {s} | {stage} | Score {alert_score:.0f}/100 | Price: {r.get('price',0)} | "
                                     f"60s: {r.get('price_60s',0):+.2f}% | Vol: {r.get('volume_ratio',0):.2f}x | "
                                     f"Trade accel: {r.get('trade_accel',0):.2f}x | Buy: {r.get('buy_pressure',0)*100:.1f}% | "
                                     f"RS 5m: {r.get('v15_relative_strength_5m',0):+.2f}% | RS 15m: {r.get('v15_relative_strength_15m',0):+.2f}% | "
