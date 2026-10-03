@@ -1,6 +1,48 @@
 import math, statistics, time
 from collections import deque
 
+
+def _robust_z(value, history):
+    vals=[float(x) for x in history if x is not None and math.isfinite(float(x))]
+    if len(vals)<8:return 0.0
+    med=statistics.median(vals)
+    mad=statistics.median([abs(x-med) for x in vals])
+    scale=max(1.4826*mad,abs(med)*0.05,1e-9)
+    return max(-8.0,min(8.0,(float(value)-med)/scale))
+
+def _clip01(x): return max(0.0,min(1.0,float(x)))
+
+def adaptive_micro_features(state,books,symbol):
+    """Per-symbol adaptive anomaly features; advisory only, never a BUY gate."""
+    x=state[symbol];now=time.time();trades=[z for z in x.get("trades",[]) if z[0]>=now-10]
+    n=len(trades);flow=sum(float(z[2]) for z in trades);buy=sum(float(z[2]) for z in trades if z[3])
+    buy_ratio=buy/flow if flow else 0.5;trade_rate=n/10.0;volume_rate=flow/10.0;avg_trade=flow/n if n else 0.0
+    cvd=(2.0*buy_ratio-1.0) if flow else 0.0
+    px10=((trades[-1][1]/trades[0][1])-1.0)*100.0 if len(trades)>1 and trades[0][1] else 0.0
+    px_per_trade=abs(px10)/max(n,1)
+    hist=x.setdefault("v158_adaptive_history",deque(maxlen=60));prior=list(hist)
+    tz=_robust_z(trade_rate,[p.get("trade_rate",0) for p in prior]);vz=_robust_z(volume_rate,[p.get("volume_rate",0) for p in prior])
+    sz=_robust_z(avg_trade,[p.get("avg_trade",0) for p in prior]);cz=_robust_z(cvd,[p.get("cvd",0) for p in prior]);piz=_robust_z(px_per_trade,[p.get("px_per_trade",0) for p in prior])
+    buy_delta=buy_ratio-(statistics.median([p.get("buy_ratio",0.5) for p in prior]) if prior else 0.5)
+    intensity=max(-8.0,min(8.0,vz-tz));positive=sum(1 for p in prior[-6:] if p.get("trade_z",0)>1.0 or p.get("volume_z",0)>1.0)
+    regime=max(0.0,min(100.0,_clip01(max(tz,0)/3)*35+_clip01(max(vz,0)/3)*25+_clip01(max(cz,0)/3)*20+_clip01(max(intensity,0)/3)*10+_clip01(positive/4)*10))
+    hist.append({"ts":now,"trade_rate":trade_rate,"volume_rate":volume_rate,"avg_trade":avg_trade,"cvd":cvd,"buy_ratio":buy_ratio,"px_per_trade":px_per_trade,"trade_z":tz,"volume_z":vz})
+    return {"adaptive_trade_rate":round(trade_rate,4),"adaptive_volume_rate":round(volume_rate,4),"adaptive_avg_trade_size":round(avg_trade,4),"adaptive_buy_ratio":round(buy_ratio,4),"adaptive_buy_delta":round(buy_delta,4),"adaptive_trade_z":round(tz,3),"adaptive_volume_z":round(vz,3),"adaptive_trade_size_z":round(sz,3),"adaptive_cvd_z":round(cz,3),"adaptive_intensity_z":round(intensity,3),"adaptive_price_impact_z":round(piz,3),"adaptive_regime_change":round(regime,1),"adaptive_baseline_samples":len(prior)}
+
+def adaptive_book_features(state,books,symbol):
+    """Detect unusual ask-liquidity depletion/book vacuum cheaply from existing depth data."""
+    b=books.get(symbol)
+    if not b or not getattr(b,"ready",False):return {"v158_book_vacuum_score":0.0,"v158_ask_consumption_z":0.0,"v158_price_impact_efficiency":0.0}
+    m=b.metrics(20);now=time.time();x=state[symbol];ask=max(float(m.get("ask_depth",0) or 0),0.0);bid=max(float(m.get("bid_depth",0) or 0),0.0)
+    prev=x.get("v158_book_prev");ask_cons=0.0
+    if prev:ask_cons=max(0.0,(1.0-ask/max(float(prev.get("ask",ask)),1e-9))*100.0)
+    hist=x.setdefault("v158_book_history",deque(maxlen=60));prior=list(hist);az=_robust_z(ask_cons,[p.get("ask_consumption",0) for p in prior]);spread=float(m.get("spread_bps",0) or 0)
+    hist.append({"ts":now,"ask_consumption":ask_cons});x["v158_book_prev"]={"ts":now,"ask":ask,"bid":bid}
+    recent=[z for z in x.get("trades",[]) if z[0]>=now-10];flow=sum(float(z[2]) for z in recent);p10=((recent[-1][1]/recent[0][1])-1.0)*100.0 if len(recent)>1 and recent[0][1] else 0.0
+    impact=abs(p10)/max(flow/100000.0,1e-6) if flow else 0.0
+    vacuum=max(0.0,min(100.0,max(az,0)/3.0*70.0+max(0.0,ask_cons)*1.5))
+    return {"v158_book_vacuum_score":round(vacuum,1),"v158_ask_consumption_z":round(az,3),"v158_price_impact_efficiency":round(impact,6),"v158_ask_consumption":round(ask_cons,2),"v158_spread_bps":round(spread,2)}
+
 class MarketDiscovery:
     """Lightweight all-market spot discovery using Binance !ticker@arr data."""
     def __init__(self, max_promoted=20, min_quote_volume=10000, ttl=180,
