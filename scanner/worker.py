@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from .orderbook import LocalOrderBook
 from .tradingview import fetch_tradingview_signals
 from .v157_learning import persist_v157_observations
-from .v158 import MarketDiscovery,trade_features,liquidity_features,data_quality
+from .v158 import MarketDiscovery,trade_features,liquidity_features,data_quality,adaptive_micro_features,adaptive_book_features
 from .v156 import evaluate as v156_evaluate
 
 load_dotenv()
@@ -18,8 +18,8 @@ LIQUID_SYMBOLS=int(os.getenv("LIQUID_SYMBOLS","80"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"));IGNITION_HISTORY_SAMPLES=int(os.getenv("IGNITION_HISTORY_SAMPLES","60"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"));HISTORY_SAMPLE_INTERVAL=float(os.getenv("HISTORY_SAMPLE_INTERVAL","300"))
 TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));BUY_ALERT_COOLDOWN=float(os.getenv("BUY_ALERT_COOLDOWN","1800"));BUY_ALERT_TOP=int(os.getenv("BUY_ALERT_TOP","3"));BUY_ALERT_MIN_QUALITY=float(os.getenv("BUY_ALERT_MIN_QUALITY","80"));BUY_ALERT_MIN_CONFIRMATION=float(os.getenv("BUY_ALERT_MIN_CONFIRMATION","70"));BUY_ALERT_MIN_OPPORTUNITY=float(os.getenv("BUY_ALERT_MIN_OPPORTUNITY","60"));BUY_ALERT_MIN_TV=float(os.getenv("BUY_ALERT_MIN_TV","70"));BUY_ALERT_MIN_BULL_TF=int(os.getenv("BUY_ALERT_MIN_BULL_TF","4"));BUY_ALERT_MAX_EXHAUSTION=float(os.getenv("BUY_ALERT_MAX_EXHAUSTION","58"));PUMP_MOMENTUM_ALERT_MIN=float(os.getenv("PUMP_MOMENTUM_ALERT_MIN","75"));PUMP_MOMENTUM_ALERT_EXTREME=float(os.getenv("PUMP_MOMENTUM_ALERT_EXTREME","90"));PUMP_MOMENTUM_ALERT_JUMP=float(os.getenv("PUMP_MOMENTUM_ALERT_JUMP","10"));PUMP_MOMENTUM_ALERT_COOLDOWN=float(os.getenv("PUMP_MOMENTUM_ALERT_COOLDOWN","300"));PUMP_MOMENTUM_ALERT_TOP=int(os.getenv("PUMP_MOMENTUM_ALERT_TOP","3"));FAST_PUMP_MIN_1M=float(os.getenv("FAST_PUMP_MIN_1M","0.15"));FAST_PUMP_MIN_5M=float(os.getenv("FAST_PUMP_MIN_5M","0.60"));FAST_PUMP_MIN_VOLUME=float(os.getenv("FAST_PUMP_MIN_VOLUME","2.00"));FAST_PUMP_MIN_ACCEL=float(os.getenv("FAST_PUMP_MIN_ACCEL","1.60"));FAST_PUMP_MIN_BUY=float(os.getenv("FAST_PUMP_MIN_BUY","0.65"));FAST_PUMP_MIN_RS5=float(os.getenv("FAST_PUMP_MIN_RS5","-0.10"));FAST_PUMP_MIN_SCORE=float(os.getenv("FAST_PUMP_MIN_SCORE","72"));FAST_PUMP_MAX_EXHAUSTION=float(os.getenv("FAST_PUMP_MAX_EXHAUSTION","35"));FAST_PUMP_ALERT_COOLDOWN=float(os.getenv("FAST_PUMP_ALERT_COOLDOWN","0"));FAST_PUMP_V15_PREFERENCE=float(os.getenv("FAST_PUMP_V15_PREFERENCE","60"));FAST_PUMP_MIN_ACCUMULATION=float(os.getenv("FAST_PUMP_MIN_ACCUMULATION","60"));FAST_PUMP_MIN_BULL_TF=int(os.getenv("FAST_PUMP_MIN_BULL_TF","2"));FAST_PUMP_LEADER_MARGIN=float(os.getenv("FAST_PUMP_LEADER_MARGIN","5"));FAST_PUMP_TOP_N=int(os.getenv("FAST_PUMP_TOP_N","2"));FAST_PUMP_ROLLING_WINDOW=float(os.getenv("FAST_PUMP_ROLLING_WINDOW","900"));FAST_PUMP_MIN_OBSERVATIONS=int(os.getenv("FAST_PUMP_MIN_OBSERVATIONS","2"));FAST_PUMP_MIN_SPAN_SECONDS=float(os.getenv("FAST_PUMP_MIN_SPAN_SECONDS","10"));FAST_PUMP_REPLACEMENT_MARGIN=float(os.getenv("FAST_PUMP_REPLACEMENT_MARGIN","5"));EARLY_MOMENTUM_MIN_SCORE=float(os.getenv("EARLY_MOMENTUM_MIN_SCORE","55"));EARLY_MOMENTUM_MIN_TRADES=int(os.getenv("EARLY_MOMENTUM_MIN_TRADES","3"));EARLY_MOMENTUM_MIN_BUY=float(os.getenv("EARLY_MOMENTUM_MIN_BUY","0.55"));EARLY_MOMENTUM_MIN_ACCEL=float(os.getenv("EARLY_MOMENTUM_MIN_ACCEL","1.15"));EARLY_MOMENTUM_MAX_SPREAD=float(os.getenv("EARLY_MOMENTUM_MAX_SPREAD","15"));FAST_PUMP_LEADERBOARD_FILE=os.getenv("FAST_PUMP_LEADERBOARD_FILE","data/v157_fastest_pump_leaderboard.json");V156_POSTBUY_WINDOW_SECONDS=float(os.getenv("V156_POSTBUY_WINDOW_SECONDS","3600"));V156_POSTBUY_CONFIRM_OBS=int(os.getenv("V156_POSTBUY_CONFIRM_OBS","2"));V156_POSTBUY_MIN_BUY=float(os.getenv("V156_POSTBUY_MIN_BUY","0.55"));V156_POSTBUY_MIN_ACCEL=float(os.getenv("V156_POSTBUY_MIN_ACCEL","1.25"));V156_POSTBUY_MIN_VOLUME=float(os.getenv("V156_POSTBUY_MIN_VOLUME","1.00"));V156_POSTBUY_MAX_RS5=float(os.getenv("V156_POSTBUY_MAX_RS5","-0.10"));V156_POSTBUY_MAX_EXHAUSTION=float(os.getenv("V156_POSTBUY_MAX_EXHAUSTION","70"));V156_POSTBUY_CONFIRM_DROP=float(os.getenv("V156_POSTBUY_CONFIRM_DROP","20"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"));TRADINGVIEW_ENABLED=os.getenv("TRADINGVIEW_ENABLED","1")=="1";TRADINGVIEW_REFRESH_SECONDS=float(os.getenv("TRADINGVIEW_REFRESH_SECONDS","30"))
-V158_ENABLED=os.getenv("V158_ENABLED","1")=="1";V158_MAX_DYNAMIC=int(os.getenv("V158_MAX_DYNAMIC","20"));V158_MIN_QUOTE_VOLUME=float(os.getenv("V158_MIN_QUOTE_VOLUME","10000"));V158_PROMOTION_TTL=float(os.getenv("V158_PROMOTION_TTL","180"));V158_PROMOTION_SCORE=float(os.getenv("V158_PROMOTION_SCORE","55"))
-symbols=[];books={};tv_cache={};tv_last_refresh=0.0
+V158_ENABLED=os.getenv("V158_ENABLED","1")=="1";V158_MAX_DYNAMIC=int(os.getenv("V158_MAX_DYNAMIC","20"));V158_MIN_QUOTE_VOLUME=float(os.getenv("V158_MIN_QUOTE_VOLUME","10000"));V158_PROMOTION_TTL=float(os.getenv("V158_PROMOTION_TTL","180"));V158_PROMOTION_SCORE=float(os.getenv("V158_PROMOTION_SCORE","55"));V158_XVENUE_ENABLED=os.getenv("V158_XVENUE_ENABLED","1")=="1";V158_XVENUE_INTERVAL=float(os.getenv("V158_XVENUE_INTERVAL","30"))
+symbols=[];books={};tv_cache={};tv_last_refresh=0.0;v158_xvenue_cache={};v158_xvenue_last=0.0
 v158_discovery=MarketDiscovery(max_promoted=V158_MAX_DYNAMIC,min_quote_volume=V158_MIN_QUOTE_VOLUME,ttl=V158_PROMOTION_TTL,min_score=V158_PROMOTION_SCORE);v158_dynamic_tasks={};v158_dynamic_until={};v158_core_symbols=set();v158_promoting=set()
 state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"ignition_window":deque(maxlen=60),"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":"","last_buy_alert":0,"last_buy_decision":"","last_buy_quality":0.0,"last_pump_momentum_alert":0,"last_pump_momentum_score":0.0,"last_pump_momentum_label":"","last_top5_price_alert":0,"last_top5_price_rank":None,"last_top5_price_score":0.0,"last_fast_pump_alert":0,"last_fast_pump_score":0.0,"last_fast_pump_symbol":"","early_momentum_score":0.0,"early_momentum_stage":"MONITOR","early_momentum_last":0.0,"v156_postbuy_active":False,"v156_postbuy_started":0.0,"v156_postbuy_price":0.0,"v156_postbuy_confirmation":0.0,"v156_postbuy_observations":0,"v156_postbuy_bad_streak":0,"v156_postbuy_last_alert":0.0,"v156_postbuy_state":"","reignition_armed_until":0,"reignition_armed_score":0.0,"last_reignition_alert":0,"last_reignition_stage":"","last_reignition_score":0.0})
 
@@ -1132,8 +1132,11 @@ def score(s):
     ob=books[s].metrics(20);imb=ob["imbalance"]
     v158_trades=trade_features(state,s,60)
     v158_liq=liquidity_features(state,books,s)
+    adaptive=adaptive_micro_features(state,books,s)
+    adaptive_book=adaptive_book_features(state,books,s)
     v158_quality=data_quality(state,books,s)
-    v158_score=min(100.0,float(v158_trades.get("whale_score",0))*0.30+float(v158_liq.get("liquidity_breakout_score",0))*0.25+float(v158_liq.get("absorption_score",0))*0.10+float(v158_quality.get("data_quality_score",0))*0.35)
+    v158_adaptive_score=min(100.0,max(0.0,35.0*min(max(adaptive.get("adaptive_trade_z",0),0)/3.0,1)+25.0*min(max(adaptive.get("adaptive_volume_z",0),0)/3.0,1)+20.0*min(max(adaptive.get("adaptive_cvd_z",0),0)/3.0,1)+10.0*min(max(adaptive.get("adaptive_intensity_z",0),0)/3.0,1)+10.0*min(max(adaptive.get("adaptive_regime_change",0)/100.0,0),1)))
+    v158_score=min(100.0,float(v158_trades.get("whale_score",0))*0.25+float(v158_liq.get("liquidity_breakout_score",0))*0.20+float(v158_liq.get("absorption_score",0))*0.10+v158_adaptive_score*0.25+float(adaptive_book.get("v158_book_vacuum_score",0))*0.05+float(v158_quality.get("data_quality_score",0))*0.15)
     v156, v156_event = v156_evaluate({"symbol":s,"price":x["price"],"price_10s":p10,"price_60s":p60,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"relative_strength_5m":eps.get("relative_strength_5m",0),"v15_score":v15.get("v15_score",0),"v15_opportunity_score":v15.get("v15_opportunity_score",0),"v15_confirmation_score":v15.get("v15_confirmation_score",0),"accumulation_score":ac.get("accumulation_score",0),"tv_bullish_timeframes":tv_bull_tf,"v15_reignition_bridge_score":reignition_bridge.get("v15_reignition_bridge_score",0),"v15_reignition_bridge_trigger":reignition_bridge.get("v15_reignition_bridge_trigger",False),"exhaustion_score":(exhaustion or {}).get("exhaustion_score",0),"spread_bps":ob["spread_bps"],"v15_btc_risk_off":v15.get("v15_btc_risk_off",False)},state[s].setdefault("v156",{}),time.time())
     raw=min(max(p10,0)*10,20)+min(max(vr-1,0)*14,28)+min(max(acc-1,0)*12,18)
     raw+=max(min((b10-.5)*50,12),-12)+max(min(imb*30,12),-12)
@@ -1146,7 +1149,7 @@ def score(s):
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
     return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,**pump_momentum,"price":x["price"],"score":sc,"stage":stage,"price_3m":p180,"price_5m":p300,"price_10m":p600,"price_15m":p900,"price_30m":p1800,"price_60m_change":p3600,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,
-            "v158_score":round(v158_score,1),"v158_whale_score":v158_trades.get("whale_score",0),
+            "v158_score":round(v158_score,1),"v158_adaptive_score":round(v158_adaptive_score,1),**adaptive,**adaptive_book,"v158_whale_score":v158_trades.get("whale_score",0),
             "v158_large_trade_count":v158_trades.get("large_trade_count",0),"v158_large_buy_notional":v158_trades.get("large_buy_notional",0),
             "v158_large_sell_notional":v158_trades.get("large_sell_notional",0),"v158_large_trade_imbalance":v158_trades.get("large_trade_imbalance",0),
             "v158_median_trade_notional":v158_trades.get("median_trade_notional",0),"v158_p95_trade_notional":v158_trades.get("p95_trade_notional",0),
@@ -1289,6 +1292,35 @@ async def telegram(msg):
             await s.post(f"https://api.telegram.org/bot{token}/sendMessage",json={"chat_id":chat,"text":msg},timeout=8)
     except Exception:pass
 
+
+async def refresh_v158_cross_exchange(http, market_symbols):
+    """Optional low-cost external confirmation using OKX public spot tickers.
+    It is advisory only and never blocks a Binance signal."""
+    global v158_xvenue_cache, v158_xvenue_last
+    now=time.time()
+    if not V158_XVENUE_ENABLED or now-v158_xvenue_last<V158_XVENUE_INTERVAL:return
+    try:
+        async with http.get("https://www.okx.com/api/v5/market/tickers",params={"instType":"SPOT"},timeout=8) as resp:
+            if resp.status!=200:return
+            payload=await resp.json()
+        data=payload.get("data",[]) if isinstance(payload,dict) else []
+        wanted={str(s).upper() for s in market_symbols}
+        previous=dict(v158_xvenue_cache)
+        current={}
+        for item in data:
+            inst=str(item.get("instId","")).upper()
+            if not inst.endswith("-USDT"):continue
+            symbol=inst.replace("-","")
+            if symbol not in wanted:continue
+            px=float(item.get("last",0) or 0)
+            if px<=0:continue
+            old=previous.get(symbol,{})
+            old_px=float(old.get("price",0) or 0)
+            ret=((px/old_px)-1)*100 if old_px else 0.0
+            current[symbol]={"price":px,"ret_pct":ret,"ts":now}
+        v158_xvenue_cache=current;v158_xvenue_last=now
+    except Exception:pass
+
 async def v158_dynamic_stream(http,symbol):
     global symbols
     streams="/".join([f"{symbol.lower()}@aggTrade",f"{symbol.lower()}@bookTicker",f"{symbol.lower()}@depth@100ms",f"{symbol.lower()}@kline_1m"])
@@ -1390,6 +1422,8 @@ async def main():
                         async def _resync_pending():return await resync_unready_books(http)
                         sync=asyncio.create_task(_resync_pending())
                     if int(time.time()/max(INTERVAL,1)) != int((time.time()-1)/max(INTERVAL,1)):
+                        if V158_XVENUE_ENABLED and (time.time()-v158_xvenue_last)>=V158_XVENUE_INTERVAL:
+                            await refresh_v158_cross_exchange(http,symbols)
                         if TRADINGVIEW_ENABLED and (time.time()-tv_last_refresh)>=TRADINGVIEW_REFRESH_SECONDS:
                             try:
                                 tv_cache,tv_last_refresh=await fetch_tradingview_signals(http,symbols)
@@ -1402,6 +1436,12 @@ async def main():
                             rr["v158_discovery_velocity_pct_s"]=float(md.get("velocity_pct_s",0) or 0)
                             rr["v158_discovery_trade_anomaly"]=float(md.get("trade_anomaly",0) or 0)
                             rr["v158_dynamic_promoted"]=str(rr.get("symbol","")).upper() in v158_discovery.active()
+                            xv=v158_xvenue_cache.get(str(rr.get("symbol","")).upper(),{})
+                            rr["v158_xvenue_price"]=float(xv.get("price",0) or 0)
+                            rr["v158_xvenue_ret_pct"]=float(xv.get("ret_pct",0) or 0)
+                            bn=float(rr.get("price_10s",0) or 0)
+                            xr=float(xv.get("ret_pct",0) or 0)
+                            rr["v158_xvenue_confirmed"]=bool(xv and ((bn>=0 and xr>=0) or (bn<0 and xr<0)) and abs(xr)>=0.02)
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
                         # Dedicated TOP-1 V15.6 FASTEST-PUMP Telegram lane.
                         # V15.7 engine: microstructure-first early-pump detection.
@@ -1436,6 +1476,11 @@ async def main():
                             bull_tf=int(r.get("tv_bullish_timeframes",0) or 0)
                             btc_off=bool(r.get("v15_btc_risk_off",False))
                             em=early_momentum(r["symbol"])
+                            adaptive_fast=adaptive_micro_features(state,books,r["symbol"])
+                            if adaptive_fast.get("adaptive_regime_change",0)>=55:
+                                r["v158_adaptive_early"]=True
+                            else:
+                                r["v158_adaptive_early"]=False
                             if em:
                                 r.update(em)
                                 state[r["symbol"]]["early_momentum_score"]=em["early_momentum_score"]
@@ -1501,6 +1546,13 @@ async def main():
                             # Early-momentum is advisory; it does not bypass the existing final V15.7 gates.
                             if em and em.get("early_momentum_quality"):
                                 structure_score += 2.0
+                            # Adaptive anomaly is advisory and cannot bypass existing Fastest-Pump gates.
+                            if adaptive_fast.get("adaptive_regime_change",0)>=55:
+                                structure_score += 2.0
+                            if adaptive_fast.get("adaptive_intensity_z",0)>=1.5 and adaptive_fast.get("adaptive_trade_size_z",0)>=1.0:
+                                structure_score += 1.0
+                            if adaptive_fast.get("adaptive_price_impact_z",0)>=1.5:
+                                structure_score += 1.0
 
                             # Dynamic exhaustion/extension protection.
                             extension=max(0.0,p1-1.50)*3.0+max(0.0,p5-4.0)*1.5
@@ -1537,6 +1589,11 @@ async def main():
                             rr["_fast_spread_bps"]=spread
                             rr["_fast_dynamic_exhaustion"]=dynamic_exhaustion
                             rr["_fast_imbalance"]=imb
+                            rr["_fast_adaptive_regime"]=adaptive_fast.get("adaptive_regime_change",0)
+                            rr["_fast_trade_z"]=adaptive_fast.get("adaptive_trade_z",0)
+                            rr["_fast_volume_z"]=adaptive_fast.get("adaptive_volume_z",0)
+                            rr["_fast_cvd_z"]=adaptive_fast.get("adaptive_cvd_z",0)
+                            rr["_fast_intensity_z"]=adaptive_fast.get("adaptive_intensity_z",0)
                             rr["_fast_volume_10s_rate"]=vol10_rate
                             fast_pump_candidates.append(rr)
 
