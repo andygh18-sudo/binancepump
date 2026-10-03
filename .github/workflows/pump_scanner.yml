@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "scanner/worker.py"
+      - "scanner/v158.py"
       - ".github/workflows/pump_scanner.yml"
   workflow_dispatch:
   schedule:
@@ -83,6 +84,9 @@ jobs:
           V8_MIN_PERSISTENCE: "2"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          V158_ENABLED: "1"
+          V158_XVENUE_ENABLED: "1"
+          V158_XVENUE_INTERVAL: "30"
         run: python run_scanner.py
 
       - name: Prepare bounded scan history
