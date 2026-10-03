@@ -1130,6 +1130,10 @@ def score(s):
     alert_tier="HIGH PRIORITY" if hs>=80 else "EARLY ACTION" if hs>=70 else "PRE-PUMP WATCH" if hs>=62 else "BELOW WATCH"
     p1=(x["price"]/c["open"]-1)*100 if c["open"] else 0
     ob=books[s].metrics(20);imb=ob["imbalance"]
+    v158_trades=trade_features(state,s,60)
+    v158_liq=liquidity_features(state,books,s)
+    v158_quality=data_quality(state,books,s)
+    v158_score=min(100.0,float(v158_trades.get("whale_score",0))*0.30+float(v158_liq.get("liquidity_breakout_score",0))*0.25+float(v158_liq.get("absorption_score",0))*0.10+float(v158_quality.get("data_quality_score",0))*0.35)
     v156, v156_event = v156_evaluate({"symbol":s,"price":x["price"],"price_10s":p10,"price_60s":p60,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"relative_strength_5m":eps.get("relative_strength_5m",0),"v15_score":v15.get("v15_score",0),"v15_opportunity_score":v15.get("v15_opportunity_score",0),"v15_confirmation_score":v15.get("v15_confirmation_score",0),"accumulation_score":ac.get("accumulation_score",0),"tv_bullish_timeframes":tv_bull_tf,"v15_reignition_bridge_score":reignition_bridge.get("v15_reignition_bridge_score",0),"v15_reignition_bridge_trigger":reignition_bridge.get("v15_reignition_bridge_trigger",False),"exhaustion_score":(exhaustion or {}).get("exhaustion_score",0),"spread_bps":ob["spread_bps"],"v15_btc_risk_off":v15.get("v15_btc_risk_off",False)},state[s].setdefault("v156",{}),time.time())
     raw=min(max(p10,0)*10,20)+min(max(vr-1,0)*14,28)+min(max(acc-1,0)*12,18)
     raw+=max(min((b10-.5)*50,12),-12)+max(min(imb*30,12),-12)
@@ -1141,7 +1145,16 @@ def score(s):
     entry="EARLY ENTRY" if early and not chase else "CONFIRMATION ENTRY" if confirm and not chase else "CHASE RISK" if chase else "WATCH"
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
-    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,**pump_momentum,"price":x["price"],"score":sc,"stage":stage,"price_3m":p180,"price_5m":p300,"price_10m":p600,"price_15m":p900,"price_30m":p1800,"price_60m_change":p3600,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition",**v156,"v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**reignition_bridge,**buy_quality,**buy_decision,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
+    return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,**pump_momentum,"price":x["price"],"score":sc,"stage":stage,"price_3m":p180,"price_5m":p300,"price_10m":p600,"price_15m":p900,"price_30m":p1800,"price_60m_change":p3600,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,
+            "v158_score":round(v158_score,1),"v158_whale_score":v158_trades.get("whale_score",0),
+            "v158_large_trade_count":v158_trades.get("large_trade_count",0),"v158_large_buy_notional":v158_trades.get("large_buy_notional",0),
+            "v158_large_sell_notional":v158_trades.get("large_sell_notional",0),"v158_large_trade_imbalance":v158_trades.get("large_trade_imbalance",0),
+            "v158_median_trade_notional":v158_trades.get("median_trade_notional",0),"v158_p95_trade_notional":v158_trades.get("p95_trade_notional",0),
+            "v158_liquidity_score":v158_liq.get("liquidity_score",0),"v158_ask_depth_change":v158_liq.get("ask_depth_change",0),
+            "v158_bid_depth_change":v158_liq.get("bid_depth_change",0),"v158_ask_consumption":v158_liq.get("ask_consumption",0),
+            "v158_bid_consumption":v158_liq.get("bid_consumption",0),"v158_absorption_score":v158_liq.get("absorption_score",0),
+            "v158_liquidity_breakout_score":v158_liq.get("liquidity_breakout_score",0),"v158_data_quality":v158_quality.get("data_quality_score",0),
+            "v158_trade_age_s":v158_quality.get("trade_age_s",999),"v158_book_age_s":v158_quality.get("book_age_s",999),"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition",**v156,"v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**reignition_bridge,**buy_quality,**buy_decision,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
 
 def load_fast_pump_leaderboard():
     try:
@@ -1352,15 +1365,16 @@ async def resync_unready_books(http):
     return await asyncio.gather(*(b.resync(http) for b in bad),return_exceptions=True)
 
 async def main():
-    global symbols,books,tv_cache,tv_last_refresh
+    global symbols,books,tv_cache,tv_last_refresh,v158_core_symbols
     os.makedirs("data",exist_ok=True);start=time.time();timeout=aiohttp.ClientTimeout(total=20)
     async with aiohttp.ClientSession(timeout=timeout) as http:
-        symbols=await discover(http);books={s:LocalOrderBook(s,REST,LIMIT) for s in symbols};state["__V156_FAST_PUMP__"]["leaderboard"]=load_fast_pump_leaderboard();streams=[];history_last_write=0.0;micro_history_last_write=0.0
+        symbols=await discover(http);v158_core_symbols=set(symbols);books={s:LocalOrderBook(s,REST,LIMIT) for s in symbols};state["__V156_FAST_PUMP__"]["leaderboard"]=load_fast_pump_leaderboard();streams=[];history_last_write=0.0;micro_history_last_write=0.0
         for s in symbols:
             q=s.lower();streams += [f"{q}@aggTrade",f"{q}@bookTicker",f"{q}@depth@100ms",f"{q}@kline_1m"]
         url=WS+"?streams="+"/".join(streams)
         async with http.ws_connect(url,heartbeat=20,autoping=True,max_msg_size=16*1024*1024) as ws:
             sync=asyncio.create_task(resync_books(http))
+            discovery_task=asyncio.create_task(v158_discovery_loop(http)) if V158_ENABLED else None
             try:
                 while time.time()-start<RUN_SECONDS:
                     try:
@@ -1377,7 +1391,13 @@ async def main():
                                 tv_cache,tv_last_refresh=await fetch_tradingview_signals(http,symbols)
                             except Exception:
                                 tv_cache={};tv_last_refresh=time.time()
-                        rows=[r for s in symbols if (r:=score(s))]
+                        rows=[r for s in list(symbols) if (r:=score(s))]
+                        for rr in rows:
+                            md=v158_discovery.items.get(str(rr.get("symbol","")).upper(),{})
+                            rr["v158_discovery_score"]=float(md.get("score",0) or 0)
+                            rr["v158_discovery_velocity_pct_s"]=float(md.get("velocity_pct_s",0) or 0)
+                            rr["v158_discovery_trade_anomaly"]=float(md.get("trade_anomaly",0) or 0)
+                            rr["v158_dynamic_promoted"]=str(rr.get("symbol","")).upper() in v158_discovery.active()
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
                         # Dedicated TOP-1 V15.6 FASTEST-PUMP Telegram lane.
                         # V15.7 engine: microstructure-first early-pump detection.
@@ -1905,11 +1925,24 @@ async def main():
                             history_last_write=now_v157
                         await asyncio.sleep(1)
             finally:
+                if discovery_task and not discovery_task.done():
+                    discovery_task.cancel()
+                    try:await discovery_task
+                    except asyncio.CancelledError:pass
+                for _s,_t in list(v158_dynamic_tasks.items()):
+                    if not _t.done():_t.cancel()
+                if v158_dynamic_tasks:await asyncio.gather(*list(v158_dynamic_tasks.values()),return_exceptions=True)
                 if not sync.done():
                     sync.cancel()
                     try:await sync
                     except asyncio.CancelledError:pass
-            rows=[r for s in symbols if (r:=score(s))]
+            rows=[r for s in list(symbols) if (r:=score(s))]
+            for rr in rows:
+                md=v158_discovery.items.get(str(rr.get("symbol","")).upper(),{})
+                rr["v158_discovery_score"]=float(md.get("score",0) or 0)
+                rr["v158_discovery_velocity_pct_s"]=float(md.get("velocity_pct_s",0) or 0)
+                rr["v158_discovery_trade_anomaly"]=float(md.get("trade_anomaly",0) or 0)
+                rr["v158_dynamic_promoted"]=str(rr.get("symbol","")).upper() in v158_discovery.active()
             rows.sort(key=lambda z:z["score"],reverse=True)
             with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
 
