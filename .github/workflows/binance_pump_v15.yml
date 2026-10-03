@@ -1,4 +1,4 @@
-name: Binance Pump Scanner V15.7 Live
+name: Binance Pump Scanner V15.8 Live
 
 on:
   schedule:
@@ -7,6 +7,7 @@ on:
     paths:
       - "scanner/worker.py"
       - "scanner/v157_learning.py"
+      - "scanner/v158.py"
       - "scanner/orderbook.py"
       - "scanner/tradingview.py"
       - "scanner/v156.py"
@@ -47,11 +48,12 @@ jobs:
           set -e
           mkdir -p data
           touch data/v157_observations.jsonl
+          touch data/v158_discovery.jsonl
 
       - name: Validate V15.7 scanner
         run: |
           set -e
-          python -m py_compile scanner/worker.py scanner/v157_learning.py scanner/orderbook.py scanner/tradingview.py scanner/v156.py run_scanner.py app.py
+          python -m py_compile scanner/worker.py scanner/v157_learning.py scanner/v158.py scanner/orderbook.py scanner/tradingview.py scanner/v156.py run_scanner.py app.py
 
       - name: Validate worker bootstrap
         run: python scripts/validate_worker_bootstrap.py
@@ -60,6 +62,11 @@ jobs:
         env:
           BINANCE_WS_BASE: wss://data-stream.binance.vision/stream
           BINANCE_REST_BASE: https://data-api.binance.vision
+          V158_ENABLED: "1"
+          V158_MAX_DYNAMIC: "20"
+          V158_MIN_QUOTE_VOLUME: "10000"
+          V158_PROMOTION_TTL: "180"
+          V158_PROMOTION_SCORE: "55"
           MAX_SYMBOLS: "120"
           MIN_QUOTE_VOLUME: "100000"
           DISCOVERY_MIN_QUOTE_VOLUME: "50000"
@@ -113,27 +120,29 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           cp data/v157_observations.jsonl /tmp/v157_observations.jsonl 2>/dev/null || : > /tmp/v157_observations.jsonl
+          cp data/v158_discovery.jsonl /tmp/v158_discovery.jsonl 2>/dev/null || : > /tmp/v158_discovery.jsonl
           cp data/latest.json /tmp/latest.json 2>/dev/null || true
           cp data/v157_fastest_pump_leaderboard.json /tmp/v157_fastest_pump_leaderboard.json 2>/dev/null || true
           git reset --hard origin/main
           mkdir -p data
           cp /tmp/v157_observations.jsonl data/v157_observations.jsonl
+          cp /tmp/v158_discovery.jsonl data/v158_discovery.jsonl
           if [ -f /tmp/latest.json ]; then cp /tmp/latest.json data/latest.json; fi
           if [ -f /tmp/v157_fastest_pump_leaderboard.json ]; then cp /tmp/v157_fastest_pump_leaderboard.json data/v157_fastest_pump_leaderboard.json; fi
-          git add -f data/v157_observations.jsonl data/latest.json data/v157_fastest_pump_leaderboard.json
+          git add -f data/v157_observations.jsonl data/v158_discovery.jsonl data/latest.json data/v157_fastest_pump_leaderboard.json
           if git diff --cached --quiet; then
             echo "No new V15.7 data to publish."
             exit 0
           fi
-          git commit -m "Publish V15.7 live learning data"
+          git commit -m "Publish V15.8 live learning data"
           git push origin HEAD:main
 
-      - name: Start next V15.7 cycle
+      - name: Start next V15.8 cycle
         if: ${{ success() }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          echo "Dispatching next V15.7 monitoring cycle..."
+          echo "Dispatching next V15.8 monitoring cycle..."
           gh workflow run .github/workflows/binance_pump_v15.yml --ref main
           echo "Next V15.7 cycle dispatched."
