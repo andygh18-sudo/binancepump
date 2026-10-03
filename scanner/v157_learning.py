@@ -96,6 +96,19 @@ def persist_v157_observations(rows, fast_candidates, state, books, alerted_symbo
             "fast_pump_pre_score":_safe_float(fast.get("_fast_pump_pre_score")) if fast else 0.0,
             "fast_pump_stage":str(fast.get("_fast_pump_stage","")) if fast else "NOT_QUALIFIED",
             "fast_dynamic_exhaustion":_safe_float(fast.get("_fast_dynamic_exhaustion")) if fast else _safe_float(row.get("exhaustion_score")),
+            "early_momentum_score":_safe_float(row.get("early_momentum_score")),
+            "early_momentum_stage":str(row.get("early_momentum_stage","MONITOR")),
+            "early_momentum_quality":bool(row.get("early_momentum_quality",False)),
+            "early_momentum_trades_10s":int(_safe_float(row.get("early_momentum_trades_10s"))),
+            "early_momentum_trade_rate":_safe_float(row.get("early_momentum_trade_rate")),
+            "early_momentum_accel_slope":_safe_float(row.get("early_momentum_accel_slope")),
+            "early_momentum_buy_ratio":_safe_float(row.get("early_momentum_buy_ratio")),
+            "early_momentum_cvd_10s":_safe_float(row.get("early_momentum_cvd_10s")),
+            "early_momentum_cvd_30s":_safe_float(row.get("early_momentum_cvd_30s")),
+            "early_momentum_cvd_60s":_safe_float(row.get("early_momentum_cvd_60s")),
+            "early_momentum_cvd_impulse":_safe_float(row.get("early_momentum_cvd_impulse")),
+            "early_momentum_spread_bps":_safe_float(row.get("early_momentum_spread_bps")),
+            "early_momentum_book_ready":bool(row.get("early_momentum_book_ready",False)),
         }
         rec.update(micro)
         records.append(rec)
