@@ -10,21 +10,31 @@ def _safe_float(v, default=0.0):
     except Exception:
         return default
 
+def _stats(state, symbol, sec):
+    cut=time.time()-sec
+    trades=[z for z in state[symbol]["trades"] if z[0]>=cut]
+    if not trades:
+        return 0,0,0,0
+    notional=sum(z[2] for z in trades)
+    buy_notional=sum(z[2] for z in trades if z[3])
+    return len(trades),notional,buy_notional/notional if notional else 0,(trades[-1][1]/trades[0][1]-1)*100 if len(trades)>1 else 0
+
+def _accel(v10,v60):
+    return v10/max(v60/6.0,1.0)
+
 def _micro_snapshot(symbol, row, state, books):
     try:
-        _,v10,cvd_buy10,p10micro=__import__("scanner.worker",fromlist=["stats"]).stats(symbol,10)
-        _,v30,cvd_buy30,p30micro=__import__("scanner.worker",fromlist=["stats"]).stats(symbol,30)
-        _,v60,cvd_buy60,p60micro=__import__("scanner.worker",fromlist=["stats"]).stats(symbol,60)
-        stats_fn=__import__("scanner.worker",fromlist=["stats"]).stats
-        accel_fn=__import__("scanner.worker",fromlist=["acceleration_ratio"]).acceleration_ratio
-        n10=stats_fn(symbol,10)[0]
+        _,v10,cvd_buy10,p10micro=_stats(state,symbol,10)
+        _,v30,cvd_buy30,p30micro=_stats(state,symbol,30)
+        _,v60,cvd_buy60,p60micro=_stats(state,symbol,60)
+        n10=_stats(state,symbol,10)[0]
         cvd10=(2.0*cvd_buy10-v10)/max(v10,1.0)
         cvd30=(2.0*cvd_buy30-v30)/max(v30,1.0)
         cvd60=(2.0*cvd_buy60-v60)/max(v60,1.0)
         buy=_safe_float(row.get("buy_pressure"))
         buy_slope=buy-(cvd_buy30/max(v30,1.0) if v30 else 0.50)
         accel=_safe_float(row.get("trade_accel"))
-        accel30=accel_fn(v30,v60)
+        accel30=_accel(v30,v60)
         accel_slope=accel-accel30
         vol10_rate=v10/max(v60/6.0,1.0)
         vol30_rate=v30/max(v60/2.0,1.0)
