@@ -1152,6 +1152,8 @@ async def telegram(msg):
     # Production Telegram policy:
     # - Normal V15.6 lane: only CONFIRMED-IGNITION / BUY is allowed.
     # - Dedicated FASTEST-PUMP lane: explicitly allowed as its own independent alert lane.
+    # - V15.7 is the Fastest-Pump scoring engine but intentionally keeps the
+    #   V15.6 FASTEST-PUMP Telegram label for downstream compatibility.
     # This keeps legacy V15/early alerts disabled without blocking Fastest-Pump.
     allowed_confirmed=msg.startswith("V15.6 CONFIRMED-IGNITION / BUY")
     allowed_fastest=msg.startswith("🚀 V15.6 FASTEST-PUMP")
@@ -1202,17 +1204,18 @@ async def main():
                         rows=[r for s in symbols if (r:=score(s))]
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
                         # Dedicated TOP-1 V15.6 FASTEST-PUMP Telegram lane.
-                        # This lane is intentionally independent from the normal V15.6
-                        # BUY/EARLY-IGNITION Telegram alerts.
+                        # V15.7 engine: microstructure-first early-pump detection.
+                        # This lane remains completely independent from the normal
+                        # V15.6 CONFIRMED-IGNITION / BUY decision layer.
                         #
-                        # Anti-noise design:
-                        #   1) hard gates protect the lane from weak/late signals;
-                        #   2) volume, acceleration, RS5 and structural evidence are
-                        #      scored rather than requiring every metric to pass;
-                        #   3) the overall Fast-Pump score must reach the trigger floor;
-                        #   4) rank all qualifying symbols and alert only the #1 leader;
-                        #   5) one Telegram alert per pump episode, not a time cooldown;
-                        #   6) a new leader must materially overtake the previous leader.
+                        # Design:
+                        #   - detect acceleration/flow change before relying on price;
+                        #   - score buy-pressure acceleration, trade acceleration-of-acceleration,
+                        #     volume acceleration and CVD/aggressive-buying flow;
+                        #   - use price movement as confirmation, not the dominant signal;
+                        #   - apply a dynamic extension/exhaustion penalty;
+                        #   - keep a PRE-PUMP WATCH state internally;
+                        #   - retain TOP-1 leader selection and loop-to-loop episode memory.
                         fast_pump_candidates=[]
                         for r in rows:
                             p1=float(r.get("price_1m",0) or 0)
@@ -1233,34 +1236,97 @@ async def main():
                             btc_off=bool(r.get("v15_btc_risk_off",False))
                             if btc_off or str(r.get("v15_stage","") or "")=="AVOID":
                                 continue
-                            # HARD GATES: these define a genuine active fast move.
-                            # The remaining momentum/structure metrics are deliberately
-                            # soft-scored so one weak metric does not automatically reject
-                            # an otherwise strong early pump.
-                            if p1<FAST_PUMP_MIN_1M or p5<FAST_PUMP_MIN_5M:
+
+                            # Raw live microstructure windows. These are derived from
+                            # the existing Binance aggTrade stream; no extra API/feed.
+                            _,v10,cvd_buy10,p10micro=stats(r["symbol"],10)
+                            _,v30,cvd_buy30,p30micro=stats(r["symbol"],30)
+                            _,v60,cvd_buy60,p60micro=stats(r["symbol"],60)
+                            n10=stats(r["symbol"],10)[0]
+                            cvd10=(2.0*cvd_buy10-v10)/max(v10,1.0)
+                            cvd30=(2.0*cvd_buy30-v30)/max(v30,1.0)
+                            cvd60=(2.0*cvd_buy60-v60)/max(v60,1.0)
+                            buy_slope=buy-(cvd_buy30/max(v30,1.0) if v30 else 0.50)
+                            accel30=acceleration_ratio(v30,v60)
+                            accel_slope=accel-accel30
+                            vol10_rate=v10/max(v60/6.0,1.0)
+                            vol30_rate=v30/max(v60/2.0,1.0)
+                            volume_accel=max(vol10_rate,0)-max(vol30_rate,0)
+                            cvd_impulse=cvd10-cvd30
+                            ob=books[r["symbol"]].metrics(20)
+                            spread=float(ob.get("spread_bps",0) or 0)
+                            imb=float(ob.get("imbalance",0) or 0)
+
+                            # PRE-PUMP hard gates: require genuine participation and
+                            # improving flow, but deliberately tolerate very small price
+                            # movement so the lane can fire before a candle-sized pump.
+                            if n10<3:
                                 continue
-                            if buy<FAST_PUMP_MIN_BUY:
+                            if buy<0.57:
                                 continue
-                            if p10s<=0 or p60s<=0:
+                            if accel<1.25:
                                 continue
-                            if ex>FAST_PUMP_MAX_EXHAUSTION:
+                            if cvd10<0.08 and buy_slope<0.025:
                                 continue
+                            if p1<0.05 or p5<0.30:
+                                continue
+                            if p10s<-0.75 or p60s<-1.0:
+                                continue
+
+                            # Price is now a confirmation component, not the dominant one.
+                            flow_score=min(max((buy-0.50)/0.20,0),1)*18.0
+                            buy_slope_score=min(max((buy_slope-0.01)/0.10,0),1)*14.0
+                            accel_score=min(max((accel-1.0)/1.5,0),1)*18.0
+                            accel_slope_score=min(max((accel_slope+0.05)/0.75,0),1)*10.0
+                            volume_accel_score=min(max((vol10_rate-1.0)/2.5,0),1)*12.0
+                            cvd_score=min(max((cvd10+0.05)/0.55,0),1)*10.0
+                            micro_price_score=min(max((p10s+0.10)/1.50,0),1)*4.0
+                            price_score=min(max((p1+0.05)/1.50,0),1)*2.0
+                            structure_score=(
+                                (3.0 if imb>=0 else 0.0)+
+                                (2.0 if spread<=12 else 0.0)+
+                                (2.0 if rs5>0 else 0.0)+
+                                (2.0 if accum>=FAST_PUMP_MIN_ACCUMULATION else 0.0)+
+                                (2.0 if v15>=FAST_PUMP_V15_PREFERENCE else 0.0)+
+                                (1.0 if bull_tf>=FAST_PUMP_MIN_BULL_TF else 0.0)
+                            )
+
+                            # Dynamic exhaustion/extension protection.
+                            extension=max(0.0,p1-1.50)*3.0+max(0.0,p5-4.0)*1.5
+                            dynamic_exhaustion=ex+extension
+                            exhaustion_penalty=max(0.0,dynamic_exhaustion-20.0)*0.65
+                            if dynamic_exhaustion>=65:
+                                continue
+
                             fast_score=max(0,min(round(
-                                p1*20.0+
-                                p3*8.0+
-                                p5*5.0+
-                                max(accel-1.0,0)*10.0+
-                                max(vol-1.0,0)*6.0+
-                                max((buy-0.50)*100.0,0)*0.8+
-                                max(min(rs5,5.0),0)*2.0+
-                                (5.0 if v15>=FAST_PUMP_V15_PREFERENCE else 0.0)+
-                                (4.0 if accum>=FAST_PUMP_MIN_ACCUMULATION else 0.0)+
-                                (3.0 if bull_tf>=FAST_PUMP_MIN_BULL_TF else 0.0)
+                                flow_score+buy_slope_score+accel_score+accel_slope_score+
+                                volume_accel_score+cvd_score+micro_price_score+price_score+
+                                structure_score-exhaustion_penalty
                             ),100))
+
+                            # Internal PRE-PUMP state is useful for learning/debugging,
+                            # but only the final Fastest-Pump trigger is sent to Telegram.
+                            pre_pump_score=max(0,min(round(
+                                flow_score+buy_slope_score+accel_score+accel_slope_score+
+                                volume_accel_score+cvd_score+structure_score
+                            ),100))
+                            pre_pump_stage="PRE-PUMP WATCH" if pre_pump_score<FAST_PUMP_MIN_SCORE else "FAST-PUMP"
+
                             if fast_score<FAST_PUMP_MIN_SCORE:
                                 continue
                             rr=dict(r)
                             rr["_fast_pump_score"]=fast_score
+                            rr["_fast_pump_pre_score"]=pre_pump_score
+                            rr["_fast_pump_stage"]=pre_pump_stage
+                            rr["_fast_buy_slope"]=buy_slope
+                            rr["_fast_accel_slope"]=accel_slope
+                            rr["_fast_volume_accel"]=volume_accel
+                            rr["_fast_cvd"]=cvd10
+                            rr["_fast_cvd_impulse"]=cvd_impulse
+                            rr["_fast_spread_bps"]=spread
+                            rr["_fast_dynamic_exhaustion"]=dynamic_exhaustion
+                            rr["_fast_imbalance"]=imb
+                            rr["_fast_volume_10s_rate"]=vol10_rate
                             fast_pump_candidates.append(rr)
 
                         fast_pump_candidates=sorted(
@@ -1324,18 +1390,20 @@ async def main():
                             if should_alert:
                                 r=leader
                                 await telegram(
-                                    f"🚀 V15.6 FASTEST-PUMP | {leader_symbol} | Fast Pump Score {leader_score:.0f}/100 | "
+                                    f"🚀 V15.6 FASTEST-PUMP | {leader_symbol} | V15.7 Engine | Fast Pump Score {leader_score:.0f}/100 | "
                                     f"Price: {r.get('price',0)} | "
                                     f"1m: {r.get('price_1m',0):+.2f}% | 3m: {r.get('price_3m',0):+.2f}% | "
                                     f"5m: {r.get('price_5m',0):+.2f}% | 10m: {r.get('price_10m',0):+.2f}% | "
                                     f"15m: {r.get('price_15m',0):+.2f}% | Volume: {r.get('volume_ratio',0):.2f}x | "
-                                    f"Trade accel: {r.get('trade_accel',0):.2f}x | "
-                                    f"Buy pressure: {r.get('buy_pressure',0)*100:.1f}% | "
+                                    f"Trade accel: {r.get('trade_accel',0):.2f}x | Accel slope: {r.get('_fast_accel_slope',0):+.2f}x | "
+                                    f"Buy: {r.get('buy_pressure',0)*100:.1f}% | Buy slope: {r.get('_fast_buy_slope',0)*100:+.1f}pp | "
+                                    f"CVD: {r.get('_fast_cvd',0):+.2f} | CVD impulse: {r.get('_fast_cvd_impulse',0):+.2f} | "
+                                    f"10s flow: {r.get('_fast_volume_10s_rate',0):.2f}x | "
                                     f"RS5: {r.get('v15_relative_strength_5m',0):+.2f}% | "
+                                    f"Spread: {r.get('_fast_spread_bps',0):.1f}bps | "
                                     f"V15: {r.get('v15_score',0):.0f}/100 | "
                                     f"Accum: {r.get('accumulation_score',0):.0f} | "
-                                    f"TV bullish TFs: {r.get('tv_bullish_timeframes',0)} | "
-                                    f"Exhaustion: {r.get('exhaustion_score',0):.0f}"
+                                    f"Exhaustion: {r.get('_fast_dynamic_exhaustion',0):.0f}"
                                 )
                                 fp_state["alerted_symbol"]=leader_symbol
                                 fp_state["last_alert"]=time.time()
