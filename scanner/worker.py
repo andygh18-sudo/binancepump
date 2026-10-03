@@ -1476,11 +1476,16 @@ async def main():
                             bull_tf=int(r.get("tv_bullish_timeframes",0) or 0)
                             btc_off=bool(r.get("v15_btc_risk_off",False))
                             em=early_momentum(r["symbol"])
-                            adaptive_fast=adaptive_micro_features(state,books,r["symbol"])
-                            if adaptive_fast.get("adaptive_regime_change",0)>=55:
-                                r["v158_adaptive_early"]=True
-                            else:
-                                r["v158_adaptive_early"]=False
+                            adaptive_fast={
+                                "adaptive_regime_change":float(r.get("adaptive_regime_change",0) or 0),
+                                "adaptive_trade_z":float(r.get("adaptive_trade_z",0) or 0),
+                                "adaptive_volume_z":float(r.get("adaptive_volume_z",0) or 0),
+                                "adaptive_cvd_z":float(r.get("adaptive_cvd_z",0) or 0),
+                                "adaptive_intensity_z":float(r.get("adaptive_intensity_z",0) or 0),
+                                "adaptive_trade_size_z":float(r.get("adaptive_trade_size_z",0) or 0),
+                                "adaptive_price_impact_z":float(r.get("adaptive_price_impact_z",0) or 0),
+                            }
+                            r["v158_adaptive_early"]=adaptive_fast.get("adaptive_regime_change",0)>=55
                             if em:
                                 r.update(em)
                                 state[r["symbol"]]["early_momentum_score"]=em["early_momentum_score"]
