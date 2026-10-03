@@ -1349,7 +1349,7 @@ async def v158_discovery_loop(http):
                         if not isinstance(t,dict) or not str(t.get("s","")).upper().endswith("USDT"):continue
                         meta=v158_discovery.update(t)
                         if meta:
-                            await v158_promote(http,meta)
+                            asyncio.create_task(v158_promote(http,meta))
                             try:
                                 with open("data/v158_discovery.jsonl","a",encoding="utf-8") as df:
                                     df.write(json.dumps({"ts":time.time(),"event":"PROMOTION","symbol":meta["symbol"],"score":meta.get("promotion_score",0),"velocity_pct_s":meta.get("velocity_pct_s",0),"trade_anomaly":meta.get("trade_anomaly",0),"quote_volume":meta.get("quote_volume",0)},separators=(",",":"))+"\\n")
