@@ -39,6 +39,7 @@ jobs:
       - name: Prepare data
         run: |
           mkdir -p data
+          cp /tmp/v157-fastest-pump-leaderboard.json data/v157_fastest_pump_leaderboard.json
           touch data/v154_events.jsonl
       - name: Validate V15 production scanner
         run: python -m py_compile scanner/worker.py scanner/v154.py scanner/v156_outcomes.py scanner/history_store.py scripts/backfill_v156_outcomes.py scripts/compact_v15_2_history.py scanner/tradingview.py run_scanner.py app.py scripts/pump_learner_v156.py
@@ -96,12 +97,13 @@ jobs:
           publish_live_snapshot() {
             if [ ! -f "$GITHUB_WORKSPACE/data/latest.json" ]; then return 0; fi
             cp "$GITHUB_WORKSPACE/data/latest.json" /tmp/v15-live-publisher/data/latest.json
+            if [ -f "$GITHUB_WORKSPACE/data/v157_fastest_pump_leaderboard.json" ]; then cp "$GITHUB_WORKSPACE/data/v157_fastest_pump_leaderboard.json" /tmp/v15-live-publisher/data/v157_fastest_pump_leaderboard.json; fi
             cd /tmp/v15-live-publisher
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git fetch origin main
             git reset --hard origin/main
-            git add -f data/latest.json
+            git add -f data/latest.json data/v157_fastest_pump_leaderboard.json
             if git diff --cached --quiet; then cd "$GITHUB_WORKSPACE"; return 0; fi
             git commit -m "Publish V15.6 live snapshot"
             git push origin HEAD:main
@@ -151,6 +153,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           cp data/latest.json /tmp/v15-latest.json
+          if [ -f data/v157_fastest_pump_leaderboard.json ]; then cp data/v157_fastest_pump_leaderboard.json /tmp/v157-fastest-pump-leaderboard.json; else printf '{"updated":0,"symbols":{},"top":[]}\n' > /tmp/v157-fastest-pump-leaderboard.json; fi
           if [ -f data/ignition_history.jsonl ]; then cp data/ignition_history.jsonl /tmp/v15-ignition-history.jsonl; else : > /tmp/v15-ignition-history.jsonl; fi
           cp data/history_index.json /tmp/v15-history-index.json
           rm -rf /tmp/v15-history
@@ -177,7 +180,7 @@ jobs:
           cp /tmp/v15-v156-learning.json data/v156_signature_learning.json
           cp /tmp/v15-v156-outcomes.jsonl data/v156_outcomes.jsonl
           cp /tmp/v15-v156-outcome-summary.json data/v156_outcome_summary.json
-          git add -f data/latest.json data/ignition_history.jsonl data/history_index.json data/v154_events.jsonl data/adaptive_microstructure_history.jsonl data/v156_signature_learning.json data/v156_outcomes.jsonl data/v156_outcome_summary.json
+          git add -f data/latest.json data/v157_fastest_pump_leaderboard.json data/ignition_history.jsonl data/history_index.json data/v154_events.jsonl data/adaptive_microstructure_history.jsonl data/v156_signature_learning.json data/v156_outcomes.jsonl data/v156_outcome_summary.json
           git add -A data/history data/microstructure
           if git diff --cached --quiet; then
             echo "V15.2/V15.4 scan data already synchronized."
