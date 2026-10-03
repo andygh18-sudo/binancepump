@@ -1,0 +1,40 @@
+{
+  "version": "V15.6",
+  "target_pct": 3.0,
+  "horizon_seconds": 600,
+  "minimum_samples_for_tuning": 10,
+  "total_samples": 287372,
+  "signatures": {
+    "PRICE_VOLUME": {
+      "samples": 74,
+      "wins": 0,
+      "losses": 58,
+      "unknown": 16,
+      "precision_pct": 0.0,
+      "avg_lead_seconds": null,
+      "median_lead_seconds": null,
+      "learning_status": "READY"
+    },
+    "ORDER_FLOW": {
+      "samples": 1,
+      "wins": 0,
+      "losses": 1,
+      "unknown": 0,
+      "precision_pct": 0.0,
+      "avg_lead_seconds": null,
+      "median_lead_seconds": null,
+      "learning_status": "COLLECTING"
+    },
+    "TRADE_ACCEL": {
+      "samples": 70,
+      "wins": 0,
+      "losses": 56,
+      "unknown": 14,
+      "precision_pct": 0.0,
+      "avg_lead_seconds": null,
+      "median_lead_seconds": null,
+      "learning_status": "READY"
+    }
+  },
+  "note": "Metrics are descriptive learner statistics; thresholds should not be promoted automatically from small samples."
+}
