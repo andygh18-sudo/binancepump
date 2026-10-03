@@ -1276,6 +1276,74 @@ async def telegram(msg):
             await s.post(f"https://api.telegram.org/bot{token}/sendMessage",json={"chat_id":chat,"text":msg},timeout=8)
     except Exception:pass
 
+async def v158_dynamic_stream(http,symbol):
+    global symbols
+    streams="/".join([f"{symbol.lower()}@aggTrade",f"{symbol.lower()}@bookTicker",f"{symbol.lower()}@depth@100ms",f"{symbol.lower()}@kline_1m"])
+    url=WS+"?streams="+streams
+    while time.time()<float(v158_dynamic_until.get(symbol,0) or 0):
+        try:
+            async with http.ws_connect(url,heartbeat=20,autoping=True,max_msg_size=8*1024*1024) as ws:
+                while time.time()<float(v158_dynamic_until.get(symbol,0) or 0):
+                    try:m=await asyncio.wait_for(ws.receive(),timeout=1)
+                    except asyncio.TimeoutError:continue
+                    if m.type==aiohttp.WSMsgType.TEXT:
+                        z=json.loads(m.data);event(z.get("stream",""),z.get("data",{}))
+                    elif m.type in (aiohttp.WSMsgType.CLOSED,aiohttp.WSMsgType.ERROR):break
+        except asyncio.CancelledError:raise
+        except Exception:await asyncio.sleep(1)
+    v158_dynamic_tasks.pop(symbol,None);v158_dynamic_until.pop(symbol,None)
+    if symbol not in v158_core_symbols:
+        try:symbols.remove(symbol)
+        except ValueError:pass
+        books.pop(symbol,None)
+
+async def v158_promote(http,meta):
+    global symbols
+    symbol=str(meta.get("symbol","") or "").upper()
+    if not symbol or symbol in v158_core_symbols:return
+    until=float(meta.get("ts",time.time()))+V158_PROMOTION_TTL
+    v158_dynamic_until[symbol]=max(until,float(v158_dynamic_until.get(symbol,0) or 0))
+    if symbol in v158_dynamic_tasks:return
+    active=[s for s,t in v158_dynamic_until.items() if t>time.time() and s not in v158_core_symbols]
+    if len(active)>=V158_MAX_DYNAMIC:
+        weakest=min(active,key=lambda s:v158_discovery.items.get(s,{}).get("score",0))
+        if weakest!=symbol and float(meta.get("promotion_score",0) or 0)<=float(v158_discovery.items.get(weakest,{}).get("score",0) or 0)+5:return
+        old=v158_dynamic_tasks.get(weakest)
+        if old:old.cancel()
+        v158_dynamic_tasks.pop(weakest,None);v158_dynamic_until.pop(weakest,None)
+        if weakest in symbols:
+            try:symbols.remove(weakest)
+            except ValueError:pass
+        books.pop(weakest,None)
+    books[symbol]=LocalOrderBook(symbol,REST,LIMIT)
+    if symbol not in symbols:symbols.append(symbol)
+    await books[symbol].resync(http)
+    v158_dynamic_tasks[symbol]=asyncio.create_task(v158_dynamic_stream(http,symbol))
+
+async def v158_discovery_loop(http):
+    if not V158_ENABLED:return
+    url=WS+"?streams=!ticker@arr"
+    while True:
+        try:
+            async with http.ws_connect(url,heartbeat=20,autoping=True,max_msg_size=8*1024*1024) as ws:
+                while True:
+                    m=await asyncio.wait_for(ws.receive(),timeout=5)
+                    if m.type!=aiohttp.WSMsgType.TEXT:
+                        if m.type in (aiohttp.WSMsgType.CLOSED,aiohttp.WSMsgType.ERROR):break
+                        continue
+                    z=json.loads(m.data);payload=z.get("data",z);items=payload if isinstance(payload,list) else [payload]
+                    for t in items:
+                        if not isinstance(t,dict) or not str(t.get("s","")).upper().endswith("USDT"):continue
+                        meta=v158_discovery.update(t)
+                        if meta:
+                            await v158_promote(http,meta)
+                            try:
+                                with open("data/v158_discovery.jsonl","a",encoding="utf-8") as df:
+                                    df.write(json.dumps({"ts":time.time(),"event":"PROMOTION","symbol":meta["symbol"],"score":meta.get("promotion_score",0),"velocity_pct_s":meta.get("velocity_pct_s",0),"trade_anomaly":meta.get("trade_anomaly",0),"quote_volume":meta.get("quote_volume",0)},separators=(",",":"))+"\\n")
+                            except Exception:pass
+        except asyncio.CancelledError:raise
+        except Exception:await asyncio.sleep(1)
+
 async def resync_books(http):return await asyncio.gather(*(b.resync(http) for b in books.values()),return_exceptions=True)
 
 async def resync_unready_books(http):
