@@ -3,10 +3,8 @@ from collections import defaultdict,deque
 from dotenv import load_dotenv
 from .orderbook import LocalOrderBook
 from .tradingview import fetch_tradingview_signals
-from .history_store import append_scan_history, append_microstructure_history
-from .v154 import evaluate as v154_evaluate
+from .v157_learning import persist_v157_observations
 from .v156 import evaluate as v156_evaluate
-from .v156_outcomes import OutcomeEngine
 
 load_dotenv()
 WS=os.getenv("BINANCE_WS_BASE","wss://data-stream.binance.vision/stream")
@@ -1118,33 +1116,11 @@ def score(s):
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
     return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,**pump_momentum,"price":x["price"],"score":sc,"stage":stage,"price_3m":p180,"price_5m":p300,"price_10m":p600,"price_15m":p900,"price_30m":p1800,"price_60m_change":p3600,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition",**v156,"v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**reignition_bridge,**buy_quality,**buy_decision,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
 
-outcomes=OutcomeEngine()
-
-def apply_v154(rows):
-    events=[]
-    for r in rows:
-        s=str(r.get("symbol","")).upper()
-        if not s: continue
-        result,event_record=v154_evaluate(r,state[s].setdefault("v154",{})); r.update(result)
-        if event_record:
-            events.append(event_record)
-            if event_record.get("event")=="TRIGGER" and str(event_record.get("stage","")).endswith("EARLY IGNITION"):
-                outcomes.register_signal(event_record,r,event_record.get("ts"))
-    outcomes.observe(rows)
-    outcomes.write_summary()
-    return events
-
 def persist_v156_event(event):
     if not event:return
     os.makedirs("data",exist_ok=True)
     with open("data/v156_events.jsonl","a",encoding="utf-8") as f:
         f.write(json.dumps(event,separators=(",",":"))+"\n")
-
-def persist_v154_events(events):
-    if not events:return
-    os.makedirs("data",exist_ok=True)
-    with open("data/v154_events.jsonl","a",encoding="utf-8") as f:
-        for event in events:f.write(json.dumps(event,separators=(",",":"))+"\\n")
 
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
@@ -1217,6 +1193,7 @@ async def main():
                         #   - keep a PRE-PUMP WATCH state internally;
                         #   - retain TOP-1 leader selection and loop-to-loop episode memory.
                         fast_pump_candidates=[]
+                        fast_alerted_symbol=""
                         for r in rows:
                             p1=float(r.get("price_1m",0) or 0)
                             p3=float(r.get("price_3m",0) or 0)
@@ -1407,6 +1384,7 @@ async def main():
                                 )
                                 fp_state["alerted_symbol"]=leader_symbol
                                 fp_state["last_alert"]=time.time()
+                                fast_alerted_symbol=leader_symbol
 
                             fp_state["active"]=True
                             fp_state["leader_symbol"]=leader_symbol
@@ -1747,33 +1725,13 @@ async def main():
                                 old["last_accum_alert"]=now
                             old["last_accum_score"]=r["accumulation_score"];old["last_accum_stage"]=r["accumulation_stage"]
                         with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
-                        now_history=time.time()
-                        if now_history-history_last_write >= HISTORY_SAMPLE_INTERVAL:
-                            append_scan_history(rows, ts=now_history)
-                            history_last_write=now_history
-                        # V15.3 microstructure history: 15s samples for armed/high-score candidates only.
-                        now_micro=time.time()
-                        if now_micro-micro_history_last_write >= 15.0:
-                            append_microstructure_history(rows, ts=now_micro)
-                            micro_history_last_write=now_micro
-                        ignition_fields=[
-    "symbol","price","v15_ignition_score","v15_ignition_stage","v15_ignition_alert","v15_ignition_signals","v15_ignition_confirmations",
-    "price_60s","v15_ignition_accel","v15_trade_accel_slope","buy_pressure","v15_buy_pressure_slope",
-    "v15_ignition_rs5","v15_ignition_rs15","v15_ignition_volume_ratio","v15_ignition_trades_10s",
-    "v15_ignition_samples_5m","v15_ignition_window_seconds","v15_ignition_score_delta_5m","v15_trade_accel_delta_5m",
-    "v15_buy_pressure_delta_5m","v15_ignition_rs5_delta_5m","v15_ignition_price_change_5m","v15_ignition_rising_ratio_5m",
-    "v15_ignition_persistence_5m","v15_ignition_early_samples_5m","v15_ignition_trajectory_score",
-    "v15_reignition_bridge_score","v15_reignition_bridge_stage","v15_reignition_bridge_armed","v15_reignition_bridge_trigger",
-    "v15_reignition_bridge_price_60s","v15_reignition_bridge_accel","v15_reignition_bridge_volume_ratio","v15_reignition_bridge_buy_pressure","v15_reignition_bridge_accel_slope",
-    "v15_ignition_trajectory_stage","v15_ignition_trajectory_confirmed"
-]
-                        ignition_rows=[
-                            {key:r.get(key) for key in ignition_fields if key in r}
-                            for r in rows if isinstance(r,dict) and r.get("symbol")
-                        ]
-                        if ignition_rows:
-                            with open("data/ignition_history.jsonl","a") as f:
-                                f.write(json.dumps({"ts":time.time(),"rows":ignition_rows},separators=(",",":"))+"\n")
+                        with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
+                        # V15.7-only learning persistence. Legacy V15/V15.4/V15.6
+                        # learning files are intentionally no longer written.
+                        now_v157=time.time()
+                        if now_v157-history_last_write >= max(HISTORY_SAMPLE_INTERVAL,30.0):
+                            persist_v157_observations(rows,fast_pump_candidates,state,books,alerted_symbol=fast_alerted_symbol,ts=now_v157)
+                            history_last_write=now_v157
                         await asyncio.sleep(1)
             finally:
                 if not sync.done():
@@ -1781,11 +1739,6 @@ async def main():
                     try:await sync
                     except asyncio.CancelledError:pass
             rows=[r for s in symbols if (r:=score(s))]
-            v154_events=apply_v154(rows)
-            persist_v154_events(v154_events)
-            for rr in rows:
-                if rr.get("v156_alert") and rr.get("v156_event_id"):
-                    persist_v156_event({"event":"TRIGGER","version":"15.6","event_id":rr.get("v156_event_id"),"symbol":rr.get("symbol"),"ts":time.time(),"stage":rr.get("v156_stage"),"sweet_score":rr.get("v156_sweet_score"),"price":rr.get("price")})
             rows.sort(key=lambda z:z["score"],reverse=True)
             with open("data/latest.json","w") as f:json.dump({"updated":time.time(),"rows":rows},f,indent=2)
 
