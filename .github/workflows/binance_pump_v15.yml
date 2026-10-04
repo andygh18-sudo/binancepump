@@ -67,6 +67,21 @@ jobs:
           V158_MIN_QUOTE_VOLUME: "10000"
           V158_PROMOTION_TTL: "180"
           V158_PROMOTION_SCORE: "55"
+          V158_EARLY_MOMENTUM_RECOVERY_ENABLED: "1"
+          V158_RECOVERY_MIN_REGIME: "55"
+          V158_RECOVERY_MIN_INTENSITY: "1.5"
+          V158_RECOVERY_MIN_TRADE_SIZE: "1.0"
+          V158_PARTICIPATION_IGNITION_ENABLED: "1"
+          V158_PARTICIPATION_MIN_TRADE_Z: "2.0"
+          V158_PARTICIPATION_MIN_VOLUME_Z: "2.0"
+          V158_PARTICIPATION_MIN_BUY: "0.60"
+          V158_PARTICIPATION_MIN_ACCEL: "1.50"
+          V158_DIRECTIONAL_ACCELERATION_ENABLED: "1"
+          V158_DIRECTIONAL_MIN_BUY_SLOPE: "0.025"
+          V158_DIRECTIONAL_MIN_PRICE_10S: "0.10"
+          V158_DIRECTIONAL_MIN_PRICE_60S: "0.00"
+          V158_DIRECTIONAL_MIN_CVD_Z: "0.50"
+          V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z: "2.50"
           MAX_SYMBOLS: "120"
           MIN_QUOTE_VOLUME: "100000"
           DISCOVERY_MIN_QUOTE_VOLUME: "50000"
@@ -121,15 +136,19 @@ jobs:
           git fetch origin main
           cp data/v157_observations.jsonl /tmp/v157_observations.jsonl 2>/dev/null || : > /tmp/v157_observations.jsonl
           cp data/v158_discovery.jsonl /tmp/v158_discovery.jsonl 2>/dev/null || : > /tmp/v158_discovery.jsonl
+          cp data/v158_participation_ignition.json /tmp/v158_participation_ignition.json 2>/dev/null || true
+          cp data/v158_directional_ignition.json /tmp/v158_directional_ignition.json 2>/dev/null || true
           cp data/latest.json /tmp/latest.json 2>/dev/null || true
           cp data/v157_fastest_pump_leaderboard.json /tmp/v157_fastest_pump_leaderboard.json 2>/dev/null || true
           git reset --hard origin/main
           mkdir -p data
           cp /tmp/v157_observations.jsonl data/v157_observations.jsonl
           cp /tmp/v158_discovery.jsonl data/v158_discovery.jsonl
+          if [ -f /tmp/v158_participation_ignition.json ]; then cp /tmp/v158_participation_ignition.json data/v158_participation_ignition.json; fi
+          if [ -f /tmp/v158_directional_ignition.json ]; then cp /tmp/v158_directional_ignition.json data/v158_directional_ignition.json; fi
           if [ -f /tmp/latest.json ]; then cp /tmp/latest.json data/latest.json; fi
           if [ -f /tmp/v157_fastest_pump_leaderboard.json ]; then cp /tmp/v157_fastest_pump_leaderboard.json data/v157_fastest_pump_leaderboard.json; fi
-          git add -f data/v157_observations.jsonl data/v158_discovery.jsonl data/latest.json data/v157_fastest_pump_leaderboard.json
+          git add -f data/v157_observations.jsonl data/v158_discovery.jsonl data/v158_participation_ignition.json data/v158_directional_ignition.json data/latest.json data/v157_fastest_pump_leaderboard.json
           if git diff --cached --quiet; then
             echo "No new V15.7 data to publish."
             exit 0
