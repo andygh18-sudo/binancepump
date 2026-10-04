@@ -157,6 +157,9 @@ def persist_v157_observations(rows, fast_candidates, state, books, alerted_symbo
             "v158_xvenue_confirmed":bool(row.get("v158_xvenue_confirmed",False)),
             "v158_trade_age_s":_safe_float(row.get("v158_trade_age_s"),999.0),
             "v158_book_age_s":_safe_float(row.get("v158_book_age_s"),999.0),
+            "cross_section_rank":_safe_float(row.get("cross_section_rank")),
+            "cross_section_percentile":_safe_float(row.get("cross_section_percentile")),
+            "cross_section_route_score":_safe_float(row.get("cross_section_route_score")),
         }
         rec.update(micro)
         records.append(rec)
