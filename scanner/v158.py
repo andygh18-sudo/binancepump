@@ -89,6 +89,55 @@ def depth_sweep_features(state,books,symbol):
     except Exception:
         return {"v158_sweep_score":0.0}
 
+def replenishment_absorption_features(state,books,symbol):
+    """Detect repeated aggressive-flow absorption followed by L2 replenishment.
+    Existing aggTrade + depth@100ms only; advisory, not a hard gate.
+    """
+    b=books.get(symbol); x=state[symbol]
+    empty={"v158_absorption_persistence_score":0.0,"v158_ask_replenishment_ratio":0.0,"v158_bid_replenishment_ratio":0.0,"v158_ask_replenishment_events":0,"v158_bid_replenishment_events":0,"v158_ask_absorption_events":0,"v158_bid_absorption_events":0,"v158_absorption_price_response":0.0,"v158_absorption_state":"NO_BOOK"}
+    if not b or not getattr(b,"ready",False): return empty
+    try:
+        asks=sorted((float(p),float(q)) for p,q in b.asks.items() if float(q)>0); bids=sorted(((float(p),float(q)) for p,q in b.bids.items() if float(q)>0),reverse=True)
+        if not asks or not bids:return empty
+        mid=(asks[0][0]+bids[0][0])/2.0
+        def near(levels,side):
+            total=0.0
+            for price,qty in levels:
+                dist=((price-mid)/mid*10000.0) if side=="ask" else ((mid-price)/mid*10000.0)
+                if 0<=dist<=10: total+=price*qty
+            return total
+        ask10,bid10=near(asks,"ask"),near(bids,"bid"); now=time.time()
+        trades=[z for z in x.get("trades",[]) if z[0]>=now-10]; flow=sum(float(z[2]) for z in trades); buy_flow=sum(float(z[2]) for z in trades if z[3]); buy_ratio=buy_flow/flow if flow else 0.5
+        p10=((trades[-1][1]/trades[0][1])-1.0)*100.0 if len(trades)>1 and trades[0][1] else 0.0
+        st=x.setdefault("v158_absorption_state",{"prev_ask":0.0,"prev_bid":0.0,"ask_pending":False,"bid_pending":False,"ask_floor":0.0,"bid_floor":0.0,"ask_pending_ts":0.0,"bid_pending_ts":0.0}); hist=x.setdefault("v158_absorption_history",deque(maxlen=60))
+        prev_ask=float(st.get("prev_ask",0) or 0); prev_bid=float(st.get("prev_bid",0) or 0); ask_drop=(1-ask10/max(prev_ask,1e-9)) if prev_ask>0 else 0.0; bid_drop=(1-bid10/max(prev_bid,1e-9)) if prev_bid>0 else 0.0
+        ask_abs=ask_drop>=0.10 and buy_ratio>=0.55 and flow>0; bid_abs=bid_drop>=0.10 and buy_ratio<=0.45 and flow>0
+        if ask_abs:
+            if not st.get("ask_pending"): st["ask_floor"]=ask10
+            else: st["ask_floor"]=min(float(st.get("ask_floor",ask10) or ask10),ask10)
+            st["ask_pending"]=True; st["ask_pending_ts"]=now
+        elif st.get("ask_pending") and ask10>=float(st.get("ask_floor",ask10) or ask10)*1.12: st["ask_pending"]=False
+        if bid_abs:
+            if not st.get("bid_pending"): st["bid_floor"]=bid10
+            else: st["bid_floor"]=min(float(st.get("bid_floor",bid10) or bid10),bid10)
+            st["bid_pending"]=True; st["bid_pending_ts"]=now
+        elif st.get("bid_pending") and bid10>=float(st.get("bid_floor",bid10) or bid10)*1.12: st["bid_pending"]=False
+        hist.append({"ts":now,"ask":ask10,"bid":bid10,"ask_abs":int(ask_abs),"bid_abs":int(bid_abs),"buy_ratio":buy_ratio,"p10":p10})
+        if st.get("ask_pending") and now-float(st.get("ask_pending_ts",now))>30: st["ask_pending"]=False
+        if st.get("bid_pending") and now-float(st.get("bid_pending_ts",now))>30: st["bid_pending"]=False
+        recent=list(hist); ask_abs_events=sum(int(h.get("ask_abs",0)) for h in recent); bid_abs_events=sum(int(h.get("bid_abs",0)) for h in recent)
+        ask_repl=sum(1 for i in range(1,len(recent)) if recent[i].get("ask_abs") and recent[i].get("ask",0)>=max(recent[i-1].get("ask",0),1e-9)*1.12); bid_repl=sum(1 for i in range(1,len(recent)) if recent[i].get("bid_abs") and recent[i].get("bid",0)>=max(recent[i-1].get("bid",0),1e-9)*1.12)
+        ask_ratio=min(1.0,ask_repl/max(ask_abs_events,1)); bid_ratio=min(1.0,bid_repl/max(bid_abs_events,1)); persistence=min(100.0,ask_ratio*45.0+min(ask_repl/3.0,1.0)*25.0+min(bid_repl/2.0,1.0)*10.0)
+        response_score=min(20.0,max(0.0,(max(-1.0,min(2.0,p10))+0.25)/2.25*20.0)); directional=min(1.0,max(0.0,(buy_ratio-0.50)/0.25)); score=persistence*0.55+response_score*0.25+directional*20.0
+        seller_wall=ask_abs_events>=2 and ask_repl>=1 and buy_ratio>=0.58 and p10<0.10; bid_support=bid_repl>=1 and buy_ratio<=0.50
+        if seller_wall: label="SELLER_ABSORPTION"
+        elif score>=60 and (ask_repl>=1 or bid_support): label="BULLISH_REPLENISHMENT"
+        elif ask_abs_events or bid_abs_events: label="ABSORPTION_BUILDING"
+        else: label="NEUTRAL"
+        st["prev_ask"]=ask10; st["prev_bid"]=bid10
+        return {"v158_absorption_persistence_score":round(max(0,min(100,score)),1),"v158_ask_replenishment_ratio":round(ask_ratio,3),"v158_bid_replenishment_ratio":round(bid_ratio,3),"v158_ask_replenishment_events":ask_repl,"v158_bid_replenishment_events":bid_repl,"v158_ask_absorption_events":ask_abs_events,"v158_bid_absorption_events":bid_abs_events,"v158_absorption_price_response":round(p10,4),"v158_absorption_state":label,"v158_ask_absorption_pending":bool(st.get("ask_pending",False)),"v158_bid_absorption_pending":bool(st.get("bid_pending",False))}
+    except Exception: return empty
+
 def adaptive_book_features(state,books,symbol):
     """Detect unusual ask-liquidity depletion/book vacuum cheaply from existing depth data."""
     b=books.get(symbol)
