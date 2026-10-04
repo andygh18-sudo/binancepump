@@ -2120,6 +2120,23 @@ async def main():
                         except Exception:
                             pass
 
+                        directional_candidates=[]
+                        if V158_DIRECTIONAL_ACCELERATION_ENABLED:
+                            for rr in rows:
+                                direction=v158_directional_ignition(rr)
+                                rr.update(direction)
+                                if direction.get("v158_directional_ignition"):
+                                    directional_candidates.append(rr)
+                                    sx=str(rr.get("symbol","")).upper()
+                                    state[sx]["v158_directional_ignition_active"]=True
+                                    state[sx]["v158_directional_ignition_score"]=float(direction.get("v158_directional_score",0) or 0)
+                                    state[sx]["v158_directional_ignition_last"]=time.time()
+                        directional_candidates=sorted(directional_candidates,key=lambda x:float(x.get("v158_directional_score",0) or 0),reverse=True)
+                        try:
+                            with open("data/v158_directional_ignition.json","w") as df:
+                                json.dump({"updated":time.time(),"tier":"TIER_1C_DIRECTIONAL_IGNITION","prerequisite":"TIER_1B_PARTICIPATION_IGNITION","thresholds":{"buy_slope_min":V158_DIRECTIONAL_MIN_BUY_SLOPE,"price_10s_min_pct":V158_DIRECTIONAL_MIN_PRICE_10S,"price_60s_min_pct":V158_DIRECTIONAL_MIN_PRICE_60S,"cvd_z_min":V158_DIRECTIONAL_MIN_CVD_Z,"price_impact_z_max":V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z},"count":len(directional_candidates),"candidates":directional_candidates[:20]},df,indent=2)
+                        except Exception:
+                            pass
                         # V15.7-only learning persistence. Legacy V15/V15.4/V15.6
                         # learning files are intentionally no longer written.
                         now_v157=time.time()
