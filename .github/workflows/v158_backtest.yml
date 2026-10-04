@@ -1,0 +1,59 @@
+name: V15.8 Replay Backtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "events or snapshot"
+        required: true
+        default: "snapshot"
+        type: choice
+        options: [snapshot, events]
+      input:
+        description: "Replay file/directory"
+        required: true
+        default: "data/v157_observations.jsonl"
+        type: string
+      profile:
+        description: "V15.8 ablation profile"
+        required: true
+        default: "full"
+        type: choice
+        options: [v157, adaptive, sweep, replenishment, full]
+      allow_missing_exhaustion:
+        description: "Allow event replay without historical exhaustion"
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile replay engine
+        run: python -m py_compile backtest/v158_replay.py
+      - name: Run V15.8 replay
+        env:
+          MODE: ${{ inputs.mode }}
+          INPUT: ${{ inputs.input }}
+          PROFILE: ${{ inputs.profile }}
+          ALLOW_MISSING: ${{ inputs.allow_missing_exhaustion }}
+        run: |
+          args=(--mode "$MODE" --input "$INPUT" --profile "$PROFILE" --output data/v158_backtest_results.json)
+          if [ "$ALLOW_MISSING" = "true" ]; then
+            args+=(--allow-missing-exhaustion)
+          fi
+          python backtest/v158_replay.py "${args[@]}"
+      - name: Publish backtest result
+        uses: actions/upload-artifact@v4
+        with:
+          name: v158-backtest-${{ inputs.profile }}
+          path: data/v158_backtest_results.json
+          if-no-files-found: error
