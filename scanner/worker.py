@@ -1661,6 +1661,26 @@ async def main():
                                     state[sx]["v158_recovery_active"]=True
                                     state[sx]["v158_recovery_score"]=float(rec.get("v158_early_momentum_recovery_score",0) or 0)
                                     state[sx]["v158_recovery_last"]=time.time()
+                        recovery_candidates=sorted(
+                            recovery_candidates,
+                            key=lambda x:float(x.get("v158_early_momentum_recovery_score",0) or 0),
+                            reverse=True
+                        )
+                        try:
+                            with open("data/v158_early_momentum_recovery.json","w") as rf:
+                                json.dump({
+                                    "updated":time.time(),
+                                    "tier":"TIER_1_STRONG",
+                                    "thresholds":{
+                                        "regime_change_min":V158_RECOVERY_MIN_REGIME,
+                                        "intensity_z_min":V158_RECOVERY_MIN_INTENSITY,
+                                        "trade_size_z_min":V158_RECOVERY_MIN_TRADE_SIZE
+                                    },
+                                    "count":len(recovery_candidates),
+                                    "candidates":recovery_candidates[:20]
+                                },rf,indent=2)
+                        except Exception:
+                            pass
 
                         fast_pump_candidates=sorted(
                             fast_pump_candidates,
