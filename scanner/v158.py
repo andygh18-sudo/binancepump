@@ -24,10 +24,10 @@ def adaptive_micro_features(state,books,symbol):
     tz=_robust_z(trade_rate,[p.get("trade_rate",0) for p in prior]);vz=_robust_z(volume_rate,[p.get("volume_rate",0) for p in prior])
     sz=_robust_z(avg_trade,[p.get("avg_trade",0) for p in prior]);cz=_robust_z(cvd,[p.get("cvd",0) for p in prior]);piz=_robust_z(px_per_trade,[p.get("px_per_trade",0) for p in prior])
     buy_delta=buy_ratio-(statistics.median([p.get("buy_ratio",0.5) for p in prior]) if prior else 0.5)
-    intensity=max(-8.0,min(8.0,vz-tz));positive=sum(1 for p in prior[-6:] if p.get("trade_z",0)>1.0 or p.get("volume_z",0)>1.0)
+    intensity=max(-8.0,min(8.0,vz-tz)); participation=math.sqrt(max(tz,0.0)**2+max(vz,0.0)**2); synchronized=min(8.0,participation/math.sqrt(2.0));positive=sum(1 for p in prior[-6:] if p.get("trade_z",0)>1.0 or p.get("volume_z",0)>1.0)
     regime=max(0.0,min(100.0,_clip01(max(tz,0)/3)*35+_clip01(max(vz,0)/3)*25+_clip01(max(cz,0)/3)*20+_clip01(max(intensity,0)/3)*10+_clip01(positive/4)*10))
     hist.append({"ts":now,"trade_rate":trade_rate,"volume_rate":volume_rate,"avg_trade":avg_trade,"cvd":cvd,"buy_ratio":buy_ratio,"px_per_trade":px_per_trade,"trade_z":tz,"volume_z":vz})
-    return {"adaptive_trade_rate":round(trade_rate,4),"adaptive_volume_rate":round(volume_rate,4),"adaptive_avg_trade_size":round(avg_trade,4),"adaptive_buy_ratio":round(buy_ratio,4),"adaptive_buy_delta":round(buy_delta,4),"adaptive_trade_z":round(tz,3),"adaptive_volume_z":round(vz,3),"adaptive_trade_size_z":round(sz,3),"adaptive_cvd_z":round(cz,3),"adaptive_intensity_z":round(intensity,3),"adaptive_price_impact_z":round(piz,3),"adaptive_regime_change":round(regime,1),"adaptive_baseline_samples":len(prior)}
+    return {"adaptive_trade_rate":round(trade_rate,4),"adaptive_volume_rate":round(volume_rate,4),"adaptive_avg_trade_size":round(avg_trade,4),"adaptive_buy_ratio":round(buy_ratio,4),"adaptive_buy_delta":round(buy_delta,4),"adaptive_trade_z":round(tz,3),"adaptive_volume_z":round(vz,3),"adaptive_participation_z":round(participation,3),"adaptive_synchronized_flow_z":round(synchronized,3),"adaptive_trade_size_z":round(sz,3),"adaptive_cvd_z":round(cz,3),"adaptive_intensity_z":round(intensity,3),"adaptive_price_impact_z":round(piz,3),"adaptive_regime_change":round(regime,1),"adaptive_baseline_samples":len(prior)}
 
 def depth_sweep_features(state,books,symbol):
     """Measure executable liquidity cost/capacity across near-price ask/bid bands.
