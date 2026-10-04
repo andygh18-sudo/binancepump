@@ -146,7 +146,7 @@ def events(path,h,strict,profile):
     for e in E:
         s=str(e.get("symbol") or e.get("s") or "").upper();typ=str(e.get("event") or e.get("type") or "").lower()
         if not s:continue
-        n=ts(e.get("ts",e.get("time")));x=S[s];x.prune(n)
+        n=ts(e.get("ts",e.get("time")));x=states[s];x.prune(n)
         if typ in ("trade","aggtrade","agg_trade"):
             p=f(e.get("price",e.get("p")));q=f(e.get("qty",e.get("q")));maker=str(e.get("is_buyer_maker",e.get("m",""))).lower() in ("1","true","yes")
             x.t.append((n,p,p*q,not maker));x.p.append((n,p));prices[s].append({"ts":n,"price":p})
