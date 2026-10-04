@@ -42,6 +42,25 @@ jobs:
         run: |
           mkdir -p data/v158_proxy_results
           python backtest/v158_batch_replay.py --input data/replay/aggtrades --allow-missing-exhaustion --output-dir data/v158_proxy_results
+      - name: Run V15.8 Tier-1 replay
+        run: |
+          python backtest/v158_tier_replay.py --input data/replay/aggtrades --allow-missing-exhaustion --output data/v158_proxy_results/tier1.json
+      - name: Build comparison
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          root=pathlib.Path("data/v158_proxy_results")
+          out={}
+          for p in ("v157","adaptive","sweep","replenishment","full"):
+              out[p]=json.loads((root/f"{p}.json").read_text())["summary"]
+          out["tier1"]=json.loads((root/"tier1.json").read_text())["summary"]
+          (root/"comparison.json").write_text(json.dumps({
+              "engine":"V15.8 historical aggTrade proxy",
+              "warning":"Proxy only: historical exhaustion, L2 depth, TradingView/BTC regime, cross-sectional routing and dynamic discovery are unavailable.",
+              "profiles":out
+          },indent=2))
+          print(json.dumps(out,indent=2))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: v158-historical-proxy-results
