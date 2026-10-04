@@ -32,7 +32,7 @@ def z(v,h):
     m=statistics.median(a); mad=statistics.median(abs(x-m) for x in a)
     return max(-8,min(8,(v-m)/max(1.4826*mad,abs(m)*.05,1e-9)))
 
-class S:
+class ReplayState:
     def __init__(self):
         self.t=deque(maxlen=20000); self.p=deque(maxlen=20000); self.d=None
         self.ah=deque(maxlen=60); self.rh=deque(maxlen=60)
@@ -142,7 +142,7 @@ def snapshot(path,h):
     return out
 
 def events(path,h,strict,profile):
-    E=sorted(load(path),key=lambda x:ts(x.get("ts",x.get("time"))));S=defaultdict(S);prices=defaultdict(list);sig=[]
+    E=sorted(load(path),key=lambda x:ts(x.get("ts",x.get("time"))));states=defaultdict(ReplayState);prices=defaultdict(list);sig=[]
     for e in E:
         s=str(e.get("symbol") or e.get("s") or "").upper();typ=str(e.get("event") or e.get("type") or "").lower()
         if not s:continue
