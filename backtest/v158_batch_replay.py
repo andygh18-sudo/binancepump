@@ -20,8 +20,8 @@ HORIZONS = (30, 60, 180, 300, 600, 1800)
 class FastState(ReplayState):
     def __init__(self):
         super().__init__()
-        self.w10=deque(); self.w30=deque(); self.w60=deque()
-        self.s10=[0,0,0]; self.s30=[0,0,0]; self.s60=[0,0,0]
+        self.w10=deque(); self.w30=deque(); self.w60=deque(); self.w300=deque()
+        self.s10=[0,0,0]; self.s30=[0,0,0]; self.s60=[0,0,0]; self.s300=[0,0,0]
         self.snap=deque(maxlen=150)
 
     @staticmethod
@@ -41,6 +41,7 @@ class FastState(ReplayState):
         self._add(self.w10,self.s10,item)
         self._add(self.w30,self.s30,item)
         self._add(self.w60,self.s60,item)
+        self._add(self.w300,self.s300,item)
         self.t.append(item)
         self.p.append((item[0],item[1]))
 
@@ -48,6 +49,7 @@ class FastState(ReplayState):
         self._trim(self.w10,self.s10,n,10)
         self._trim(self.w30,self.s30,n,30)
         self._trim(self.w60,self.s60,n,60)
+        self._trim(self.w300,self.s300,n,300)
         while self.p and self.p[0][0] < n-650:
             self.p.popleft()
         while self.t and self.t[0][0] < n-650:
@@ -63,10 +65,11 @@ class FastState(ReplayState):
         n10,v10,b10,p10=self.stat_fast(self.w10,self.s10)
         _,v30,b30,p30=self.stat_fast(self.w30,self.s30)
         _,v60,b60,p60=self.stat_fast(self.w60,self.s60)
+        _,v300,b300,p300=self.stat_fast(self.w300,self.s300)
         # Preserve the existing engine's formulas.
         a=v10/max(v60/6,1)
         cvd=2*b10-1 if v10 else 0
-        total300=sum(x[2] for x in self.t if x[0]>=n-300)
+        total300=v300
         # t is now at most 650s, so this is bounded; use snapshots below for
         # longer price lookbacks.
         self.snap.append((n,self.p[-1][1] if self.p else 0))
@@ -213,9 +216,35 @@ def run(input_path, allow_missing):
                "adaptive_bonus":ab,"sweep_bonus":sb,"replenishment_bonus":rb}
             r.update(m);r.update(a);r.update(bk)
             signals[profile].append(r)
-    # Indexed outcomes are calculated once per profile from the same price path.
+    # Build the coarse price index once and reuse it for all profiles.
+    indexed_by=defaultdict(list)
+    for s,rows in prices.items():
+        cur=None; hi=lo=last=None
+        for t,p in rows:
+            b=int(t//5)
+            if cur is None or b!=cur:
+                if cur is not None: indexed_by[s].append((cur*5,hi,lo,last))
+                cur=b; hi=p; lo=p; last=p
+            else:
+                hi=max(hi,p); lo=min(lo,p); last=p
+        if cur is not None: indexed_by[s].append((cur*5,hi,lo,last))
     for p in PROFILES:
-        indexed_outcomes([(s,t,pr) for s,rows in prices.items() for t,pr in rows], signals[p])
+        for sig in signals[p]:
+            rows=indexed_by[sig["symbol"]]; times=[x[0] for x in rows]
+            i=bisect.bisect_right(times,sig["ts"]); p0=sig["price"]
+            for sec in HORIZONS:
+                j=bisect.bisect_right(times,sig["ts"]+sec); q=rows[i:j]
+                if q:
+                    sig[f"mfe_{sec}s"]=max(pct(p0,x[1]) for x in q)
+                    sig[f"mae_{sec}s"]=min(pct(p0,x[2]) for x in q)
+                else:
+                    sig[f"mfe_{sec}s"]=None; sig[f"mae_{sec}s"]=None
+            target=p0*1.05; tt=None
+            for k in range(i,bisect.bisect_right(times,sig["ts"]+1800)):
+                if rows[k][1]>=target:
+                    tt=max(0,rows[k][0]-sig["ts"]); break
+            sig["time_to_5pct_s"]=tt
+            sig["time_to_2pct_s"]=None; sig["time_to_10pct_s"]=None
     return signals
 
 def main():
