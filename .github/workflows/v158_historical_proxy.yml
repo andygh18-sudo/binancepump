@@ -1,0 +1,66 @@
+name: V15.8 Historical Proxy Backtest
+
+on:
+  push:
+    paths:
+      - "backtest/**"
+      - ".github/workflows/v158_historical_proxy.yml"
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated Binance Spot symbols"
+        required: true
+        default: "ONEUSDT,GLMRUSDT,SANDUSDT,NIGHTUSDT,MOVRUSDT,CELOUSDT,GRTUSDT,SYRUPUSDT,RAREUSDT,AMPUSDT,HBARUSDT,ZECUSDT,ZENUSDT,ZROUSDT"
+        type: string
+      start:
+        description: "UTC start date"
+        required: true
+        default: "2026-10-01"
+        type: string
+      end:
+        description: "UTC end date"
+        required: true
+        default: "2026-10-03"
+        type: string
+
+jobs:
+  proxy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download Binance aggTrades
+        env:
+          SYMBOLS: ${{ inputs.symbols || 'ONEUSDT,GLMRUSDT,SANDUSDT,NIGHTUSDT,MOVRUSDT,CELOUSDT,GRTUSDT,SYRUPUSDT,RAREUSDT,AMPUSDT,HBARUSDT,ZECUSDT,ZENUSDT,ZROUSDT' }}
+          START: ${{ inputs.start || '2026-10-01' }}
+          END: ${{ inputs.end || '2026-10-03' }}
+        run: python backtest/download_binance_aggtrades.py --symbols "$SYMBOLS" --start "$START" --end "$END" --out data/replay/aggtrades
+      - name: Run V15.7 and V15.8 profiles
+        run: |
+          mkdir -p data/v158_proxy_results
+          for profile in v157 adaptive sweep replenishment full; do
+            python backtest/v158_replay.py --mode events --input data/replay/aggtrades --profile "$profile" --allow-missing-exhaustion --output "data/v158_proxy_results/$profile.json"
+          done
+      - name: Build comparison
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          root=pathlib.Path("data/v158_proxy_results")
+          out={}
+          for p in ("v157","adaptive","sweep","replenishment","full"):
+              x=json.loads((root/f"{p}.json").read_text())
+              out[p]=x["summary"]
+          (root/"comparison.json").write_text(json.dumps({
+              "engine":"V15.8 historical aggTrade proxy",
+              "warning":"Not an exact production replay: historical exhaustion, L2 depth, TradingView/BTC regime, cross-sectional routing and dynamic discovery are unavailable.",
+              "profiles":out
+          },indent=2))
+          print(json.dumps(out,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v158-historical-proxy-results
+          path: data/v158_proxy_results/
