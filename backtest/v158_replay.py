@@ -51,7 +51,7 @@ class ReplayState:
     def micro(self,n):
         n10,v10,b10,p10=self.stat(n,10);_,v30,b30,p30=self.stat(n,30);_,v60,b60,p60=self.stat(n,60)
         a=v10/max(v60/6,1);cvd=2*b10-1 if v10 else 0
-        return {"trades_10s":n10,"flow_10s":v10,"buy_pressure":b10,"trade_accel":a,
+        return {"trades_10s":n10,"flow_10s":v10,"buy_pressure":b10,"trade_accel":a,"volume_ratio":v60/max(sum(x[2] for x in self.t if x[0]>=n-300)/5,1),
                 "cvd_10s":cvd,"buy_slope":b10-(b30 if v30 else .5),
                 "price_10s":p10,"price_30s":p30,"price_60s":p60,
                 "price_1m":self.oldmove(n,60),"price_5m":self.oldmove(n,300),
@@ -165,11 +165,41 @@ def events(path,h,strict,profile):
         exh=e.get("exhaustion_score");exh=f(exh) if exh not in (None,"") else None
         ok,why=gates(m,exh,strict)
         if ok:
-            if profile=="v157":a={};bk={}
-            elif profile=="adaptive":bk={}
-            elif profile=="sweep":bk={k:v for k,v in bk.items() if "absorption" not in k and "replenishment" not in k}
-            elif profile=="replenishment":bk={k:v for k,v in bk.items() if "sweep" not in k and "capacity" not in k and "asymmetry" not in k}
-            r={"symbol":s,"ts":n,"price":x.p[-1][1],"profile":profile,"exhaustion_score":exh,"gate_failures":why};r.update(m);r.update(a);r.update(bk);sig.append(r)
+            flow_score=min(max((m["buy_pressure"]-.50)/.20,0),1)*18
+            buy_slope_score=min(max((m["buy_slope"]-.01)/.10,0),1)*14
+            accel_score=min(max((m["trade_accel"]-1.0)/1.5,0),1)*18
+            accel_slope_score=min(max((m["accel_slope"]+.05)/.75,0),1)*10
+            volume_accel_score=min(max((m["trade_accel"]-1.0)/2.5,0),1)*12
+            cvd_score=min(max((m["cvd_10s"]+.05)/.55,0),1)*10
+            micro_price_score=min(max((m["price_10s"]+.10)/1.50,0),1)*4
+            price_score=min(max((m["price_1m"]+.05)/1.50,0),1)*2
+            structure_score=0.0
+            if bk.get("book_ready"):
+                bids=bk.get("v158_bid_capacity_10bps",0); asks=bk.get("v158_ask_capacity_10bps",0)
+                structure_score += 3 if bids>=asks else 0
+                structure_score += 2 if bk.get("v158_ask_sweep_cost_bps",999)<=12 else 0
+            adaptive_bonus=0.0
+            if profile in ("adaptive","sweep","replenishment","full"):
+                if a.get("adaptive_regime_change",0)>=55: adaptive_bonus+=2
+                if a.get("adaptive_intensity_z",0)>=1.5 and a.get("adaptive_trade_size_z",0)>=1.0: adaptive_bonus+=1
+                if a.get("adaptive_price_impact_z",0)>=1.5: adaptive_bonus+=1
+            sweep_bonus=0.0
+            if profile in ("sweep","full"):
+                ss=bk.get("v158_sweep_score",0)
+                sweep_bonus=3 if ss>=70 else 2 if ss>=55 else 1 if ss>=40 else 0
+                if bk.get("v158_ask_capacity_10bps",0)>0 and bk.get("v158_bid_capacity_10bps",0)>0 and bk.get("v158_ask_capacity_10bps",0)<bk.get("v158_bid_capacity_10bps",0)*.65: sweep_bonus+=1
+            repl_bonus=0.0
+            if profile in ("replenishment","full"):
+                ps=bk.get("v158_absorption_persistence_score",0); st=bk.get("v158_absorption_state",""); resp=bk.get("v158_absorption_price_response",0)
+                repl_bonus=3 if st=="BULLISH_REPLENISHMENT" and ps>=60 else 1.5 if ps>=45 and resp>0 else 0
+                if st=="SELLER_ABSORPTION": repl_bonus-=2
+            dynamic_exhaustion=(exh or 0)+max(0,m["price_1m"]-1.50)*3+max(0,m["price_5m"]-4.0)*1.5
+            exhaustion_penalty=max(0,dynamic_exhaustion-20)*.65
+            fast_score=max(0,min(round(flow_score+buy_slope_score+accel_score+accel_slope_score+volume_accel_score+cvd_score+micro_price_score+price_score+structure_score+adaptive_bonus+sweep_bonus+repl_bonus-exhaustion_penalty),100))
+            if fast_score < 72: continue
+            r={"symbol":s,"ts":n,"price":x.p[-1][1],"profile":profile,"exhaustion_score":exh,"fast_score":fast_score,
+               "adaptive_bonus":adaptive_bonus,"sweep_bonus":sweep_bonus,"replenishment_bonus":repl_bonus,"gate_failures":why}
+            r.update(m);r.update(a);r.update(bk);sig.append(r)
     for r in sig:
         rows=prices[r["symbol"]];r.update(outcomes(rows,r,h))
     return sig
