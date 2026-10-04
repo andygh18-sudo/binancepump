@@ -966,7 +966,8 @@ def v158_directional_ignition(r):
     """Participation ignition confirmed by directional acceleration; advisory only."""
     if not V158_DIRECTIONAL_ACCELERATION_ENABLED or not isinstance(r,dict):
         return {"v158_directional_ignition":False,"v158_directional_tier":"OFF","v158_directional_score":0.0}
-    participation=bool(r.get("v158_participation_ignition",False))
+    tz=float(r.get("adaptive_trade_z",0) or 0);vz=float(r.get("adaptive_volume_z",0) or 0)
+    participation=(tz>=V158_PARTICIPATION_MIN_TRADE_Z and vz>=V158_PARTICIPATION_MIN_VOLUME_Z and float(r.get("buy_pressure",0) or 0)>=V158_PARTICIPATION_MIN_BUY and float(r.get("trade_accel",0) or 0)>=V158_PARTICIPATION_MIN_ACCEL)
     buy_slope=float(r.get("v158_directional_buy_slope",0) or 0)
     p10=float(r.get("price_10s",0) or 0);p60=float(r.get("price_60s",0) or 0)
     cvd_z=float(r.get("adaptive_cvd_z",0) or 0);impact_z=float(r.get("adaptive_price_impact_z",0) or 0)
