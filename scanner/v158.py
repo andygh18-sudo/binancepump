@@ -114,6 +114,7 @@ class MarketDiscovery:
         self.items={}
         self.promoted={}
         self.events=0
+        self.cross_section_refresh=0
 
     def update(self, t):
         try:
@@ -157,8 +158,12 @@ class MarketDiscovery:
                   "score":score,"pct24h":pct,"quote_volume":quote}
             self.items[s]=item
             self.events+=1
+            self._refresh_cross_section(now)
+            item=self.items[s]
             eligible=(quote>=self.min_quote_volume and
-                      score>=self.min_score and
+                      (score>=self.min_score or
+                       (float(item.get("cross_section_percentile",0.0))>=99.0 and
+                        int(item.get("cross_section_rank",999999))<=max(20,self.max_promoted))) and
                       (velocity>=0.025 or trade_anomaly>=1.45 or pct>=2.0))
             if eligible:
                 self.promoted[s]=max(now+self.ttl,self.promoted.get(s,0))
@@ -168,6 +173,34 @@ class MarketDiscovery:
         except Exception:
             return None
         return None
+
+    def _refresh_cross_section(self, now):
+        """Rank discovery anomalies across the live Binance universe.
+        Routing-only: downstream V15.7/V15.8 scores and hard gates are unchanged.
+        """
+        items=[(s,v) for s,v in self.items.items()
+               if float(v.get("quote_volume",0) or 0)>=self.min_quote_volume]
+        if len(items)<10:
+            for s,v in items:
+                v["cross_section_rank"]=len(items)
+                v["cross_section_percentile"]=0.0
+                v["cross_section_route_score"]=float(v.get("score",0) or 0)
+            return
+        def key(v):
+            return (
+                0.45*min(max(float(v.get("score",0) or 0)/100.0,0),1) +
+                0.20*min(max(float(v.get("trade_anomaly",1) or 1)/4.0,0),1) +
+                0.20*min(max(float(v.get("velocity_pct_s",0) or 0)/0.10,0),1) +
+                0.15*min(max(float(v.get("volume_rate",0) or 0)/(max(float(v.get("quote_volume",0) or 1),1)*0.02),0),1)
+            )
+        ranked=sorted(items,key=lambda sv:key(sv[1]),reverse=True)
+        n=len(ranked)
+        for rank,(s,v) in enumerate(ranked,1):
+            pct=1.0-(rank-1)/max(n-1,1)
+            v["cross_section_rank"]=rank
+            v["cross_section_percentile"]=round(pct*100.0,2)
+            v["cross_section_route_score"]=round(key(v)*100.0,2)
+        self.cross_section_refresh+=1
 
     def _trim(self, now):
         active=[(s,t) for s,t in self.promoted.items() if t>now]
