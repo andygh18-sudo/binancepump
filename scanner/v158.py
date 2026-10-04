@@ -172,7 +172,7 @@ class MarketDiscovery:
                 self.promoted[s]=max(now+self.ttl,self.promoted.get(s,0))
             self._trim(now)
             if eligible:
-                return {"symbol":s,**item,"promotion_score":score}
+                return {"symbol":s,**item,"promotion_score":float(item.get("cross_section_route_score",score) or score)}
         except Exception:
             return None
         return None
@@ -202,7 +202,7 @@ class MarketDiscovery:
             pct=1.0-(rank-1)/max(n-1,1)
             v["cross_section_rank"]=rank
             v["cross_section_percentile"]=round(pct*100.0,2)
-            v["cross_section_route_score"]=round(key(v)*100.0,2)
+            v["cross_section_route_score"]=round(0.75*float(v.get("score",0) or 0)+0.25*pct*100.0,2)
         self.cross_section_refresh+=1
 
     def _trim(self, now):
