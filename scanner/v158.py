@@ -29,6 +29,66 @@ def adaptive_micro_features(state,books,symbol):
     hist.append({"ts":now,"trade_rate":trade_rate,"volume_rate":volume_rate,"avg_trade":avg_trade,"cvd":cvd,"buy_ratio":buy_ratio,"px_per_trade":px_per_trade,"trade_z":tz,"volume_z":vz})
     return {"adaptive_trade_rate":round(trade_rate,4),"adaptive_volume_rate":round(volume_rate,4),"adaptive_avg_trade_size":round(avg_trade,4),"adaptive_buy_ratio":round(buy_ratio,4),"adaptive_buy_delta":round(buy_delta,4),"adaptive_trade_z":round(tz,3),"adaptive_volume_z":round(vz,3),"adaptive_trade_size_z":round(sz,3),"adaptive_cvd_z":round(cz,3),"adaptive_intensity_z":round(intensity,3),"adaptive_price_impact_z":round(piz,3),"adaptive_regime_change":round(regime,1),"adaptive_baseline_samples":len(prior)}
 
+def depth_sweep_features(state,books,symbol):
+    """Measure executable liquidity cost/capacity across near-price ask/bid bands.
+    Uses the existing local L2 book; advisory only and intentionally cheap.
+    """
+    b=books.get(symbol)
+    if not b or not getattr(b,"ready",False):
+        return {"v158_sweep_score":0.0,"v158_ask_capacity_5bps":0.0,"v158_ask_capacity_10bps":0.0,
+                "v158_ask_capacity_25bps":0.0,"v158_bid_capacity_5bps":0.0,"v158_bid_capacity_10bps":0.0,
+                "v158_bid_capacity_25bps":0.0,"v158_ask_sweep_cost_bps":0.0,"v158_bid_sweep_cost_bps":0.0,
+                "v158_ask_liquidity_gap_bps":0.0,"v158_bid_liquidity_gap_bps":0.0,"v158_liquidity_asymmetry":0.0}
+    try:
+        asks=sorted((float(p),float(q)) for p,q in b.asks.items() if float(q)>0)
+        bids=sorted(((float(p),float(q)) for p,q in b.bids.items() if float(q)>0),reverse=True)
+        if not asks or not bids:return {"v158_sweep_score":0.0}
+        best_ask=asks[0][0];best_bid=bids[0][0];mid=(best_ask+best_bid)/2.0
+        if mid<=0:return {"v158_sweep_score":0.0}
+        def bands(levels,side):
+            out={5:0.0,10:0.0,25:0.0};gap=0.0;prev=0.0
+            for price,qty in levels:
+                dist=((price-mid)/mid*10000.0) if side=="ask" else ((mid-price)/mid*10000.0)
+                if dist<0:continue
+                notional=price*qty
+                for band in out:
+                    if dist<=band:out[band]+=notional
+                if gap==0.0 and dist>2.0 and prev>0 and dist-prev>5.0:gap=dist-prev
+                prev=dist
+            return out,gap
+        ask,gap_a=bands(asks,"ask");bid,gap_b=bands(bids,"bid")
+        # Cost-to-trade for a small normalized order: walk the book until the
+        # reference notional is filled, then report VWAP slippage from the touch.
+        hist=state[symbol].get("trades",[]);now=time.time();recent=[float(z[2]) for z in hist if z[0]>=now-10 and float(z[2])>0]
+        target=max(1000.0,(sum(recent)/max(len(recent),1))*max(len(recent),1)*0.25)
+        def sweep_cost(levels,target,side):
+            remaining=target;spent=0.0;qty=0.0
+            touch=levels[0][0]
+            for price,size in levels:
+                take=min(size,remaining/price)
+                if take<=0:break
+                spent+=take*price;qty+=take;remaining-=take*price
+                if remaining<=1e-9:break
+            if qty<=0 or remaining>target*0.01:return 0.0
+            vwap=spent/qty
+            return abs(vwap/touch-1.0)*10000.0
+        ask_cost=sweep_cost(asks,target,"ask");bid_cost=sweep_cost(bids,target,"bid")
+        ask10=ask.get(10,0.0);bid10=bid.get(10,0.0);ask25=ask.get(25,0.0);bid25=bid.get(25,0.0)
+        asym=(bid10-ask10)/max(bid10+ask10,1e-9)
+        thin=max(0.0,min(1.0,(target/max(ask10,1.0)-1.0)/4.0))
+        gap_score=max(0.0,min(gap_a/25.0,1.0))
+        cost_score=max(0.0,min(ask_cost/8.0,1.0))
+        sweep_score=max(0.0,min(100.0,thin*45.0+gap_score*20.0+cost_score*20.0+max(0.0,asym)*15.0))
+        return {"v158_sweep_score":round(sweep_score,1),"v158_ask_capacity_5bps":round(ask.get(5,0.0),2),
+                "v158_ask_capacity_10bps":round(ask10,2),"v158_ask_capacity_25bps":round(ask25,2),
+                "v158_bid_capacity_5bps":round(bid.get(5,0.0),2),"v158_bid_capacity_10bps":round(bid10,2),
+                "v158_bid_capacity_25bps":round(bid25,2),"v158_ask_sweep_cost_bps":round(ask_cost,3),
+                "v158_bid_sweep_cost_bps":round(bid_cost,3),"v158_ask_liquidity_gap_bps":round(gap_a,3),
+                "v158_bid_liquidity_gap_bps":round(gap_b,3),"v158_liquidity_asymmetry":round(asym,4),
+                "v158_sweep_target_notional":round(target,2)}
+    except Exception:
+        return {"v158_sweep_score":0.0}
+
 def adaptive_book_features(state,books,symbol):
     """Detect unusual ask-liquidity depletion/book vacuum cheaply from existing depth data."""
     b=books.get(symbol)
