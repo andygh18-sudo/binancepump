@@ -206,8 +206,6 @@ def run(input_path, allow_missing):
         exh=f(exh) if exh not in (None,"") else None
         ok,_=gates(m,exh,not allow_missing)
         if not ok: continue
-        base_score,*_=score_profile(m,a,bk,exh,"v157")
-        if base_score<72: continue
         for profile in PROFILES:
             score,ab,sb,rb=score_profile(m,a,bk,exh,profile)
             if score<72: continue
