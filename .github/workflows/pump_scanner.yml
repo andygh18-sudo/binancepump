@@ -88,6 +88,10 @@ jobs:
           V158_ENABLED: "1"
           V158_XVENUE_ENABLED: "1"
           V158_XVENUE_INTERVAL: "30"
+          V158_EARLY_MOMENTUM_RECOVERY_ENABLED: "1"
+          V158_RECOVERY_MIN_REGIME: "55"
+          V158_RECOVERY_MIN_INTENSITY: "1.5"
+          V158_RECOVERY_MIN_TRADE_SIZE: "1.0"
         run: python run_scanner.py
 
       - name: Prepare bounded scan history
