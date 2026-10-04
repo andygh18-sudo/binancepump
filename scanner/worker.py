@@ -1389,7 +1389,7 @@ async def v158_discovery_loop(http):
                             asyncio.create_task(v158_promote(http,meta))
                             try:
                                 with open("data/v158_discovery.jsonl","a",encoding="utf-8") as df:
-                                    df.write(json.dumps({"ts":time.time(),"event":"PROMOTION","symbol":meta["symbol"],"score":meta.get("promotion_score",0),"velocity_pct_s":meta.get("velocity_pct_s",0),"trade_anomaly":meta.get("trade_anomaly",0),"quote_volume":meta.get("quote_volume",0)},separators=(",",":"))+"\\n")
+                                    df.write(json.dumps({"ts":time.time(),"event":"PROMOTION","symbol":meta["symbol"],"score":meta.get("promotion_score",0),"discovery_score":meta.get("score",0),"cross_section_rank":meta.get("cross_section_rank",0),"cross_section_percentile":meta.get("cross_section_percentile",0),"cross_section_route_score":meta.get("cross_section_route_score",0),"velocity_pct_s":meta.get("velocity_pct_s",0),"trade_anomaly":meta.get("trade_anomaly",0),"quote_volume":meta.get("quote_volume",0)},separators=(",",":"))+"\\n")
                             except Exception:pass
         except asyncio.CancelledError:raise
         except Exception:await asyncio.sleep(1)
