@@ -97,6 +97,12 @@ jobs:
           V158_PARTICIPATION_MIN_VOLUME_Z: "2.0"
           V158_PARTICIPATION_MIN_BUY: "0.60"
           V158_PARTICIPATION_MIN_ACCEL: "1.50"
+          V158_DIRECTIONAL_ACCELERATION_ENABLED: "1"
+          V158_DIRECTIONAL_MIN_BUY_SLOPE: "0.025"
+          V158_DIRECTIONAL_MIN_PRICE_10S: "0.10"
+          V158_DIRECTIONAL_MIN_PRICE_60S: "0.00"
+          V158_DIRECTIONAL_MIN_CVD_Z: "0.50"
+          V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z: "2.50"
         run: python run_scanner.py
 
       - name: Prepare bounded scan history
