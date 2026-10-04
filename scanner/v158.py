@@ -115,6 +115,7 @@ class MarketDiscovery:
         self.promoted={}
         self.events=0
         self.cross_section_refresh=0
+        self.last_cross_section_ts=0.0
 
     def update(self, t):
         try:
@@ -158,7 +159,9 @@ class MarketDiscovery:
                   "score":score,"pct24h":pct,"quote_volume":quote}
             self.items[s]=item
             self.events+=1
-            self._refresh_cross_section(now)
+            if now-self.last_cross_section_ts>=2.0:
+                self._refresh_cross_section(now)
+                self.last_cross_section_ts=now
             item=self.items[s]
             eligible=(quote>=self.min_quote_volume and
                       (score>=self.min_score or
