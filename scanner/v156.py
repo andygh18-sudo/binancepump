@@ -108,6 +108,8 @@ def evaluate(row, memory, now=None):
     v158_liq = _f(row,"v158_liquidity_state_score")
     v158_part = _f(row,"v158_participation_score")
     v158_dir = _f(row,"v158_directional_score")
+    v158_temporal = _f(row,"v158_temporal_score")
+    v158_temporal_reignition = bool(row.get("v158_temporal_reignition",False))
     xvenue = _f(row,"v158_cross_venue_confidence")
 
     hard_veto = btc_off or p10 <= 0 or p60 <= 0 or buy < .50 or rs5 < 0 or spread > CFG["wide_spread"]
@@ -154,9 +156,10 @@ def evaluate(row, memory, now=None):
               bridge_trigger and bridge >= CFG["path_b_bridge"] and
               exhaustion <= CFG["path_b_exhaustion"])
 
-    v158_support = max(v158_pre, v158_liq, v158_part, v158_dir)
+    v158_support = max(v158_pre, v158_liq, v158_part, v158_dir, v158_temporal)
+    temporal_fast = (CFG["v158_tier1_enabled"] and not hard_veto and v158_temporal_reignition and p10 >= 0.05 and p60 >= 0.10 and accel >= 2.40 and buy >= 0.62 and rs5 >= CFG["v158_tier1_rs5"] and spread <= CFG["v158_tier1_spread"] and v158_temporal >= 65)
     tier1_fast = (CFG["v158_tier1_enabled"] and not hard_veto and p10 >= CFG["v158_tier1_p10"] and accel >= CFG["v158_tier1_accel"] and buy >= CFG["v158_tier1_buy"] and rs5 >= CFG["v158_tier1_rs5"] and spread <= CFG["v158_tier1_spread"] and v158_support >= CFG["v158_tier1_support"])
-    early = path_a or path_b or tier1_fast
+    early = path_a or path_b or tier1_fast or temporal_fast
 
     # Explicit price/participation divergence veto: a positive price move
     # without fresh participation/acceleration is not an early pump.
@@ -168,7 +171,7 @@ def evaluate(row, memory, now=None):
         path_b = False
         early = False
 
-    v158_enhancers = sum(bool(x) for x in [v158_pre >= 55, v158_liq >= 60, v158_part >= 60, v158_dir >= 60, xvenue >= 60])
+    v158_enhancers = sum(bool(x) for x in [v158_pre >= 55, v158_liq >= 60, v158_part >= 60, v158_dir >= 60, v158_temporal >= 65, xvenue >= 60])
     enhancer_bonus = min(8, v158_enhancers * 2)
     sweet = min(100, _sweet_score(p10,p60,vol,accel,buy,v15,opp,conf,acc,rs5,bridge,tvtf) + enhancer_bonus)
     status = str(memory.get("status","IDLE"))
@@ -246,8 +249,9 @@ def evaluate(row, memory, now=None):
     return {
         "v156_version":V156_VERSION,"v156_watch":watch,"v156_early_ignition":early,
         "v156_path_a":path_a,"v156_path_b":path_b,"v156_path_v158_tier1":tier1_fast,
-        "v156_path":("V158-TIER1" if tier1_fast else "B" if path_b else "A" if path_a else ""),
-        "v158_tier1":bool(tier1_fast),
+        "v156_path":("V158-TEMPORAL-REIGNITION" if temporal_fast else "V158-TIER1" if tier1_fast else "B" if path_b else "A" if path_a else ""),
+        "v158_tier1":bool(tier1_fast or temporal_fast),
+        "v158_temporal_reignition":bool(temporal_fast),
         "v158_tier1b_volume_ok":bool(status == "PENDING" and vol >= CFG["v158_tier1_volume_confirm"]),
         "v158_tier1b_support_count":int(tier1b_support_count if status == "PENDING" else 0),
         "v158_tier1c_confirmed":bool(status == "CONFIRMED_IGNITION" and (vol >= CFG["v158_tier1_volume_confirm"] or v158_enhancers >= CFG["persist_min_enhancers"])),
