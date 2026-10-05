@@ -42,7 +42,7 @@ CFG = {
     "path_b_bridge": float(os.getenv("V156_PATH_B_BRIDGE", "15")),
     "path_b_exhaustion": float(os.getenv("V156_PATH_B_EXHAUSTION", "30")),
     "persist_min": float(os.getenv("V156_PERSIST_MIN_SECONDS", "10")),
-    "persist_max": float(os.getenv("V156_PERSIST_MAX_SECONDS", "20")),
+    "persist_max": float(os.getenv("V156_PERSIST_MAX_SECONDS", "45")),
     "persist_p10": float(os.getenv("V156_PERSIST_P10", "0.00")),
     "persist_p60": float(os.getenv("V156_PERSIST_P60", "0.00")),
     "persist_volume": float(os.getenv("V156_PERSIST_VOLUME", "1.25")),
@@ -53,7 +53,7 @@ CFG = {
     "exhaustion_max": float(os.getenv("V156_EXHAUSTION_MAX", "35")),
     "wide_spread": float(os.getenv("V156_WIDE_SPREAD_BPS", "50")),
     "cooldown": float(os.getenv("V156_COOLDOWN", "180")),
-    "persist_max_soft_failures": int(os.getenv("V156_PERSIST_MAX_SOFT_FAILURES", "1")),
+    "persist_max_soft_failures": int(os.getenv("V156_PERSIST_MAX_SOFT_FAILURES", "1")),\n    "persist_grace_seconds": float(os.getenv("V156_PERSIST_GRACE_SECONDS", "25")),\n    "persist_burst_recovery_accel": float(os.getenv("V156_PERSIST_BURST_RECOVERY_ACCEL", "2.00")),\n    "persist_burst_recovery_buy": float(os.getenv("V156_PERSIST_BURST_RECOVERY_BUY", "0.60")),\n    "tier1_support_count": int(os.getenv("V158_TIER1_SUPPORT_COUNT", "2")),\n    "tier1_support_soft": float(os.getenv("V158_TIER1_SUPPORT_SOFT", "45")),,
     "persist_min_enhancers": int(os.getenv("V156_PERSIST_MIN_ENHANCERS", "2")),
     # V15.8 Tier-1 fast ignition: price/trade-flow can lead rolling volume.
     "v158_tier1_enabled": os.getenv("V158_TIER1_ENABLED", "1") == "1",
@@ -109,10 +109,10 @@ def evaluate(row, memory, now=None):
     v158_part = _f(row,"v158_participation_score")
     v158_dir = _f(row,"v158_directional_score")
     v158_temporal = _f(row,"v158_temporal_score")
-    v158_temporal_reignition = bool(row.get("v158_temporal_reignition",False))
+    v158_temporal_reignition = bool(row.get("v158_temporal_reignition",False))\n    v158_queue_imbalance = _f(row,"v158_queue_imbalance")\n    v158_queue_direction = str(row.get("v158_queue_direction","NEUTRAL") or "NEUTRAL")\n    v158_liq_state = str(row.get("v158_liquidity_state","BALANCED") or "BALANCED")\n    v158_absorption = _f(row,"v158_absorption_persistence_score")\n    v158_absorption_state = str(row.get("v158_absorption_state","NEUTRAL") or "NEUTRAL")
     xvenue = _f(row,"v158_cross_venue_confidence")
 
-    hard_veto = btc_off or p10 <= 0 or p60 <= 0 or buy < .50 or rs5 < 0 or spread > CFG["wide_spread"]
+    rs5_hard_floor = -0.10\n    exceptional_flow = accel >= 3.25 and buy >= 0.64 and p10 >= 0.05\n    hard_veto = btc_off or p10 <= 0 or p60 <= 0 or buy < .50 or rs5 < rs5_hard_floor or spread > CFG["wide_spread"]\n    if rs5 < 0 and not exceptional_flow:\n        hard_veto = True
     exhaustion_veto = exhaustion > CFG["exhaustion_max"] and exhaustion > 0
     hard_veto = hard_veto or exhaustion_veto
 
@@ -156,9 +156,9 @@ def evaluate(row, memory, now=None):
               bridge_trigger and bridge >= CFG["path_b_bridge"] and
               exhaustion <= CFG["path_b_exhaustion"])
 
-    v158_support = max(v158_pre, v158_liq, v158_part, v158_dir, v158_temporal)
-    temporal_fast = (CFG["v158_tier1_enabled"] and not hard_veto and v158_temporal_reignition and p10 >= 0.05 and p60 >= 0.10 and accel >= 2.40 and buy >= 0.62 and rs5 >= CFG["v158_tier1_rs5"] and spread <= CFG["v158_tier1_spread"] and v158_temporal >= 65)
-    tier1_fast = (CFG["v158_tier1_enabled"] and not hard_veto and p10 >= CFG["v158_tier1_p10"] and accel >= CFG["v158_tier1_accel"] and buy >= CFG["v158_tier1_buy"] and rs5 >= CFG["v158_tier1_rs5"] and spread <= CFG["v158_tier1_spread"] and v158_support >= CFG["v158_tier1_support"])
+    support_values = [v158_pre, v158_liq, v158_part, v158_dir, v158_temporal]\n    v158_support = max(support_values)\n    support_strong = sum(v >= CFG["v158_tier1_support"] for v in support_values)\n    support_soft = sum(v >= CFG["tier1_support_soft"] for v in support_values)\n    support_breadth_ok = support_strong >= CFG["tier1_support_count"] or (max(support_values) >= 75 and support_soft >= 3)\n    book_bullish = v158_queue_direction == "BULLISH" or v158_queue_imbalance >= 0.05 or v158_liq_state in ("BID_BUILDING","BID_DOMINANT","LIQUIDITY_IGNITION")\n    book_bearish = v158_queue_direction == "BEARISH" or v158_queue_imbalance <= -0.08 or v158_liq_state in ("ASK_DOMINANT","LIQUIDITY_BREAKDOWN")\n    temporal_continuity = (not book_bearish and v158_absorption_state != "SELLER_ABSORPTION" and (book_bullish or v158_absorption >= 55 or v158_temporal >= 75))
+    temporal_fast = (CFG["v158_tier1_enabled"] and not hard_veto and v158_temporal_reignition and p10 >= 0.05 and p60 >= 0.10 and accel >= 2.40 and buy >= 0.62 and rs5 >= CFG["v158_tier1_rs5"] and spread <= CFG["v158_tier1_spread"] and v158_temporal >= 65 and temporal_continuity)
+    tier1_fast = (CFG["v158_tier1_enabled"] and not hard_veto and p10 >= CFG["v158_tier1_p10"] and accel >= CFG["v158_tier1_accel"] and buy >= CFG["v158_tier1_buy"] and rs5 >= CFG["v158_tier1_rs5"] and spread <= CFG["v158_tier1_spread"] and support_breadth_ok and not book_bearish)
     early = path_a or path_b or tier1_fast or temporal_fast
 
     # Explicit price/participation divergence veto: a positive price move
@@ -169,6 +169,8 @@ def evaluate(row, memory, now=None):
     if participation_divergence:
         path_a = False
         path_b = False
+        tier1_fast = False
+        temporal_fast = False
         early = False
 
     v158_enhancers = sum(bool(x) for x in [v158_pre >= 55, v158_liq >= 60, v158_part >= 60, v158_dir >= 60, v158_temporal >= 65, xvenue >= 60])
@@ -221,7 +223,7 @@ def evaluate(row, memory, now=None):
         memory["persistence_strength"]=persistence_strength; memory["v158_enhancers"]=v158_enhancers
         tier1b_ready = tier1b_volume_ok
         confirmable=(age >= CFG["persist_min"] and age <= CFG["persist_max"] and not hard_fail and len(soft_failures) <= CFG["persist_max_soft_failures"] and tier1b_ready and (not soft_failures or (persistence_strength >= 3 and v158_enhancers >= CFG["persist_min_enhancers"])))
-        if hard_fail or (age >= CFG["persist_min"] and len(failures) >= 2 and not confirmable):
+        burst_recovery = (age <= CFG["persist_max"] and age > CFG["persist_min"] and accel >= CFG["persist_burst_recovery_accel"] and buy >= CFG["persist_burst_recovery_buy"] and p60 > 0 and not btc_off and not exhaustion_veto)\n        if hard_fail or (age >= CFG["persist_min"] and len(failures) >= 2 and not confirmable and not burst_recovery):
             memory["status"]="FAILED_PERSISTENCE"; memory["stage"]="WATCH"
             event={"event":"RESOLVED","version":V156_VERSION,"event_id":memory.get("event_id",""),"symbol":symbol,"ts":now,
                    "outcome":"FAILED_PERSISTENCE","persistence_seconds":round(age,1),"failures":failures,"sweet_score":sweet,
@@ -248,7 +250,7 @@ def evaluate(row, memory, now=None):
     buy_signal = status == "CONFIRMED_IGNITION"
     return {
         "v156_version":V156_VERSION,"v156_watch":watch,"v156_early_ignition":early,
-        "v156_path_a":path_a,"v156_path_b":path_b,"v156_path_v158_tier1":tier1_fast,
+        "v156_path_a":path_a,"v156_path_b":path_b,"v156_path_v158_tier1":tier1_fast,\n        "v156_v158_support_breadth":int(support_strong),\n        "v156_v158_support_soft_breadth":int(support_soft),\n        "v156_v158_support_breadth_ok":bool(support_breadth_ok),\n        "v156_temporal_continuity":bool(temporal_continuity),
         "v156_path":("V158-TEMPORAL-REIGNITION" if temporal_fast else "V158-TIER1" if tier1_fast else "B" if path_b else "A" if path_a else ""),
         "v158_tier1":bool(tier1_fast or temporal_fast),
         "v158_temporal_reignition":bool(temporal_fast),
