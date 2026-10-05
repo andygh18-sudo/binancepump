@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from .orderbook import LocalOrderBook
 from .tradingview import fetch_tradingview_signals
 from .v157_learning import persist_v157_observations
-from .v158 import MarketDiscovery,trade_features,liquidity_features,data_quality,adaptive_micro_features,adaptive_book_features,depth_sweep_features,replenishment_absorption_features
+from .v158 import MarketDiscovery,trade_features,liquidity_features,data_quality,adaptive_micro_features,adaptive_book_features,queue_transition_imbalance_features,depth_sweep_features,replenishment_absorption_features
 from .v156 import evaluate as v156_evaluate
 
 load_dotenv()
@@ -1182,11 +1182,12 @@ def score(s):
     directional_buy_slope=b10-(b30_dir if v30_dir else 0.50)
     adaptive["directional_buy_slope"]=directional_buy_slope
     adaptive_book=adaptive_book_features(state,books,s)
+    queue_transition=queue_transition_imbalance_features(state,books,s)
     sweep=depth_sweep_features(state,books,s)
     replenishment=replenishment_absorption_features(state,books,s)
     v158_quality=data_quality(state,books,s)
     v158_adaptive_score=min(100.0,max(0.0,35.0*min(max(adaptive.get("adaptive_trade_z",0),0)/3.0,1)+25.0*min(max(adaptive.get("adaptive_volume_z",0),0)/3.0,1)+20.0*min(max(adaptive.get("adaptive_cvd_z",0),0)/3.0,1)+10.0*min(max(adaptive.get("adaptive_intensity_z",0),0)/3.0,1)+10.0*min(max(adaptive.get("adaptive_regime_change",0)/100.0,0),1)))
-    v158_score=min(100.0,float(v158_trades.get("whale_score",0))*0.25+float(v158_liq.get("liquidity_breakout_score",0))*0.20+float(v158_liq.get("absorption_score",0))*0.10+v158_adaptive_score*0.15+float(adaptive_book.get("v158_book_vacuum_score",0))*0.05+float(sweep.get("v158_sweep_score",0))*0.10+float(replenishment.get("v158_absorption_persistence_score",0))*0.10+float(v158_quality.get("data_quality_score",0))*0.05)
+    v158_score=min(100.0,float(v158_trades.get("whale_score",0))*0.23+float(v158_liq.get("liquidity_breakout_score",0))*0.18+float(v158_liq.get("absorption_score",0))*0.09+v158_adaptive_score*0.14+float(queue_transition.get("v158_queue_transition_score",0))*0.06+float(adaptive_book.get("v158_book_vacuum_score",0))*0.05+float(sweep.get("v158_sweep_score",0))*0.10+float(replenishment.get("v158_absorption_persistence_score",0))*0.10+float(v158_quality.get("data_quality_score",0))*0.05)
     v156, v156_event = v156_evaluate({"symbol":s,"price":x["price"],"price_10s":p10,"price_60s":p60,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"relative_strength_5m":eps.get("relative_strength_5m",0),"v15_score":v15.get("v15_score",0),"v15_opportunity_score":v15.get("v15_opportunity_score",0),"v15_confirmation_score":v15.get("v15_confirmation_score",0),"accumulation_score":ac.get("accumulation_score",0),"tv_bullish_timeframes":tv_bull_tf,"v15_reignition_bridge_score":reignition_bridge.get("v15_reignition_bridge_score",0),"v15_reignition_bridge_trigger":reignition_bridge.get("v15_reignition_bridge_trigger",False),"exhaustion_score":(exhaustion or {}).get("exhaustion_score",0),"spread_bps":ob["spread_bps"],"v15_btc_risk_off":v15.get("v15_btc_risk_off",False)},state[s].setdefault("v156",{}),time.time())
     raw=min(max(p10,0)*10,20)+min(max(vr-1,0)*14,28)+min(max(acc-1,0)*12,18)
     raw+=max(min((b10-.5)*50,12),-12)+max(min(imb*30,12),-12)
@@ -1199,7 +1200,7 @@ def score(s):
     panic=p1<-3 or (imb<-.30 and b10<.42);dist=imb<-.15 and b10<.48;mom=b10<.50 and b60<.53 and sc<45
     sell="PANIC EXIT" if panic else "DISTRIBUTION" if dist else "MOMENTUM EXIT" if mom else "TAKE PROFIT" if sc<50 and x["price"]<c["open"] else "HOLD"
     return {"hybrid_score":hs,"alert_tier":alert_tier,"hybrid_path":hybrid.get("hybrid_path","") if hybrid else "","hybrid_grade":hybrid.get("hybrid_grade","") if hybrid else "","hybrid_alert":hybrid.get("hybrid_alert",False) if hybrid else False,"hybrid_a_plus":hybrid.get("hybrid_a_plus",False) if hybrid else False,"hybrid_confirmation":hybrid.get("hybrid_confirmation",False) if hybrid else False,"hybrid_efficiency":hybrid.get("hybrid_efficiency",0) if hybrid else 0,"symbol":s,**pump_momentum,"price":x["price"],"score":sc,"stage":stage,"price_3m":p180,"price_5m":p300,"price_10m":p600,"price_15m":p900,"price_30m":p1800,"price_60m_change":p3600,"entry":entry,"sell":sell,"price_1m":p1,"price_60s":p60,"price_10s":p10,"volume_ratio":vr,"trade_accel":acc,"buy_pressure":b10,"book_imbalance":imb,"spread_bps":ob["spread_bps"],"book_ready":ob["ready"],"book_gaps":books[s].gaps,
-            "v158_score":round(v158_score,1),"v158_adaptive_score":round(v158_adaptive_score,1),**v158_early_momentum_recovery(adaptive),**v158_participation_ignition({**adaptive,"buy_pressure":b10,"trade_accel":acc}),**v158_directional_ignition({**adaptive,"buy_pressure":b10,"trade_accel":acc,"price_10s":p10,"price_60s":p60}),**adaptive,**adaptive_book,**sweep,**replenishment,"v158_whale_score":v158_trades.get("whale_score",0),
+            "v158_score":round(v158_score,1),"v158_adaptive_score":round(v158_adaptive_score,1),**v158_early_momentum_recovery(adaptive),**v158_participation_ignition({**adaptive,"buy_pressure":b10,"trade_accel":acc}),**v158_directional_ignition({**adaptive,"buy_pressure":b10,"trade_accel":acc,"price_10s":p10,"price_60s":p60}),**adaptive,**adaptive_book,**queue_transition,**sweep,**replenishment,"v158_whale_score":v158_trades.get("whale_score",0),
             "v158_large_trade_count":v158_trades.get("large_trade_count",0),"v158_large_buy_notional":v158_trades.get("large_buy_notional",0),
             "v158_large_sell_notional":v158_trades.get("large_sell_notional",0),"v158_large_trade_imbalance":v158_trades.get("large_trade_imbalance",0),
             "v158_median_trade_notional":v158_trades.get("median_trade_notional",0),"v158_p95_trade_notional":v158_trades.get("p95_trade_notional",0),
