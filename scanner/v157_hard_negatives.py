@@ -19,7 +19,7 @@ DEFAULT_SIGNAL_SCORE_MIN = 55.0
 
 # Decision-time features only: no future/outcome fields are used for distance.
 FEATURES: Tuple[str, ...] = (
-    "v158_score", "v158_adaptive_score", "adaptive_trade_z",
+    "v158_score", "v158_adaptive_score", "v158_pre_ignition_score", "v158_liquidity_state_score", "v158_queue_transition_score", "v158_queue_imbalance_density", "v158_xvenue_confidence", "adaptive_trade_z",
     "adaptive_volume_z", "adaptive_trade_size_z", "adaptive_cvd_z",
     "adaptive_intensity_z", "adaptive_price_impact_z",
     "adaptive_regime_change", "adaptive_participation_z",
