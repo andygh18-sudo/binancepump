@@ -184,6 +184,97 @@ def queue_transition_imbalance_features(state,books,symbol):
                 "v158_queue_history_samples":len(recent)}
     except Exception:return empty
 
+def v158_pre_ignition_build_features(state, symbol, adaptive, queue, participation=None, directional=None):
+    """Detect a causal rising edge across complementary microstructure channels.
+    Research/advisory layer: it identifies build-up, not a standalone BUY trigger.
+    """
+    try:
+        x=state[symbol]; now=time.time()
+        adaptive=adaptive or {}; queue=queue or {}; participation=participation or {}; directional=directional or {}
+        channels=[
+            max(0.0,min(float(adaptive.get("adaptive_trade_z",0) or 0)/3.0,1.0)),
+            max(0.0,min(float(adaptive.get("adaptive_volume_z",0) or 0)/3.0,1.0)),
+            max(0.0,min(float(queue.get("v158_queue_transition_score",0) or 0)/100.0,1.0)),
+            max(0.0,min(float(queue.get("v158_queue_imbalance_density",0) or 0)/100.0,1.0)),
+            max(0.0,min(float(participation.get("v158_participation_score",0) or 0)/100.0,1.0)),
+            max(0.0,min(float(directional.get("v158_directional_score",0) or 0)/100.0,1.0)),
+        ]
+        signal=max(channels) if channels else 0.0
+        mean_signal=sum(channels)/len(channels) if channels else 0.0
+        hist=x.setdefault("v158_pre_ignition_history",deque(maxlen=24))
+        prev=float(hist[-1].get("signal",signal)) if hist else signal
+        prev_mean=float(hist[-1].get("mean",mean_signal)) if hist else mean_signal
+        delta=signal-prev
+        mean_delta=mean_signal-prev_mean
+        hist.append({"ts":now,"signal":signal,"mean":mean_signal})
+        recent=[float(h.get("signal",0)) for h in list(hist)[-8:]]
+        baseline=statistics.median(recent[:-1]) if len(recent)>=4 else 0.0
+        mad=statistics.median([abs(v-baseline) for v in recent[:-1]]) if len(recent)>=4 else 0.0
+        threshold=max(0.55,baseline+max(1.4826*mad,0.05))
+        rising=signal>=threshold and delta>0 and mean_delta>=-0.02
+        build_score=min(100.0,max(0.0,signal*55.0+max(delta,0)/0.20*25.0+max(mean_delta,0)/0.15*20.0))
+        stage="PRE-IGNITION BUILD" if rising and build_score>=60 else "BUILDING" if build_score>=45 else "QUIET"
+        return {"v158_pre_ignition_score":round(build_score,1),
+                "v158_pre_ignition_rising":bool(rising),
+                "v158_pre_ignition_stage":stage,
+                "v158_pre_ignition_signal":round(signal,4),
+                "v158_pre_ignition_delta":round(delta,4),
+                "v158_pre_ignition_mean":round(mean_signal,4),
+                "v158_pre_ignition_threshold":round(threshold,4),
+                "v158_pre_ignition_samples":len(hist)}
+    except Exception:
+        return {"v158_pre_ignition_score":0.0,"v158_pre_ignition_rising":False,"v158_pre_ignition_stage":"QUIET",
+                "v158_pre_ignition_signal":0.0,"v158_pre_ignition_delta":0.0,"v158_pre_ignition_mean":0.0,
+                "v158_pre_ignition_threshold":0.55,"v158_pre_ignition_samples":0}
+
+def v158_liquidity_state_features(state, symbol, queue, adaptive_book, liquidity, sweep, replenishment):
+    """Compact discrete L2 liquidity state machine built from existing book features."""
+    try:
+        q=float((queue or {}).get("v158_queue_imbalance",0) or 0)
+        dens=float((queue or {}).get("v158_queue_imbalance_density",0) or 0)
+        direction=str((queue or {}).get("v158_queue_direction","NEUTRAL") or "NEUTRAL")
+        ask_cons=float((adaptive_book or {}).get("v158_ask_consumption",0) or 0)
+        bid_change=float((liquidity or {}).get("bid_depth_change",0) or 0)
+        ask_change=float((liquidity or {}).get("ask_depth_change",0) or 0)
+        sweep_score=float((sweep or {}).get("v158_sweep_score",0) or 0)
+        repl=float((replenishment or {}).get("v158_absorption_persistence_score",0) or 0)
+        if direction=="BULLISH" and dens>=65 and q>=0.10 and (ask_cons>=2 or ask_change<=-2):
+            current="LIQUIDITY_IGNITION"
+        elif direction=="BULLISH" and dens>=50 and q>=0.05:
+            current="BID_DOMINANT"
+        elif direction=="BULLISH" or q>=0.03:
+            current="BID_BUILDING"
+        elif direction=="BEARISH" and dens>=65 and q<=-0.10 and (bid_change<=-2 or sweep_score<25):
+            current="LIQUIDITY_BREAKDOWN"
+        elif direction=="BEARISH" and dens>=50 and q<=-0.05:
+            current="ASK_DOMINANT"
+        elif direction=="BEARISH" or q<=-0.03:
+            current="ASK_BUILDING"
+        else:
+            current="BALANCED"
+        x=state[symbol]; hist=x.setdefault("v158_liquidity_state_history",deque(maxlen=24))
+        prev=str(hist[-1].get("state","BALANCED")) if hist else current
+        hist.append({"ts":time.time(),"state":current})
+        bullish_states={"BID_BUILDING","BID_DOMINANT","LIQUIDITY_IGNITION"}
+        bearish_states={"ASK_BUILDING","ASK_DOMINANT","LIQUIDITY_BREAKDOWN"}
+        transition=(current!=prev)
+        bullish_transition=transition and current in bullish_states and prev not in bullish_states
+        bearish_transition=transition and current in bearish_states and prev not in bearish_states
+        state_score=100.0 if current=="LIQUIDITY_IGNITION" else 80.0 if current=="BID_DOMINANT" else 60.0 if current=="BID_BUILDING" else 20.0 if current=="BALANCED" else 0.0
+        if current in bearish_states: state_score=max(0.0,100.0-state_score)
+        return {"v158_liquidity_state":current,"v158_liquidity_state_prev":prev,
+                "v158_liquidity_state_transition":bool(transition),
+                "v158_liquidity_bullish_transition":bool(bullish_transition),
+                "v158_liquidity_bearish_transition":bool(bearish_transition),
+                "v158_liquidity_state_score":round(state_score,1),
+                "v158_liquidity_state_samples":len(hist),
+                "v158_liquidity_replenishment":round(repl,1)}
+    except Exception:
+        return {"v158_liquidity_state":"BALANCED","v158_liquidity_state_prev":"BALANCED",
+                "v158_liquidity_state_transition":False,"v158_liquidity_bullish_transition":False,
+                "v158_liquidity_bearish_transition":False,"v158_liquidity_state_score":20.0,
+                "v158_liquidity_state_samples":0,"v158_liquidity_replenishment":0.0}
+
 def adaptive_book_features(state,books,symbol):
     """Detect unusual ask-liquidity depletion/book vacuum cheaply from existing depth data."""
     b=books.get(symbol)
