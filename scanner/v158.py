@@ -138,6 +138,52 @@ def replenishment_absorption_features(state,books,symbol):
         return {"v158_absorption_persistence_score":round(max(0,min(100,score)),1),"v158_ask_replenishment_ratio":round(ask_ratio,3),"v158_bid_replenishment_ratio":round(bid_ratio,3),"v158_ask_replenishment_events":ask_repl,"v158_bid_replenishment_events":bid_repl,"v158_ask_absorption_events":ask_abs_events,"v158_bid_absorption_events":bid_abs_events,"v158_absorption_price_response":round(p10,4),"v158_absorption_state":label,"v158_ask_absorption_pending":bool(st.get("ask_pending",False)),"v158_bid_absorption_pending":bool(st.get("bid_pending",False))}
     except Exception: return empty
 
+def queue_transition_imbalance_features(state,books,symbol):
+    """Lightweight L2 queue-transition and imbalance-density features.
+    Uses the existing local book only; advisory signal, never a hard gate.
+    """
+    b=books.get(symbol)
+    empty={"v158_queue_transition_score":0.0,"v158_queue_imbalance":0.0,
+           "v158_queue_imbalance_delta":0.0,"v158_queue_imbalance_slope":0.0,
+           "v158_queue_imbalance_density":0.0,"v158_queue_direction":"NEUTRAL",
+           "v158_queue_history_samples":0}
+    if not b or not getattr(b,"ready",False): return empty
+    try:
+        bids=sorted(((float(p),float(q)) for p,q in b.bids.items() if float(q)>0),reverse=True)
+        asks=sorted((float(p),float(q)) for p,q in b.asks.items() if float(q)>0)
+        if not bids or not asks:return empty
+        mid=(bids[0][0]+asks[0][0])/2.0
+        if mid<=0:return empty
+        def near(levels,side,n=5):
+            total=0.0
+            for price,qty in levels[:n]:
+                dist=((price-mid)/mid*10000.0) if side=="ask" else ((mid-price)/mid*10000.0)
+                if 0<=dist<=15: total+=price*qty
+            return total
+        bid5=near(bids,"bid");ask5=near(asks,"ask")
+        qimb=(bid5-ask5)/max(bid5+ask5,1e-9)
+        now=time.time();x=state[symbol]
+        hist=x.setdefault("v158_queue_transition_history",deque(maxlen=36))
+        prev=float(hist[-1]["imbalance"]) if hist else qimb
+        delta=qimb-prev
+        hist.append({"ts":now,"imbalance":qimb})
+        recent=list(hist)
+        slope=(qimb-float(recent[-3]["imbalance"]))/2.0 if len(recent)>=3 else delta
+        window=recent[-12:]
+        bull_density=sum(1 for h in window if float(h["imbalance"])>=0.15)/max(len(window),1)*100.0
+        bear_density=sum(1 for h in window if float(h["imbalance"])<=-0.15)/max(len(window),1)*100.0
+        density=max(bull_density,bear_density)
+        direction="BULLISH" if bull_density>bear_density else "BEARISH" if bear_density>bull_density else "NEUTRAL"
+        if direction=="BEARISH":
+            score=max(0.0,min(100.0,max(0.0,-delta)/0.12*35.0+max(0.0,-slope)/0.08*25.0+max(0.0,-qimb)/0.40*25.0+max(0.0,bear_density-50.0)/50.0*15.0))
+        else:
+            score=max(0.0,min(100.0,max(0.0,delta)/0.12*35.0+max(0.0,slope)/0.08*25.0+max(0.0,qimb)/0.40*25.0+max(0.0,bull_density-50.0)/50.0*15.0))
+        return {"v158_queue_transition_score":round(score,1),"v158_queue_imbalance":round(qimb,4),
+                "v158_queue_imbalance_delta":round(delta,4),"v158_queue_imbalance_slope":round(slope,4),
+                "v158_queue_imbalance_density":round(density,1),"v158_queue_direction":direction,
+                "v158_queue_history_samples":len(recent)}
+    except Exception:return empty
+
 def adaptive_book_features(state,books,symbol):
     """Detect unusual ask-liquidity depletion/book vacuum cheaply from existing depth data."""
     b=books.get(symbol)
