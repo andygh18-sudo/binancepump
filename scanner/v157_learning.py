@@ -54,6 +54,22 @@ def _micro_snapshot(symbol, row, state, books):
     except Exception as exc:
         return {"microstructure_error":str(exc)[:160]}
 
+def feature_combo_signature(row):
+    """Compact, leakage-safe pump-signature bucket for outcome analysis."""
+    pre=bool(row.get("v158_pre_ignition_rising",False))
+    liq=str(row.get("v158_liquidity_state","BALANCED") or "BALANCED")
+    part=float(row.get("v158_participation_score",0) or 0)
+    direc=float(row.get("v158_directional_score",0) or 0)
+    q=float(row.get("v158_queue_transition_score",0) or 0)
+    x=float(row.get("v158_xvenue_confidence",50) or 50)
+    ex=float(row.get("exhaustion_score",0) or 0)
+    p="P+" if part>=60 else "P0"
+    d="D+" if direc>=60 else "D0"
+    ql="Q+" if q>=60 else "Q0"
+    xv="X+" if x>=75 else "X-" if x<=25 else "X0"
+    e="E-" if ex<35 else "E+" if ex>=60 else "E0"
+    return "|".join((str(liq),p,d,ql,"PRE+" if pre else "PRE0",xv,e))
+
 def persist_v157_observations(rows, fast_candidates, state, books, alerted_symbol="", ts=None):
     """
     Persist a clean V15.7-only learning stream.
@@ -171,7 +187,7 @@ def persist_v157_observations(rows, fast_candidates, state, books, alerted_symbo
             "v158_ask_absorption_events":int(_safe_float(row.get("v158_ask_absorption_events"))),
             "v158_bid_absorption_events":int(_safe_float(row.get("v158_bid_absorption_events"))),
             "v158_absorption_price_response":_safe_float(row.get("v158_absorption_price_response")),
-            "v158_absorption_state":str(row.get("v158_absorption_state","")),
+            "v158_absorption_state":str(row.get("v158_absorption_state","")),\n            "v158_pre_ignition_score":_safe_float(row.get("v158_pre_ignition_score")),\n            "v158_pre_ignition_rising":bool(row.get("v158_pre_ignition_rising",False)),\n            "v158_pre_ignition_stage":str(row.get("v158_pre_ignition_stage","QUIET")),\n            "v158_liquidity_state":str(row.get("v158_liquidity_state","BALANCED")),\n            "v158_liquidity_state_score":_safe_float(row.get("v158_liquidity_state_score")),\n            "v158_liquidity_state_transition":bool(row.get("v158_liquidity_state_transition",False)),\n            "v158_queue_transition_score":_safe_float(row.get("v158_queue_transition_score")),\n            "v158_queue_imbalance":_safe_float(row.get("v158_queue_imbalance")),\n            "v158_queue_imbalance_density":_safe_float(row.get("v158_queue_imbalance_density")),\n            "v158_xvenue_confidence":_safe_float(row.get("v158_xvenue_confidence"),50.0),\n            "v158_xvenue_divergence":bool(row.get("v158_xvenue_divergence",False)),\n            "v157_combo_signature":feature_combo_signature(row),
             "v158_xvenue_ret_pct":_safe_float(row.get("v158_xvenue_ret_pct")),
             "v158_xvenue_confirmed":bool(row.get("v158_xvenue_confirmed",False)),
             "v158_trade_age_s":_safe_float(row.get("v158_trade_age_s"),999.0),
