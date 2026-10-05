@@ -1611,6 +1611,7 @@ async def main():
                                     st["sustained_pump_streak"]=int(st.get("sustained_pump_streak",0))+1
                                     st["sustained_pump_score"]=sp["score"]
                                     st["sustained_pump_state"]="CONFIRMED" if st["sustained_pump_streak"]>=SUSTAINED_PUMP_MIN_OBS and sp["score"]>=SUSTAINED_PUMP_MIN_SCORE else "WATCH"
+                                    r["sustained_pump_score"]=sp["score"]; r["sustained_pump_state"]=st["sustained_pump_state"]; r["sustained_pump_streak"]=st["sustained_pump_streak"]; r["sustained_pump_qualifies"]=st["sustained_pump_state"]=="CONFIRMED"
                                     if st["sustained_pump_state"]=="CONFIRMED":
                                         rr_sp=dict(r); rr_sp.update(sp); rr_sp["_sustained_pump_score"]=sp["score"]
                                         sustained_pump_candidates.append(rr_sp)
