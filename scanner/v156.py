@@ -232,8 +232,8 @@ def evaluate(row, memory, now=None):
         if btc_off: failures.append("BTC_RISK_OFF")
         if exhaustion_veto: failures.append("EXHAUSTION_VETO")
         memory["failures"]=failures; memory["last_update"]=now
-        hard_fail=any(x in failures for x in ("PRICE_10S_LOST","PRICE_60S_LOST","BUY_PRESSURE_COLLAPSE","V15_CONFIRMATION_LOST","BTC_RISK_OFF","EXHAUSTION_VETO"))
-        soft_failures=[x for x in failures if x in ("VOLUME_COLLAPSE","ACCEL_COLLAPSE","RS5_LOST")]
+        hard_fail=any(x in failures for x in ("PRICE_10S_LOST","PRICE_60S_LOST","BUY_PRESSURE_COLLAPSE","BTC_RISK_OFF","EXHAUSTION_VETO"))
+        soft_failures=[x for x in failures if x in ("VOLUME_COLLAPSE","ACCEL_COLLAPSE","RS5_LOST","V15_CONFIRMATION_LOST")]
         persistence_strength=sum(bool(x) for x in [
             p10 >= _f(memory,"trigger_p10") if _f(memory,"trigger_p10") > 0 else p10 > 0,
             p60 >= _f(memory,"trigger_p60") if _f(memory,"trigger_p60") > 0 else p60 > 0,
@@ -242,7 +242,7 @@ def evaluate(row, memory, now=None):
             v158_pre >= 55, v158_liq >= 60, v158_part >= 60, v158_dir >= 60
         ])
         memory["persistence_strength"]=persistence_strength; memory["v158_enhancers"]=v158_enhancers
-        tier1b_ready = tier1b_volume_ok
+        tier1b_ready = tier1b_volume_ok or (tier1_fast and support_strong >= CFG["tier1_support_count"] and accel >= CFG["persist_burst_recovery_accel"] and buy >= CFG["persist_burst_recovery_buy"])
         confirmable=(age >= CFG["persist_min"] and age <= CFG["persist_max"] and not hard_fail and len(soft_failures) <= CFG["persist_max_soft_failures"] and tier1b_ready and (not soft_failures or (persistence_strength >= 3 and v158_enhancers >= CFG["persist_min_enhancers"])))
         burst_recovery = (age <= CFG["persist_max"] and age > CFG["persist_min"] and accel >= CFG["persist_burst_recovery_accel"] and buy >= CFG["persist_burst_recovery_buy"] and p60 > 0 and not btc_off and not exhaustion_veto)
         if hard_fail or (age >= CFG["persist_min"] and len(failures) >= 2 and not confirmable and not burst_recovery):
