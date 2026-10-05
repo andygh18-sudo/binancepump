@@ -227,6 +227,40 @@ def v158_pre_ignition_build_features(state, symbol, adaptive, queue, participati
                 "v158_pre_ignition_signal":0.0,"v158_pre_ignition_delta":0.0,"v158_pre_ignition_mean":0.0,
                 "v158_pre_ignition_threshold":0.55,"v158_pre_ignition_samples":0}
 
+def v158_temporal_reignition_memory(state, symbol, v15, accumulation, adaptive, price_10s, price_60s, volume_ratio, trade_accel, buy_pressure, btc_risk_off=False):
+    """RLC/GLMR/ONE-style burst chaining with decaying ignition memory."""
+    now=time.time(); x=state[symbol]
+    v15=float(v15 or 0); accumulation=float(accumulation or 0); adaptive=adaptive or {}
+    tz=float(adaptive.get("adaptive_trade_z",0) or 0); vz=float(adaptive.get("adaptive_volume_z",0) or 0)
+    cz=float(adaptive.get("adaptive_cvd_z",0) or 0); p10=float(price_10s or 0); p60=float(price_60s or 0)
+    accel=float(trade_accel or 0); buy=float(buy_pressure or 0)
+    armed_until=float(x.get("v158_temporal_armed_until",0) or 0); peak=float(x.get("v158_temporal_peak",0) or 0)
+    last_burst=float(x.get("v158_temporal_last_burst",0) or 0)
+    structural=(not btc_risk_off and ((v15>=75 and accumulation>=70) or
+                 (v15>=70 and accumulation>=78 and tz>=1.5) or
+                 (tz>=2.5 and vz>=2.0 and buy>=0.62 and accel>=2.5)))
+    if structural:
+        armed_until=max(armed_until,now+600.0); peak=max(peak,v15,accumulation); x["v158_temporal_memory_ts"]=now
+    armed=armed_until>=now and not btc_risk_off
+    burst_score=min(100.0,max(0.0,min(max(tz,0)/3,1)*25+min(max(vz,0)/3,1)*20+
+        min(max(cz,0)/2.5,1)*15+min(max((buy-0.52)/0.28,0),1)*15+
+        min(max((accel-1.8)/2.2,0),1)*15+min(max((p60+0.10)/1.10,0),1)*10))
+    current_burst=(p10>=0.05 and p60>=0.10 and accel>=2.4 and buy>=0.62 and burst_score>=58)
+    gap=(now-last_burst) if last_burst else 9999.0
+    chained=armed and current_burst and gap>=20.0
+    if current_burst: last_burst=now; x["v158_temporal_last_burst"]=now; peak=max(peak,burst_score)
+    memory_ts=float(x.get("v158_temporal_memory_ts",now) or now)
+    memory_age=max(0.0,now-memory_ts)
+    memory_score=max(0.0,peak*math.exp(-memory_age/360.0)) if armed else 0.0
+    score=max(memory_score,burst_score if current_burst else 0.0)
+    if chained: score=min(100.0,score+10.0)
+    x["v158_temporal_armed_until"]=armed_until; x["v158_temporal_peak"]=peak
+    return {"v158_temporal_reignition":bool(chained),"v158_temporal_stage":"REIGNITION" if chained else "ARMED" if armed else "NONE",
+            "v158_temporal_score":round(score,1),"v158_temporal_memory_score":round(memory_score,1),
+            "v158_temporal_burst_score":round(burst_score,1),"v158_temporal_armed":bool(armed),
+            "v158_temporal_burst":bool(current_burst),"v158_temporal_chain_gap_s":round(gap,1),
+            "v158_temporal_memory_age_s":round(memory_age,1),"v158_temporal_peak":round(peak,1)}
+
 def v158_liquidity_state_features(state, symbol, queue, adaptive_book, liquidity, sweep, replenishment):
     """Compact discrete L2 liquidity state machine built from existing book features."""
     try:
