@@ -27,7 +27,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -157,11 +157,11 @@ jobs:
           git push origin HEAD:main
 
       - name: Start next V15.8 cycle
-        if: ${{ success() }}
+        if: ${{ always() }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           echo "Dispatching next V15.8 monitoring cycle..."
           gh workflow run .github/workflows/binance_pump_v15.yml --ref main
-          echo "Next V15.7 cycle dispatched."
+          echo "Next V15.8 cycle dispatched."
