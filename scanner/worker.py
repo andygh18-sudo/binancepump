@@ -17,11 +17,11 @@ MOMENTUM_SYMBOLS=int(os.getenv("MOMENTUM_SYMBOLS","40"))
 LIQUID_SYMBOLS=int(os.getenv("LIQUID_SYMBOLS","80"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"));IGNITION_HISTORY_SAMPLES=int(os.getenv("IGNITION_HISTORY_SAMPLES","60"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"));HISTORY_SAMPLE_INTERVAL=float(os.getenv("HISTORY_SAMPLE_INTERVAL","300"))
-TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));BUY_ALERT_COOLDOWN=float(os.getenv("BUY_ALERT_COOLDOWN","1800"));BUY_ALERT_TOP=int(os.getenv("BUY_ALERT_TOP","3"));BUY_ALERT_MIN_QUALITY=float(os.getenv("BUY_ALERT_MIN_QUALITY","80"));BUY_ALERT_MIN_CONFIRMATION=float(os.getenv("BUY_ALERT_MIN_CONFIRMATION","70"));BUY_ALERT_MIN_OPPORTUNITY=float(os.getenv("BUY_ALERT_MIN_OPPORTUNITY","60"));BUY_ALERT_MIN_TV=float(os.getenv("BUY_ALERT_MIN_TV","70"));BUY_ALERT_MIN_BULL_TF=int(os.getenv("BUY_ALERT_MIN_BULL_TF","4"));BUY_ALERT_MAX_EXHAUSTION=float(os.getenv("BUY_ALERT_MAX_EXHAUSTION","58"));PUMP_MOMENTUM_ALERT_MIN=float(os.getenv("PUMP_MOMENTUM_ALERT_MIN","75"));PUMP_MOMENTUM_ALERT_EXTREME=float(os.getenv("PUMP_MOMENTUM_ALERT_EXTREME","90"));PUMP_MOMENTUM_ALERT_JUMP=float(os.getenv("PUMP_MOMENTUM_ALERT_JUMP","10"));PUMP_MOMENTUM_ALERT_COOLDOWN=float(os.getenv("PUMP_MOMENTUM_ALERT_COOLDOWN","300"));PUMP_MOMENTUM_ALERT_TOP=int(os.getenv("PUMP_MOMENTUM_ALERT_TOP","3"));FAST_PUMP_MIN_1M=float(os.getenv("FAST_PUMP_MIN_1M","0.15"));FAST_PUMP_MIN_5M=float(os.getenv("FAST_PUMP_MIN_5M","0.60"));FAST_PUMP_MIN_VOLUME=float(os.getenv("FAST_PUMP_MIN_VOLUME","2.00"));FAST_PUMP_MIN_ACCEL=float(os.getenv("FAST_PUMP_MIN_ACCEL","1.60"));FAST_PUMP_MIN_BUY=float(os.getenv("FAST_PUMP_MIN_BUY","0.65"));FAST_PUMP_MIN_RS5=float(os.getenv("FAST_PUMP_MIN_RS5","-0.10"));FAST_PUMP_MIN_SCORE=float(os.getenv("FAST_PUMP_MIN_SCORE","72"));FAST_PUMP_MAX_EXHAUSTION=float(os.getenv("FAST_PUMP_MAX_EXHAUSTION","35"));FAST_PUMP_ALERT_COOLDOWN=float(os.getenv("FAST_PUMP_ALERT_COOLDOWN","0"));FAST_PUMP_V15_PREFERENCE=float(os.getenv("FAST_PUMP_V15_PREFERENCE","60"));FAST_PUMP_MIN_ACCUMULATION=float(os.getenv("FAST_PUMP_MIN_ACCUMULATION","60"));FAST_PUMP_MIN_BULL_TF=int(os.getenv("FAST_PUMP_MIN_BULL_TF","2"));FAST_PUMP_LEADER_MARGIN=float(os.getenv("FAST_PUMP_LEADER_MARGIN","5"));FAST_PUMP_TOP_N=int(os.getenv("FAST_PUMP_TOP_N","2"));FAST_PUMP_ROLLING_WINDOW=float(os.getenv("FAST_PUMP_ROLLING_WINDOW","900"));FAST_PUMP_MIN_OBSERVATIONS=int(os.getenv("FAST_PUMP_MIN_OBSERVATIONS","2"));FAST_PUMP_MIN_SPAN_SECONDS=float(os.getenv("FAST_PUMP_MIN_SPAN_SECONDS","10"));FAST_PUMP_REPLACEMENT_MARGIN=float(os.getenv("FAST_PUMP_REPLACEMENT_MARGIN","5"));V158_EARLY_MOMENTUM_RECOVERY_ENABLED=os.getenv("V158_EARLY_MOMENTUM_RECOVERY_ENABLED","1")=="1";V158_RECOVERY_MIN_REGIME=float(os.getenv("V158_RECOVERY_MIN_REGIME","55"));V158_RECOVERY_MIN_INTENSITY=float(os.getenv("V158_RECOVERY_MIN_INTENSITY","1.5"));V158_RECOVERY_MIN_TRADE_SIZE=float(os.getenv("V158_RECOVERY_MIN_TRADE_SIZE","1.0"));V158_PARTICIPATION_IGNITION_ENABLED=os.getenv("V158_PARTICIPATION_IGNITION_ENABLED","1")=="1";V158_PARTICIPATION_MIN_TRADE_Z=float(os.getenv("V158_PARTICIPATION_MIN_TRADE_Z","2.0"));V158_PARTICIPATION_MIN_VOLUME_Z=float(os.getenv("V158_PARTICIPATION_MIN_VOLUME_Z","2.0"));V158_PARTICIPATION_MIN_BUY=float(os.getenv("V158_PARTICIPATION_MIN_BUY","0.60"));V158_PARTICIPATION_MIN_ACCEL=float(os.getenv("V158_PARTICIPATION_MIN_ACCEL","1.50"));V158_DIRECTIONAL_ACCELERATION_ENABLED=os.getenv("V158_DIRECTIONAL_ACCELERATION_ENABLED","1")=="1";V158_DIRECTIONAL_MIN_BUY_SLOPE=float(os.getenv("V158_DIRECTIONAL_MIN_BUY_SLOPE","0.025"));V158_DIRECTIONAL_MIN_PRICE_10S=float(os.getenv("V158_DIRECTIONAL_MIN_PRICE_10S","0.10"));V158_DIRECTIONAL_MIN_PRICE_60S=float(os.getenv("V158_DIRECTIONAL_MIN_PRICE_60S","0.00"));V158_DIRECTIONAL_MIN_CVD_Z=float(os.getenv("V158_DIRECTIONAL_MIN_CVD_Z","0.50"));V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z=float(os.getenv("V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z","2.50"));EARLY_MOMENTUM_MIN_SCORE=float(os.getenv("EARLY_MOMENTUM_MIN_SCORE","55"));EARLY_MOMENTUM_MIN_TRADES=int(os.getenv("EARLY_MOMENTUM_MIN_TRADES","3"));EARLY_MOMENTUM_MIN_BUY=float(os.getenv("EARLY_MOMENTUM_MIN_BUY","0.55"));EARLY_MOMENTUM_MIN_ACCEL=float(os.getenv("EARLY_MOMENTUM_MIN_ACCEL","1.15"));EARLY_MOMENTUM_MAX_SPREAD=float(os.getenv("EARLY_MOMENTUM_MAX_SPREAD","15"));FAST_PUMP_LEADERBOARD_FILE=os.getenv("FAST_PUMP_LEADERBOARD_FILE","data/v157_fastest_pump_leaderboard.json");V156_POSTBUY_WINDOW_SECONDS=float(os.getenv("V156_POSTBUY_WINDOW_SECONDS","3600"));V156_POSTBUY_CONFIRM_OBS=int(os.getenv("V156_POSTBUY_CONFIRM_OBS","2"));V156_POSTBUY_MIN_BUY=float(os.getenv("V156_POSTBUY_MIN_BUY","0.55"));V156_POSTBUY_MIN_ACCEL=float(os.getenv("V156_POSTBUY_MIN_ACCEL","1.25"));V156_POSTBUY_MIN_VOLUME=float(os.getenv("V156_POSTBUY_MIN_VOLUME","1.00"));V156_POSTBUY_MAX_RS5=float(os.getenv("V156_POSTBUY_MAX_RS5","-0.10"));V156_POSTBUY_MAX_EXHAUSTION=float(os.getenv("V156_POSTBUY_MAX_EXHAUSTION","70"));V156_POSTBUY_CONFIRM_DROP=float(os.getenv("V156_POSTBUY_CONFIRM_DROP","20"));V156_POSTBUY_MAX_DRAWDOWN=float(os.getenv("V156_POSTBUY_MAX_DRAWDOWN","-0.80"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"));TRADINGVIEW_ENABLED=os.getenv("TRADINGVIEW_ENABLED","1")=="1";TRADINGVIEW_REFRESH_SECONDS=float(os.getenv("TRADINGVIEW_REFRESH_SECONDS","30"))
+TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));BUY_ALERT_COOLDOWN=float(os.getenv("BUY_ALERT_COOLDOWN","1800"));BUY_ALERT_TOP=int(os.getenv("BUY_ALERT_TOP","3"));BUY_ALERT_MIN_QUALITY=float(os.getenv("BUY_ALERT_MIN_QUALITY","80"));BUY_ALERT_MIN_CONFIRMATION=float(os.getenv("BUY_ALERT_MIN_CONFIRMATION","70"));BUY_ALERT_MIN_OPPORTUNITY=float(os.getenv("BUY_ALERT_MIN_OPPORTUNITY","60"));BUY_ALERT_MIN_TV=float(os.getenv("BUY_ALERT_MIN_TV","70"));BUY_ALERT_MIN_BULL_TF=int(os.getenv("BUY_ALERT_MIN_BULL_TF","4"));BUY_ALERT_MAX_EXHAUSTION=float(os.getenv("BUY_ALERT_MAX_EXHAUSTION","58"));PUMP_MOMENTUM_ALERT_MIN=float(os.getenv("PUMP_MOMENTUM_ALERT_MIN","75"));PUMP_MOMENTUM_ALERT_EXTREME=float(os.getenv("PUMP_MOMENTUM_ALERT_EXTREME","90"));PUMP_MOMENTUM_ALERT_JUMP=float(os.getenv("PUMP_MOMENTUM_ALERT_JUMP","10"));PUMP_MOMENTUM_ALERT_COOLDOWN=float(os.getenv("PUMP_MOMENTUM_ALERT_COOLDOWN","300"));PUMP_MOMENTUM_ALERT_TOP=int(os.getenv("PUMP_MOMENTUM_ALERT_TOP","3"));FAST_PUMP_MIN_1M=float(os.getenv("FAST_PUMP_MIN_1M","0.15"));FAST_PUMP_MIN_5M=float(os.getenv("FAST_PUMP_MIN_5M","0.60"));FAST_PUMP_MIN_VOLUME=float(os.getenv("FAST_PUMP_MIN_VOLUME","2.00"));FAST_PUMP_MIN_ACCEL=float(os.getenv("FAST_PUMP_MIN_ACCEL","1.60"));FAST_PUMP_MIN_BUY=float(os.getenv("FAST_PUMP_MIN_BUY","0.65"));FAST_PUMP_MIN_RS5=float(os.getenv("FAST_PUMP_MIN_RS5","-0.10"));FAST_PUMP_MIN_SCORE=float(os.getenv("FAST_PUMP_MIN_SCORE","72"));FAST_PUMP_MAX_EXHAUSTION=float(os.getenv("FAST_PUMP_MAX_EXHAUSTION","35"));FAST_PUMP_ALERT_COOLDOWN=float(os.getenv("FAST_PUMP_ALERT_COOLDOWN","0"));FAST_PUMP_V15_PREFERENCE=float(os.getenv("FAST_PUMP_V15_PREFERENCE","60"));FAST_PUMP_MIN_ACCUMULATION=float(os.getenv("FAST_PUMP_MIN_ACCUMULATION","60"));FAST_PUMP_MIN_BULL_TF=int(os.getenv("FAST_PUMP_MIN_BULL_TF","2"));FAST_PUMP_LEADER_MARGIN=float(os.getenv("FAST_PUMP_LEADER_MARGIN","5"));FAST_PUMP_TOP_N=int(os.getenv("FAST_PUMP_TOP_N","2"));FAST_PUMP_ROLLING_WINDOW=float(os.getenv("FAST_PUMP_ROLLING_WINDOW","900"));FAST_PUMP_MIN_OBSERVATIONS=int(os.getenv("FAST_PUMP_MIN_OBSERVATIONS","2"));FAST_PUMP_MIN_SPAN_SECONDS=float(os.getenv("FAST_PUMP_MIN_SPAN_SECONDS","10"));FAST_PUMP_REPLACEMENT_MARGIN=float(os.getenv("FAST_PUMP_REPLACEMENT_MARGIN","5"));V158_EARLY_MOMENTUM_RECOVERY_ENABLED=os.getenv("V158_EARLY_MOMENTUM_RECOVERY_ENABLED","1")=="1";V158_RECOVERY_MIN_REGIME=float(os.getenv("V158_RECOVERY_MIN_REGIME","55"));V158_RECOVERY_MIN_INTENSITY=float(os.getenv("V158_RECOVERY_MIN_INTENSITY","1.5"));V158_RECOVERY_MIN_TRADE_SIZE=float(os.getenv("V158_RECOVERY_MIN_TRADE_SIZE","1.0"));V158_PARTICIPATION_IGNITION_ENABLED=os.getenv("V158_PARTICIPATION_IGNITION_ENABLED","1")=="1";V158_PARTICIPATION_MIN_TRADE_Z=float(os.getenv("V158_PARTICIPATION_MIN_TRADE_Z","2.0"));V158_PARTICIPATION_MIN_VOLUME_Z=float(os.getenv("V158_PARTICIPATION_MIN_VOLUME_Z","2.0"));V158_PARTICIPATION_MIN_BUY=float(os.getenv("V158_PARTICIPATION_MIN_BUY","0.60"));V158_PARTICIPATION_MIN_ACCEL=float(os.getenv("V158_PARTICIPATION_MIN_ACCEL","1.50"));V158_DIRECTIONAL_ACCELERATION_ENABLED=os.getenv("V158_DIRECTIONAL_ACCELERATION_ENABLED","1")=="1";V158_DIRECTIONAL_MIN_BUY_SLOPE=float(os.getenv("V158_DIRECTIONAL_MIN_BUY_SLOPE","0.025"));V158_DIRECTIONAL_MIN_PRICE_10S=float(os.getenv("V158_DIRECTIONAL_MIN_PRICE_10S","0.10"));V158_DIRECTIONAL_MIN_PRICE_60S=float(os.getenv("V158_DIRECTIONAL_MIN_PRICE_60S","0.00"));V158_DIRECTIONAL_MIN_CVD_Z=float(os.getenv("V158_DIRECTIONAL_MIN_CVD_Z","0.50"));V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z=float(os.getenv("V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z","2.50"));EARLY_MOMENTUM_MIN_SCORE=float(os.getenv("EARLY_MOMENTUM_MIN_SCORE","55"));EARLY_MOMENTUM_MIN_TRADES=int(os.getenv("EARLY_MOMENTUM_MIN_TRADES","3"));EARLY_MOMENTUM_MIN_BUY=float(os.getenv("EARLY_MOMENTUM_MIN_BUY","0.55"));EARLY_MOMENTUM_MIN_ACCEL=float(os.getenv("EARLY_MOMENTUM_MIN_ACCEL","1.15"));EARLY_MOMENTUM_MAX_SPREAD=float(os.getenv("EARLY_MOMENTUM_MAX_SPREAD","15"));FAST_PUMP_LEADERBOARD_FILE=os.getenv("FAST_PUMP_LEADERBOARD_FILE","data/v157_fastest_pump_leaderboard.json");V156_POSTBUY_WINDOW_SECONDS=float(os.getenv("V156_POSTBUY_WINDOW_SECONDS","3600"));V156_POSTBUY_GRACE_SECONDS=float(os.getenv("V156_POSTBUY_GRACE_SECONDS","10"));V156_POSTBUY_CONFIRM_OBS=int(os.getenv("V156_POSTBUY_CONFIRM_OBS","2"));V156_POSTBUY_MIN_BUY=float(os.getenv("V156_POSTBUY_MIN_BUY","0.55"));V156_POSTBUY_MIN_ACCEL=float(os.getenv("V156_POSTBUY_MIN_ACCEL","1.25"));V156_POSTBUY_MIN_VOLUME=float(os.getenv("V156_POSTBUY_MIN_VOLUME","1.00"));V156_POSTBUY_MAX_RS5=float(os.getenv("V156_POSTBUY_MAX_RS5","-0.10"));V156_POSTBUY_MAX_EXHAUSTION=float(os.getenv("V156_POSTBUY_MAX_EXHAUSTION","70"));V156_POSTBUY_CONFIRM_DROP=float(os.getenv("V156_POSTBUY_CONFIRM_DROP","20"));V156_POSTBUY_MAX_DRAWDOWN=float(os.getenv("V156_POSTBUY_MAX_DRAWDOWN","-0.80"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"));TRADINGVIEW_ENABLED=os.getenv("TRADINGVIEW_ENABLED","1")=="1";TRADINGVIEW_REFRESH_SECONDS=float(os.getenv("TRADINGVIEW_REFRESH_SECONDS","30"))
 V158_ENABLED=os.getenv("V158_ENABLED","1")=="1";V158_MAX_DYNAMIC=int(os.getenv("V158_MAX_DYNAMIC","20"));V158_MIN_QUOTE_VOLUME=float(os.getenv("V158_MIN_QUOTE_VOLUME","10000"));V158_PROMOTION_TTL=float(os.getenv("V158_PROMOTION_TTL","180"));V158_PROMOTION_SCORE=float(os.getenv("V158_PROMOTION_SCORE","55"));V158_XVENUE_ENABLED=os.getenv("V158_XVENUE_ENABLED","1")=="1";V158_XVENUE_INTERVAL=float(os.getenv("V158_XVENUE_INTERVAL","30"))
 symbols=[];books={};tv_cache={};tv_last_refresh=0.0;v158_xvenue_cache={};v158_xvenue_last=0.0
 v158_discovery=MarketDiscovery(max_promoted=V158_MAX_DYNAMIC,min_quote_volume=V158_MIN_QUOTE_VOLUME,ttl=V158_PROMOTION_TTL,min_score=V158_PROMOTION_SCORE);v158_dynamic_tasks={};v158_dynamic_until={};v158_core_symbols=set();v158_promoting=set()
-state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"ignition_window":deque(maxlen=60),"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":"","last_buy_alert":0,"last_buy_decision":"","last_buy_quality":0.0,"last_pump_momentum_alert":0,"last_pump_momentum_score":0.0,"last_pump_momentum_label":"","last_top5_price_alert":0,"last_top5_price_rank":None,"last_top5_price_score":0.0,"last_fast_pump_alert":0,"last_fast_pump_score":0.0,"last_fast_pump_symbol":"","early_momentum_score":0.0,"early_momentum_stage":"MONITOR","early_momentum_last":0.0,"v156_postbuy_active":False,"v156_postbuy_started":0.0,"v156_postbuy_price":0.0,"v156_postbuy_confirmation":0.0,"v156_postbuy_observations":0,"v156_postbuy_bad_streak":0,"v156_postbuy_last_alert":0.0,"v156_postbuy_state":"","reignition_armed_until":0,"reignition_armed_score":0.0,"last_reignition_alert":0,"last_reignition_stage":"","last_reignition_score":0.0,"v158_recovery_active":False,"v158_recovery_score":0.0,"v158_recovery_last":0.0,"v158_participation_active":False,"v158_participation_score":0.0,"v158_participation_last":0.0,"v158_directional_ignition_active":False,"v158_directional_ignition_score":0.0,"v158_directional_ignition_last":0.0})
+state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"ignition_window":deque(maxlen=60),"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":"","last_buy_alert":0,"last_buy_decision":"","last_buy_quality":0.0,"last_pump_momentum_alert":0,"last_pump_momentum_score":0.0,"last_pump_momentum_label":"","last_top5_price_alert":0,"last_top5_price_rank":None,"last_top5_price_score":0.0,"last_fast_pump_alert":0,"last_fast_pump_score":0.0,"last_fast_pump_symbol":"","early_momentum_score":0.0,"early_momentum_stage":"MONITOR","early_momentum_last":0.0,"v156_postbuy_active":False,"v156_postbuy_started":0.0,"v156_postbuy_ready_at":0.0,"v156_postbuy_baseline_price":0.0,"v156_postbuy_baseline_confirmation":0.0,"v156_postbuy_price":0.0,"v156_postbuy_confirmation":0.0,"v156_postbuy_observations":0,"v156_postbuy_bad_streak":0,"v156_postbuy_last_alert":0.0,"v156_postbuy_state":"","reignition_armed_until":0,"reignition_armed_score":0.0,"last_reignition_alert":0,"last_reignition_stage":"","last_reignition_score":0.0,"v158_recovery_active":False,"v158_recovery_score":0.0,"v158_recovery_last":0.0,"v158_participation_active":False,"v158_participation_score":0.0,"v158_participation_last":0.0,"v158_directional_ignition_active":False,"v158_directional_ignition_score":0.0,"v158_directional_ignition_last":0.0})
 
 async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
@@ -2035,31 +2035,71 @@ async def main():
                             old=state[r["symbol"]]
                             old["last_buy_quality"]=float(r.get("buy_setup_quality",0) or 0)
                             old["last_buy_decision"]=str(r.get("buy_decision","") or "")
-                        # V15.6 post-BUY deterioration monitor. This is separate from
-                        # the BUY signal and Fastest-Pump lane. Telegram fires only after
-                        # deterioration persists across consecutive observations.
+                        # V15.6 post-BUY deterioration monitor. This is deliberately
+                        # separated from the BUY event by a grace period and a fresh
+                        # post-BUY baseline. A BUY observation can never also count as
+                        # deterioration observation #1.
                         for r in rows:
                             s=r["symbol"];old=state[s];now=time.time()
                             confirmed=bool(r.get("v156_buy_alert",False)) and not bool(r.get("v15_btc_risk_off",False))
+
                             if confirmed and not bool(old.get("v156_postbuy_active",False)):
-                                old["v156_postbuy_active"]=True;old["v156_postbuy_started"]=now
-                                old["v156_postbuy_price"]=float(r.get("price",0) or 0)
-                                old["v156_postbuy_confirmation"]=float(r.get("v15_confirmation_score",r.get("v156_buy_score",0)) or 0)
-                                old["v156_postbuy_observations"]=0;old["v156_postbuy_bad_streak"]=0
-                                old["v156_postbuy_last_alert"]=0.0;old["v156_postbuy_state"]="CONFIRMED_BUY"
+                                entry_price=float(r.get("price",0) or 0)
+                                entry_conf=float(r.get("v15_confirmation_score",r.get("v156_buy_score",0)) or 0)
+                                old["v156_postbuy_active"]=True
+                                old["v156_postbuy_started"]=now
+                                old["v156_postbuy_ready_at"]=now+V156_POSTBUY_GRACE_SECONDS
+                                old["v156_postbuy_baseline_price"]=entry_price
+                                old["v156_postbuy_baseline_confirmation"]=entry_conf
+                                old["v156_postbuy_price"]=entry_price
+                                old["v156_postbuy_confirmation"]=entry_conf
+                                old["v156_postbuy_observations"]=0
+                                old["v156_postbuy_bad_streak"]=0
+                                old["v156_postbuy_last_alert"]=0.0
+                                old["v156_postbuy_state"]="BUY_GRACE"
                                 continue
-                            if not bool(old.get("v156_postbuy_active",False)): continue
-                            if now-float(old.get("v156_postbuy_started",0) or 0)>V156_POSTBUY_WINDOW_SECONDS:
-                                old["v156_postbuy_active"]=False;old["v156_postbuy_state"]="CLOSED";continue
+
+                            if not bool(old.get("v156_postbuy_active",False)):
+                                continue
+
+                            started=float(old.get("v156_postbuy_started",0) or 0)
+                            ready_at=float(old.get("v156_postbuy_ready_at",0) or 0)
+                            if now-started>V156_POSTBUY_WINDOW_SECONDS:
+                                old["v156_postbuy_active"]=False
+                                old["v156_postbuy_state"]="CLOSED"
+                                continue
+
                             p10=float(r.get("price_10s",0) or 0);p60=float(r.get("price_60s",0) or 0)
                             buy=float(r.get("buy_pressure",0) or 0);accel=float(r.get("trade_accel",0) or 0)
                             vol=float(r.get("volume_ratio",0) or 0);rs5=float(r.get("v15_relative_strength_5m",0) or 0)
                             conf=float(r.get("v15_confirmation_score",0) or 0);ex=float(r.get("exhaustion_score",0) or 0)
-                            price=float(r.get("price",0) or 0);base_price=float(old.get("v156_postbuy_price",0) or 0)
+                            price=float(r.get("price",0) or 0)
+                            base_price=float(old.get("v156_postbuy_baseline_price",old.get("v156_postbuy_price",0)) or 0)
                             drawdown=((price/base_price)-1.0)*100 if base_price>0 and price>0 else 0.0
                             pre=float(r.get("v158_pre_ignition_score",0) or 0);liq=float(r.get("v158_liquidity_state_score",0) or 0)
                             part=float(r.get("v158_participation_score",0) or 0);directional=float(r.get("v158_directional_score",0) or 0)
-                            base_conf=float(old.get("v156_postbuy_confirmation",0) or 0)
+                            base_conf=float(old.get("v156_postbuy_baseline_confirmation",old.get("v156_postbuy_confirmation",0)) or 0)
+
+                            # Grace period: do not score deterioration and do not
+                            # consume confirmation observations immediately after BUY.
+                            if now < ready_at:
+                                old["v156_postbuy_state"]="BUY_GRACE"
+                                old["v156_postbuy_bad_streak"]=0
+                                continue
+
+                            # First observation after grace establishes a fresh
+                            # monitoring baseline. It is never a deterioration vote.
+                            observations=int(old.get("v156_postbuy_observations",0))
+                            if observations==0:
+                                old["v156_postbuy_price"]=price
+                                old["v156_postbuy_confirmation"]=conf
+                                old["v156_postbuy_baseline_price"]=price
+                                old["v156_postbuy_baseline_confirmation"]=conf
+                                old["v156_postbuy_observations"]=1
+                                old["v156_postbuy_bad_streak"]=0
+                                old["v156_postbuy_state"]="MONITORING"
+                                continue
+
                             conditions=[p10<=0,p60<=0,buy<V156_POSTBUY_MIN_BUY,accel<V156_POSTBUY_MIN_ACCEL,
                                         vol<V156_POSTBUY_MIN_VOLUME,rs5<V156_POSTBUY_MAX_RS5,
                                         base_conf-conf>=V156_POSTBUY_CONFIRM_DROP,
@@ -2068,24 +2108,28 @@ async def main():
                                         pre<35 and liq<40,
                                         part<45 and directional<45]
                             severe=sum(bool(x) for x in conditions)
-                            old["v156_postbuy_observations"]=int(old.get("v156_postbuy_observations",0))+1
+                            old["v156_postbuy_observations"]=observations+1
                             confirmed_deterioration=severe>=3 or (severe>=2 and p10<0 and p60<0 and (buy<V156_POSTBUY_MIN_BUY or conf<=base_conf-V156_POSTBUY_CONFIRM_DROP))
-                            if confirmed_deterioration: old["v156_postbuy_bad_streak"]=int(old.get("v156_postbuy_bad_streak",0))+1
-                            else: old["v156_postbuy_bad_streak"]=0
+                            if confirmed_deterioration:
+                                old["v156_postbuy_bad_streak"]=int(old.get("v156_postbuy_bad_streak",0))+1
+                            else:
+                                old["v156_postbuy_bad_streak"]=0
+
+                            if old.get("v156_postbuy_bad_streak",0)>0:
+                                old["v156_postbuy_state"]="DETERIORATION_WATCH"
+                            else:
+                                old["v156_postbuy_state"]="MONITORING"
+
                             if (old.get("v156_postbuy_bad_streak",0)>=V156_POSTBUY_CONFIRM_OBS and
                                 old.get("v156_postbuy_state")!="CONFIRMED_DETERIORATION"):
-                                old["v156_postbuy_state"]="CONFIRMED_DETERIORATION";old["v156_postbuy_last_alert"]=now
+                                old["v156_postbuy_state"]="CONFIRMED_DETERIORATION"
+                                old["v156_postbuy_last_alert"]=now
                                 await telegram(
-                                    f"🔴 V15.6 CONFIRMED DETERIORATION | {s} | BUY setup degrading\
-"
-                                    f"Price: {r.get('price',0)} | 10s: {p10:+.2f}% | 60s: {p60:+.2f}%\
-"
-                                    f"Volume: {vol:.2f}x | Trade accel: {accel:.2f}x | Buy pressure: {buy*100:.1f}%\
-"
-                                    f"RS 5m: {rs5:+.2f}% | V15 confirmation: {conf:.0f}/100 (from {base_conf:.0f}) | Exhaustion: {ex:.0f}/100 | Drawdown: {drawdown:+.2f}%\
-"
-                                    f"Deterioration conditions: {severe}/8 | Confirmed after {old.get('v156_postbuy_bad_streak',0)} consecutive observations\
-"
+                                    f"🔴 V15.6 CONFIRMED DETERIORATION | {s} | BUY setup degrading\\n"
+                                    f"Price: {r.get('price',0)} | 10s: {p10:+.2f}% | 60s: {p60:+.2f}%\\n"
+                                    f"Volume: {vol:.2f}x | Trade accel: {accel:.2f}x | Buy pressure: {buy*100:.1f}%\\n"
+                                    f"RS 5m: {rs5:+.2f}% | V15 confirmation: {conf:.0f}/100 (from {base_conf:.0f}) | Exhaustion: {ex:.0f}/100 | Drawdown: {drawdown:+.2f}%\\n"
+                                    f"Deterioration conditions: {severe}/11 | Confirmed after {old.get('v156_postbuy_bad_streak',0)} consecutive observations\\n"
                                     "⚠️ Post-BUY monitoring alert — persistent deterioration detected."
                                 )
                         exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
