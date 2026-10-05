@@ -58,7 +58,7 @@ CFG = {
     "persist_burst_recovery_accel": float(os.getenv("V156_PERSIST_BURST_RECOVERY_ACCEL", "2.00")),
     "persist_burst_recovery_buy": float(os.getenv("V156_PERSIST_BURST_RECOVERY_BUY", "0.60")),
     "tier1_support_count": int(os.getenv("V158_TIER1_SUPPORT_COUNT", "2")),
-    "tier1_support_soft": float(os.getenv("V158_TIER1_SUPPORT_SOFT", "45")),,
+    "tier1_support_soft": float(os.getenv("V158_TIER1_SUPPORT_SOFT", "45")),
     "persist_min_enhancers": int(os.getenv("V156_PERSIST_MIN_ENHANCERS", "2")),
     # V15.8 Tier-1 fast ignition: price/trade-flow can lead rolling volume.
     "v158_tier1_enabled": os.getenv("V158_TIER1_ENABLED", "1") == "1",
