@@ -55,6 +55,16 @@ CFG = {
     "cooldown": float(os.getenv("V156_COOLDOWN", "180")),
     "persist_max_soft_failures": int(os.getenv("V156_PERSIST_MAX_SOFT_FAILURES", "1")),
     "persist_min_enhancers": int(os.getenv("V156_PERSIST_MIN_ENHANCERS", "2")),
+    # V15.8 Tier-1 fast ignition: price/trade-flow can lead rolling volume.
+    "v158_tier1_enabled": os.getenv("V158_TIER1_ENABLED", "1") == "1",
+    "v158_tier1_p10": float(os.getenv("V158_TIER1_P10", "0.10")),
+    "v158_tier1_accel": float(os.getenv("V158_TIER1_ACCEL", "3.50")),
+    "v158_tier1_buy": float(os.getenv("V158_TIER1_BUY", "0.65")),
+    "v158_tier1_rs5": float(os.getenv("V158_TIER1_RS5", "-0.10")),
+    "v158_tier1_support": float(os.getenv("V158_TIER1_SUPPORT", "55")),
+    "v158_tier1_spread": float(os.getenv("V158_TIER1_SPREAD", "35")),
+    "v158_tier1_volume_confirm": float(os.getenv("V158_TIER1_VOLUME_CONFIRM", "1.25")),
+    "v158_tier1_min_confirm": int(os.getenv("V158_TIER1_MIN_CONFIRM", "2")),
 }
 
 def _f(row, k, d=0.0):
@@ -144,7 +154,9 @@ def evaluate(row, memory, now=None):
               bridge_trigger and bridge >= CFG["path_b_bridge"] and
               exhaustion <= CFG["path_b_exhaustion"])
 
-    early = path_a or path_b
+    v158_support = max(v158_pre, v158_liq, v158_part, v158_dir)
+    tier1_fast = (CFG["v158_tier1_enabled"] and not hard_veto and p10 >= CFG["v158_tier1_p10"] and accel >= CFG["v158_tier1_accel"] and buy >= CFG["v158_tier1_buy"] and rs5 >= CFG["v158_tier1_rs5"] and spread <= CFG["v158_tier1_spread"] and v158_support >= CFG["v158_tier1_support"])
+    early = path_a or path_b or tier1_fast
 
     # Explicit price/participation divergence veto: a positive price move
     # without fresh participation/acceleration is not an early pump.
@@ -179,10 +191,12 @@ def evaluate(row, memory, now=None):
             status="PENDING"; age=0
 
     if status == "PENDING":
+        tier1b_volume_ok = vol >= CFG["v158_tier1_volume_confirm"]
+        tier1b_support_count = sum(bool(x) for x in [v158_pre >= CFG["v158_tier1_support"], v158_liq >= 60, v158_part >= 60, v158_dir >= 60, xvenue >= 60])
         failures=[]
         if p10 <= CFG["persist_p10"]: failures.append("PRICE_10S_LOST")
         if p60 <= CFG["persist_p60"]: failures.append("PRICE_60S_LOST")
-        if vol < CFG["persist_volume"]: failures.append("VOLUME_COLLAPSE")
+        if vol < CFG["persist_volume"] and not (tier1_fast and accel >= CFG["v158_tier1_accel"] and buy >= CFG["v158_tier1_buy"]): failures.append("VOLUME_COLLAPSE")
         if accel < CFG["persist_accel"]: failures.append("ACCEL_COLLAPSE")
         if buy < CFG["persist_buy"]: failures.append("BUY_PRESSURE_COLLAPSE")
         if rs5 < CFG["persist_rs5"]: failures.append("RS5_LOST")
@@ -200,9 +214,8 @@ def evaluate(row, memory, now=None):
             v158_pre >= 55, v158_liq >= 60, v158_part >= 60, v158_dir >= 60
         ])
         memory["persistence_strength"]=persistence_strength; memory["v158_enhancers"]=v158_enhancers
-        confirmable=(age >= CFG["persist_min"] and age <= CFG["persist_max"] and
-                     not hard_fail and len(soft_failures) <= CFG["persist_max_soft_failures"] and
-                     (not soft_failures or (persistence_strength >= 3 and v158_enhancers >= CFG["persist_min_enhancers"])))
+        tier1b_ready = tier1b_volume_ok or tier1b_support_count >= CFG["v158_tier1_min_confirm"]
+        confirmable=(age >= CFG["persist_min"] and age <= CFG["persist_max"] and not hard_fail and len(soft_failures) <= CFG["persist_max_soft_failures"] and tier1b_ready and (not soft_failures or (persistence_strength >= 3 and v158_enhancers >= CFG["persist_min_enhancers"])))
         if hard_fail or (age >= CFG["persist_min"] and len(failures) >= 2 and not confirmable):
             memory["status"]="FAILED_PERSISTENCE"; memory["stage"]="WATCH"
             event={"event":"RESOLVED","version":V156_VERSION,"event_id":memory.get("event_id",""),"symbol":symbol,"ts":now,
@@ -230,7 +243,12 @@ def evaluate(row, memory, now=None):
     buy_signal = status == "CONFIRMED_IGNITION"
     return {
         "v156_version":V156_VERSION,"v156_watch":watch,"v156_early_ignition":early,
-        "v156_path_a":path_a,"v156_path_b":path_b,"v156_path":("B" if path_b else "A" if path_a else ""),
+        "v156_path_a":path_a,"v156_path_b":path_b,"v156_path_v158_tier1":tier1_fast,
+        "v156_path":("V158-TIER1" if tier1_fast else "B" if path_b else "A" if path_a else ""),
+        "v158_tier1":bool(tier1_fast),
+        "v158_tier1b_volume_ok":bool(status == "PENDING" and vol >= CFG["v158_tier1_volume_confirm"]),
+        "v158_tier1b_support_count":int(tier1b_support_count if status == "PENDING" else 0),
+        "v158_tier1c_confirmed":bool(status == "CONFIRMED_IGNITION" and (vol >= CFG["v158_tier1_volume_confirm"] or v158_enhancers >= CFG["persist_min_enhancers"])),
         "v156_stage":stage,"v156_status":status,"v156_sweet_score":sweet,
         "v156_persistence_seconds":round(age,1),"v156_persistence_failures":"|".join(memory.get("failures",[])),
         "v156_persistence_strength":int(memory.get("persistence_strength",0) or 0),"v156_v158_enhancers":int(v158_enhancers),"v156_enhancer_bonus":int(enhancer_bonus),
@@ -240,7 +258,7 @@ def evaluate(row, memory, now=None):
         "v156_trigger_accel":_f(memory,"trigger_accel"),"v156_trigger_buy":_f(memory,"trigger_buy"),
         "v156_trigger_v15":_f(memory,"trigger_v15"),"v156_trigger_path":str(memory.get("trigger_path","")),"v156_bridge_bonus":5 if bridge_trigger and bridge>=15 else 3 if bridge>=15 else 0,
         "v156_fast_score":sweet,"v156_fast_ignition":early,"v156_fast_alert":bool(event and event.get("event")=="TRIGGER"),
-        "v156_fast_reason":"SWEET_SPOT" if early else "WATCH" if watch else "",
+        "v156_fast_reason":"V158_TIER1_FAST_IGNITION" if tier1_fast else "SWEET_SPOT" if early else "WATCH" if watch else "",
         "v156_signature_score":sweet,"v156_signature_alert":False,"v156_signature_signals":"SWEET_SPOT" if early else "",
         "v156_buy_alert":buy_signal,"v156_buy_score":sweet,
         "v156_path_b_reason":"PATH_B_STRONG_PRICE_STRUCTURAL_CONFIRMATION" if path_b else "",
