@@ -202,8 +202,7 @@ def evaluate(row, memory, now=None):
         memory["persistence_strength"]=persistence_strength; memory["v158_enhancers"]=v158_enhancers
         confirmable=(age >= CFG["persist_min"] and age <= CFG["persist_max"] and
                      not hard_fail and len(soft_failures) <= CFG["persist_max_soft_failures"] and
-                     (not soft_failures or persistence_strength >= 3) and
-                     v158_enhancers >= CFG["persist_min_enhancers"])
+                     (not soft_failures or (persistence_strength >= 3 and v158_enhancers >= CFG["persist_min_enhancers"])))
         if hard_fail or (age >= CFG["persist_min"] and len(failures) >= 2 and not confirmable):
             memory["status"]="FAILED_PERSISTENCE"; memory["stage"]="WATCH"
             event={"event":"RESOLVED","version":V156_VERSION,"event_id":memory.get("event_id",""),"symbol":symbol,"ts":now,
