@@ -1494,7 +1494,13 @@ async def main():
                             rr["v158_xvenue_ret_pct"]=float(xv.get("ret_pct",0) or 0)
                             bn=float(rr.get("price_10s",0) or 0)
                             xr=float(xv.get("ret_pct",0) or 0)
-                            rr["v158_xvenue_confirmed"]=bool(xv and ((bn>=0 and xr>=0) or (bn<0 and xr<0)) and abs(xr)>=0.02)
+                            same_direction=bool(xv and ((bn>=0 and xr>=0) or (bn<0 and xr<0)) and abs(xr)>=0.02)
+                            divergent=bool(xv and ((bn>0.05 and xr<-0.02) or (bn<-0.05 and xr>0.02)))
+                            xconf=100.0 if same_direction else 0.0 if divergent else 50.0
+                            rr["v158_xvenue_confirmed"]=same_direction
+                            rr["v158_xvenue_divergence"]=divergent
+                            rr["v158_xvenue_confidence"]=xconf
+                            rr["v158_cross_venue_modifier"]=round((xconf-50.0)*0.04,2)
                         rows.sort(key=lambda z: float(z.get("hybrid_score", 0) or 0), reverse=True)
                         # Dedicated TOP-1 V15.6 FASTEST-PUMP Telegram lane.
                         # V15.7 engine: microstructure-first early-pump detection.
