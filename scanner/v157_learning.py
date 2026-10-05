@@ -200,7 +200,7 @@ def persist_v157_observations(rows, fast_candidates, state, books, alerted_symbo
             "v158_xvenue_confidence":_safe_float(row.get("v158_xvenue_confidence"),50.0),
             "v158_xvenue_divergence":bool(row.get("v158_xvenue_divergence",False)),
             "v157_combo_signature":feature_combo_signature(row),
-            "v158_xvenue_ret_pct":_safe_float(row.get("v158_xvenue_ret_pct")),
+            "sustained_pump_score":_safe_float(row.get("sustained_pump_score")),"sustained_pump_state":str(row.get("sustained_pump_state","MONITOR")),"sustained_pump_streak":int(_safe_float(row.get("sustained_pump_streak"))),"sustained_pump_qualifies":bool(row.get("sustained_pump_qualifies",False)),"v158_xvenue_ret_pct":_safe_float(row.get("v158_xvenue_ret_pct")),
             "v158_xvenue_confirmed":bool(row.get("v158_xvenue_confirmed",False)),
             "v158_trade_age_s":_safe_float(row.get("v158_trade_age_s"),999.0),
             "v158_book_age_s":_safe_float(row.get("v158_book_age_s"),999.0),
