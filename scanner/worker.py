@@ -2115,14 +2115,19 @@ async def main():
                             else:
                                 old["v156_postbuy_bad_streak"]=0
 
-                            if old.get("v156_postbuy_bad_streak",0)>0:
+                            was_confirmed_deterioration=(old.get("v156_postbuy_state")=="CONFIRMED_DETERIORATION")
+                            deterioration_confirmed=(old.get("v156_postbuy_bad_streak",0)>=V156_POSTBUY_CONFIRM_OBS)
+
+                            # Alert only on the transition into CONFIRMED_DETERIORATION.
+                            # Do not emit the same deterioration episode repeatedly.
+                            if deterioration_confirmed:
+                                old["v156_postbuy_state"]="CONFIRMED_DETERIORATION"
+                            elif old.get("v156_postbuy_bad_streak",0)>0:
                                 old["v156_postbuy_state"]="DETERIORATION_WATCH"
                             else:
                                 old["v156_postbuy_state"]="MONITORING"
 
-                            if (old.get("v156_postbuy_bad_streak",0)>=V156_POSTBUY_CONFIRM_OBS and
-                                old.get("v156_postbuy_state")!="CONFIRMED_DETERIORATION"):
-                                old["v156_postbuy_state"]="CONFIRMED_DETERIORATION"
+                            if deterioration_confirmed and not was_confirmed_deterioration:
                                 old["v156_postbuy_last_alert"]=now
                                 await telegram(
                                     f"🔴 V15.6 CONFIRMED DETERIORATION | {s} | BUY setup degrading\\n"
