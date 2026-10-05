@@ -210,7 +210,7 @@ def evaluate(row, memory, now=None):
                 "trigger_ts":now,"last_alert":now,"trigger_price":_f(row,"price"),
                 "trigger_p10":p10,"trigger_p60":p60,"trigger_volume":vol,"trigger_accel":accel,
                 "trigger_buy":buy,"trigger_rs5":rs5,"trigger_v15":v15,"trigger_sweet_score":sweet,
-                "trigger_path":"B" if path_b else "A"})
+                "trigger_path":"V158-TEMPORAL-REIGNITION" if temporal_fast else "V158-TIER1" if tier1_fast else "B" if path_b else "A"})
             event={"event":"TRIGGER","version":V156_VERSION,"event_id":eid,"symbol":symbol,"ts":now,
                    "stage":"EARLY IGNITION","alert":True,"path":"B" if path_b else "A","sweet_score":sweet,"price":_f(row,"price"),
                    "p10":p10,"p60":p60,"volume":vol,"accel":accel,"buy":buy,"rs5":rs5,"v15":v15}
@@ -292,7 +292,7 @@ def evaluate(row, memory, now=None):
         "v156_trigger_accel":_f(memory,"trigger_accel"),"v156_trigger_buy":_f(memory,"trigger_buy"),
         "v156_trigger_v15":_f(memory,"trigger_v15"),"v156_trigger_path":str(memory.get("trigger_path","")),"v156_bridge_bonus":5 if bridge_trigger and bridge>=15 else 3 if bridge>=15 else 0,
         "v156_fast_score":sweet,"v156_fast_ignition":early,"v156_fast_alert":bool(event and event.get("event")=="TRIGGER"),
-        "v156_fast_reason":"V158_TIER1_FAST_IGNITION" if tier1_fast else "SWEET_SPOT" if early else "WATCH" if watch else "",
+        "v156_fast_reason":"V158_TEMPORAL_REIGNITION" if temporal_fast else "V158_TIER1_FAST_IGNITION" if tier1_fast else "SWEET_SPOT" if early else "WATCH" if watch else "",
         "v156_signature_score":sweet,"v156_signature_alert":False,"v156_signature_signals":"SWEET_SPOT" if early else "",
         "v156_buy_alert":buy_signal,"v156_buy_score":sweet,
         "v156_path_b_reason":"PATH_B_STRONG_PRICE_STRUCTURAL_CONFIRMATION" if path_b else "",
