@@ -53,6 +53,8 @@ CFG = {
     "exhaustion_max": float(os.getenv("V156_EXHAUSTION_MAX", "35")),
     "wide_spread": float(os.getenv("V156_WIDE_SPREAD_BPS", "50")),
     "cooldown": float(os.getenv("V156_COOLDOWN", "180")),
+    "persist_max_soft_failures": int(os.getenv("V156_PERSIST_MAX_SOFT_FAILURES", "1")),
+    "persist_min_enhancers": int(os.getenv("V156_PERSIST_MIN_ENHANCERS", "2")),
 }
 
 def _f(row, k, d=0.0):
@@ -92,6 +94,11 @@ def evaluate(row, memory, now=None):
     exhaustion = _f(row,"exhaustion_score")
     spread = _f(row,"spread_bps")
     btc_off = bool(row.get("v15_btc_risk_off",False))
+    v158_pre = _f(row,"v158_pre_ignition_score")
+    v158_liq = _f(row,"v158_liquidity_state_score")
+    v158_part = _f(row,"v158_participation_score")
+    v158_dir = _f(row,"v158_directional_score")
+    xvenue = _f(row,"v158_cross_venue_confidence")
 
     hard_veto = btc_off or p10 <= 0 or p60 <= 0 or buy < .50 or rs5 < 0 or spread > CFG["wide_spread"]
     exhaustion_veto = exhaustion > CFG["exhaustion_max"] and exhaustion > 0
@@ -149,7 +156,9 @@ def evaluate(row, memory, now=None):
         path_b = False
         early = False
 
-    sweet = _sweet_score(p10,p60,vol,accel,buy,v15,opp,conf,acc,rs5,bridge,tvtf)
+    v158_enhancers = sum(bool(x) for x in [v158_pre >= 55, v158_liq >= 60, v158_part >= 60, v158_dir >= 60, xvenue >= 60])
+    enhancer_bonus = min(8, v158_enhancers * 2)
+    sweet = min(100, _sweet_score(p10,p60,vol,accel,buy,v15,opp,conf,acc,rs5,bridge,tvtf) + enhancer_bonus)
     status = str(memory.get("status","IDLE"))
     trigger_ts = float(memory.get("trigger_ts",0) or 0)
     age = max(0.0, now-trigger_ts) if status == "PENDING" else 0.0
@@ -182,14 +191,29 @@ def evaluate(row, memory, now=None):
         if exhaustion_veto: failures.append("EXHAUSTION_VETO")
         memory["failures"]=failures; memory["last_update"]=now
         hard_fail=any(x in failures for x in ("PRICE_10S_LOST","PRICE_60S_LOST","BUY_PRESSURE_COLLAPSE","V15_CONFIRMATION_LOST","BTC_RISK_OFF","EXHAUSTION_VETO"))
-        if hard_fail or (age >= CFG["persist_min"] and len(failures) >= 2):
+        soft_failures=[x for x in failures if x in ("VOLUME_COLLAPSE","ACCEL_COLLAPSE","RS5_LOST")]
+        persistence_strength=sum(bool(x) for x in [
+            p10 >= _f(memory,"trigger_p10") if _f(memory,"trigger_p10") > 0 else p10 > 0,
+            p60 >= _f(memory,"trigger_p60") if _f(memory,"trigger_p60") > 0 else p60 > 0,
+            buy >= max(_f(memory,"trigger_buy")*.90, CFG["persist_buy"]),
+            accel >= max(_f(memory,"trigger_accel")*.90, CFG["persist_accel"]),
+            v158_pre >= 55, v158_liq >= 60, v158_part >= 60, v158_dir >= 60
+        ])
+        memory["persistence_strength"]=persistence_strength; memory["v158_enhancers"]=v158_enhancers
+        confirmable=(age >= CFG["persist_min"] and age <= CFG["persist_max"] and
+                     not hard_fail and len(soft_failures) <= CFG["persist_max_soft_failures"] and
+                     (not soft_failures or persistence_strength >= 3) and
+                     v158_enhancers >= CFG["persist_min_enhancers"])
+        if hard_fail or (age >= CFG["persist_min"] and len(failures) >= 2 and not confirmable):
             memory["status"]="FAILED_PERSISTENCE"; memory["stage"]="WATCH"
             event={"event":"RESOLVED","version":V156_VERSION,"event_id":memory.get("event_id",""),"symbol":symbol,"ts":now,
-                   "outcome":"FAILED_PERSISTENCE","persistence_seconds":round(age,1),"failures":failures,"sweet_score":sweet}
-        elif age >= CFG["persist_min"] and age <= CFG["persist_max"] and not failures:
+                   "outcome":"FAILED_PERSISTENCE","persistence_seconds":round(age,1),"failures":failures,"sweet_score":sweet,
+                   "persistence_strength":persistence_strength,"v158_enhancers":v158_enhancers}
+        elif confirmable:
             memory["status"]="CONFIRMED_IGNITION"; memory["stage"]="CONFIRMED IGNITION"; memory["confirmed_ts"]=now
             event={"event":"RESOLVED","version":V156_VERSION,"event_id":memory.get("event_id",""),"symbol":symbol,"ts":now,
-                   "outcome":"CONFIRMED_IGNITION","persistence_seconds":round(age,1),"failures":[],"sweet_score":sweet}
+                   "outcome":"CONFIRMED_IGNITION","persistence_seconds":round(age,1),"failures":failures,"sweet_score":sweet,
+                   "persistence_strength":persistence_strength,"v158_enhancers":v158_enhancers}
         elif age > CFG["persist_max"]:
             memory["status"]="FAILED_PERSISTENCE"; memory["stage"]="WATCH"
             event={"event":"RESOLVED","version":V156_VERSION,"event_id":memory.get("event_id",""),"symbol":symbol,"ts":now,
@@ -210,6 +234,7 @@ def evaluate(row, memory, now=None):
         "v156_path_a":path_a,"v156_path_b":path_b,"v156_path":("B" if path_b else "A" if path_a else ""),
         "v156_stage":stage,"v156_status":status,"v156_sweet_score":sweet,
         "v156_persistence_seconds":round(age,1),"v156_persistence_failures":"|".join(memory.get("failures",[])),
+        "v156_persistence_strength":int(memory.get("persistence_strength",0) or 0),"v156_v158_enhancers":int(v158_enhancers),"v156_enhancer_bonus":int(enhancer_bonus),
         "v156_buy_signal":buy_signal,"v156_alert":bool(event and event.get("event")=="TRIGGER"),
         "v156_event_id":memory.get("event_id",""),"v156_trigger_p10":_f(memory,"trigger_p10"),
         "v156_trigger_p60":_f(memory,"trigger_p60"),"v156_trigger_volume":_f(memory,"trigger_volume"),
