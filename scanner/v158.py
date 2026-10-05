@@ -261,7 +261,7 @@ def v158_liquidity_state_features(state, symbol, queue, adaptive_book, liquidity
         bullish_transition=transition and current in bullish_states and prev not in bullish_states
         bearish_transition=transition and current in bearish_states and prev not in bearish_states
         state_score=100.0 if current=="LIQUIDITY_IGNITION" else 80.0 if current=="BID_DOMINANT" else 60.0 if current=="BID_BUILDING" else 20.0 if current=="BALANCED" else 0.0
-        if current in bearish_states: state_score=max(0.0,100.0-state_score)
+        if current in bearish_states: state_score=0.0
         return {"v158_liquidity_state":current,"v158_liquidity_state_prev":prev,
                 "v158_liquidity_state_transition":bool(transition),
                 "v158_liquidity_bullish_transition":bool(bullish_transition),
