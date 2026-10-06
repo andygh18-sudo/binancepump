@@ -1,7 +1,7 @@
 import json, os, time
 from pathlib import Path
 
-V156_STATE_PATH=Path(os.getenv("V156_POSTBUY_STATE_PATH","data/v156_postbuy_state.json"))
+V156_STATE_PATH=Path(os.getenv("V156_POSTBUY_STATE_PATH","data/v157_observations.jsonl"))
 V156_WINDOW=float(os.getenv("V156_POSTBUY_WINDOW_SECONDS","3600"))
 V156_GRACE=float(os.getenv("V156_POSTBUY_GRACE_SECONDS","30"))
 V156_CONFIRM=int(os.getenv("V156_POSTBUY_CONFIRM_OBS","3"))
@@ -29,16 +29,29 @@ class V156DeteriorationMonitor:
 
     def _load(self):
         try:
+            if self.path.suffix == ".jsonl":
+                with self.path.open("r",encoding="utf-8") as fh:
+                    for line in fh:
+                        try:
+                            rec=json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if rec.get("event")=="V156_POSTBUY_STATE" and isinstance(rec.get("episodes"),dict):
+                            self.episodes.update(rec["episodes"])
+                return
             payload=json.loads(self.path.read_text(encoding="utf-8"))
-            if isinstance(payload,dict) and payload.get("version")==V156_STATE_VERSION:
-                episodes=payload.get("episodes",{})
-                if isinstance(episodes,dict):
-                    self.episodes=episodes
-        except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError):
+            if isinstance(payload,dict) and payload.get("version")==V156_STATE_VERSION and isinstance(payload.get("episodes"),dict):
+                self.episodes=payload["episodes"]
+        except (FileNotFoundError,OSError,TypeError):
             self.episodes={}
 
     def _save(self):
         self.path.parent.mkdir(parents=True,exist_ok=True)
+        payload={"event":"V156_POSTBUY_STATE","v156_state_version":V156_STATE_VERSION,"ts":time.time(),"episodes":self.episodes}
+        if self.path.suffix == ".jsonl":
+            with self.path.open("a",encoding="utf-8") as fh:
+                fh.write(json.dumps(payload,separators=(",",":"),allow_nan=False)+"\\n")
+            return
         tmp=self.path.with_suffix(self.path.suffix+".tmp")
         tmp.write_text(json.dumps({"version":V156_STATE_VERSION,"updated":time.time(),"episodes":self.episodes},separators=(",",":"),allow_nan=False),encoding="utf-8")
         tmp.replace(self.path)

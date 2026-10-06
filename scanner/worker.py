@@ -6,6 +6,7 @@ from .tradingview import fetch_tradingview_signals
 from .v157_learning import persist_v157_observations
 from .v158 import MarketDiscovery,trade_features,liquidity_features,data_quality,adaptive_micro_features,adaptive_book_features,queue_transition_imbalance_features,depth_sweep_features,replenishment_absorption_features,v158_pre_ignition_build_features,v158_liquidity_state_features,v158_temporal_reignition_memory
 from .v156 import evaluate as v156_evaluate
+from .v156_deterioration import V156DeteriorationMonitor
 
 load_dotenv()
 WS=os.getenv("BINANCE_WS_BASE","wss://data-stream.binance.vision/stream")
@@ -21,6 +22,7 @@ TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_A
 V158_ENABLED=os.getenv("V158_ENABLED","1")=="1";V158_MAX_DYNAMIC=int(os.getenv("V158_MAX_DYNAMIC","20"));V158_MIN_QUOTE_VOLUME=float(os.getenv("V158_MIN_QUOTE_VOLUME","10000"));V158_PROMOTION_TTL=float(os.getenv("V158_PROMOTION_TTL","180"));V158_PROMOTION_SCORE=float(os.getenv("V158_PROMOTION_SCORE","55"));V158_XVENUE_ENABLED=os.getenv("V158_XVENUE_ENABLED","1")=="1";V158_XVENUE_INTERVAL=float(os.getenv("V158_XVENUE_INTERVAL","30"))
 symbols=[];books={};tv_cache={};tv_last_refresh=0.0;v158_xvenue_cache={};v158_xvenue_last=0.0
 v158_discovery=MarketDiscovery(max_promoted=V158_MAX_DYNAMIC,min_quote_volume=V158_MIN_QUOTE_VOLUME,ttl=V158_PROMOTION_TTL,min_score=V158_PROMOTION_SCORE);v158_dynamic_tasks={};v158_dynamic_until={};v158_core_symbols=set();v158_promoting=set()
+v156_deterioration=V156DeteriorationMonitor()
 state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"ignition_window":deque(maxlen=60),"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":"","last_buy_alert":0,"last_buy_decision":"","last_buy_quality":0.0,"last_pump_momentum_alert":0,"last_pump_momentum_score":0.0,"last_pump_momentum_label":"","last_top5_price_alert":0,"last_top5_price_rank":None,"last_top5_price_score":0.0,"last_fast_pump_alert":0,"last_fast_pump_score":0.0,"last_fast_pump_symbol":"","early_momentum_score":0.0,"early_momentum_stage":"MONITOR","early_momentum_last":0.0,"v156_postbuy_active":False,"v156_postbuy_started":0.0,"v156_postbuy_ready_at":0.0,"v156_postbuy_baseline_price":0.0,"v156_postbuy_baseline_confirmation":0.0,"v156_postbuy_price":0.0,"v156_postbuy_confirmation":0.0,"v156_postbuy_observations":0,"v156_postbuy_bad_streak":0,"v156_postbuy_last_alert":0.0,"v156_postbuy_state":"","v156_postbuy_prev_rsi":{},"reignition_armed_until":0,"reignition_armed_score":0.0,"last_reignition_alert":0,"last_reignition_stage":"","last_reignition_score":0.0,"v158_recovery_active":False,"v158_recovery_score":0.0,"v158_recovery_last":0.0,"v158_participation_active":False,"v158_participation_score":0.0,"v158_participation_last":0.0,"v158_directional_ignition_active":False,"v158_directional_ignition_score":0.0,"v158_directional_ignition_last":0.0,"sustained_pump_streak":0,"sustained_pump_score":0.0,"sustained_pump_last_alert":0.0,"sustained_pump_state":"MONITOR"})
 
 async def get_json(s,url,params=None):
@@ -1976,6 +1978,7 @@ async def main():
                                     f"V15: {r.get('v15_score',0):.0f}/100 | BUY SCORE: {r.get('v156_buy_score',0):.0f} | "
                                     f"Drivers: {reason}"
                                 )
+                                v156_deterioration.start_episode(s,r.get("price",0),alert_score,now)
                                 old["last_v156_telegram_alert"]=now
                             old["last_v156_telegram_score"]=alert_score
                             old["last_v156_telegram_mode"]=mode
@@ -2196,130 +2199,21 @@ async def main():
                             old=state[r["symbol"]]
                             old["last_buy_quality"]=float(r.get("buy_setup_quality",0) or 0)
                             old["last_buy_decision"]=str(r.get("buy_decision","") or "")
-                        # V15.6 post-BUY deterioration monitor. This is deliberately
-                        # separated from the BUY event by a grace period and a fresh
-                        # post-BUY baseline. A BUY observation can never also count as
-                        # deterioration observation #1.
+                        # V15.6 post-BUY deterioration monitor.
+                        # Episodes are created only when the actual V15.6
+                        # CONFIRMED-IGNITION / BUY Telegram is sent above.
+                        # The V15.6 BUY decision and alert-selection lane is untouched.
                         for r in rows:
-                            s=r["symbol"];old=state[s];now=time.time()
-                            confirmed=bool(r.get("v156_buy_alert",False)) and not bool(r.get("v15_btc_risk_off",False))
-
-                            if confirmed and not bool(old.get("v156_postbuy_active",False)):
-                                entry_price=float(r.get("price",0) or 0)
-                                entry_conf=float(r.get("v15_confirmation_score",r.get("v156_buy_score",0)) or 0)
-                                old["v156_postbuy_active"]=True
-                                old["v156_postbuy_started"]=now
-                                old["v156_postbuy_ready_at"]=now+V156_POSTBUY_GRACE_SECONDS
-                                old["v156_postbuy_baseline_price"]=entry_price
-                                old["v156_postbuy_baseline_confirmation"]=entry_conf
-                                old["v156_postbuy_price"]=entry_price
-                                old["v156_postbuy_confirmation"]=entry_conf
-                                old["v156_postbuy_observations"]=0
-                                old["v156_postbuy_bad_streak"]=0
-                                old["v156_postbuy_last_alert"]=0.0
-                                old["v156_postbuy_state"]="BUY_GRACE"
-                                continue
-
-                            if not bool(old.get("v156_postbuy_active",False)):
-                                continue
-
-                            started=float(old.get("v156_postbuy_started",0) or 0)
-                            ready_at=float(old.get("v156_postbuy_ready_at",0) or 0)
-                            if now-started>V156_POSTBUY_WINDOW_SECONDS:
-                                old["v156_postbuy_active"]=False
-                                old["v156_postbuy_state"]="CLOSED"
-                                continue
-
-                            p10=float(r.get("price_10s",0) or 0);p60=float(r.get("price_60s",0) or 0)
-                            buy=float(r.get("buy_pressure",0) or 0);accel=float(r.get("trade_accel",0) or 0)
-                            vol=float(r.get("volume_ratio",0) or 0);rs5=float(r.get("v15_relative_strength_5m",0) or 0)
-                            conf=float(r.get("v15_confirmation_score",0) or 0);ex=float(r.get("exhaustion_score",0) or 0)
-                            price=float(r.get("price",0) or 0)
-                            base_price=float(old.get("v156_postbuy_baseline_price",old.get("v156_postbuy_price",0)) or 0)
-                            drawdown=((price/base_price)-1.0)*100 if base_price>0 and price>0 else 0.0
-                            pre=float(r.get("v158_pre_ignition_score",0) or 0);liq=float(r.get("v158_liquidity_state_score",0) or 0)
-                            part=float(r.get("v158_participation_score",0) or 0);directional=float(r.get("v158_directional_score",0) or 0)
-                            # V15 confirmation is intentionally excluded from post-BUY deterioration analysis.
-                            # Deterioration uses price, flow, momentum, exhaustion, drawdown,
-                            # V15.8 structural/participation signals, and multi-timeframe RSI.
-                            rsi5=float(r.get("tv_5m_rsi",0) or 0);rsi30=float(r.get("tv_30m_rsi",0) or 0)
-                            rsi1h=float(r.get("tv_1h_rsi",0) or 0);rsi4h=float(r.get("tv_4h_rsi",0) or 0)
-                            prev_rsi=old.get("v156_postbuy_prev_rsi",{}) or {}
-                            rsi_values={"5m":rsi5,"30m":rsi30,"1h":rsi1h,"4h":rsi4h}
-                            rsi_falling={}
-                            for _tf,_value in rsi_values.items():
-                                _prev=prev_rsi.get(_tf)
-                                rsi_falling[_tf]=(_prev is not None and _value>0 and _value < float(_prev)-0.5)
-                            rsi_bearish=[rsi5>0 and rsi5<45 and rsi_falling["5m"],rsi30>0 and rsi30<45 and rsi_falling["30m"],rsi1h>0 and rsi1h<50 and rsi_falling["1h"],rsi4h>0 and rsi4h<50 and rsi_falling["4h"]]
-                            rsi_bear_count=sum(bool(x) for x in rsi_bearish)
-                            rsi_confirmed=(rsi_bear_count>=2 or (rsi1h>0 and rsi4h>0 and rsi1h<50 and rsi4h<50 and (rsi_falling["1h"] or rsi_falling["4h"])))
-                            rsi_strong=(rsi1h>0 and rsi4h>0 and rsi1h<45 and rsi4h<45 and rsi_falling["1h"] and rsi_falling["4h"])
-
-                            # Grace period: do not score deterioration immediately after BUY.
-                            if now < ready_at:
-                                old["v156_postbuy_state"]="BUY_GRACE"
-                                old["v156_postbuy_bad_streak"]=0
-                                continue
-
-                            # First observation after grace establishes a fresh
-                            # monitoring baseline. It is never a deterioration vote.
-                            observations=int(old.get("v156_postbuy_observations",0))
-                            if observations==0:
-                                old["v156_postbuy_price"]=price
-                                old["v156_postbuy_confirmation"]=conf
-                                old["v156_postbuy_baseline_price"]=price
-                                old["v156_postbuy_baseline_confirmation"]=conf
-                                old["v156_postbuy_observations"]=1
-                                old["v156_postbuy_bad_streak"]=0
-                                old["v156_postbuy_state"]="MONITORING"
-                                continue
-
-                            conditions=[p10<=0,p60<=0,buy<V156_POSTBUY_MIN_BUY,accel<V156_POSTBUY_MIN_ACCEL,
-                                        vol<V156_POSTBUY_MIN_VOLUME,rs5<V156_POSTBUY_MAX_RS5,
-                                        ex>=V156_POSTBUY_MAX_EXHAUSTION and (buy<V156_POSTBUY_MIN_BUY or p60<=0),
-                                        drawdown<=V156_POSTBUY_MAX_DRAWDOWN,
-                                        pre<35 and liq<40,
-                                        part<45 and directional<45,rsi_confirmed]
-                            severe=sum(bool(x) for x in conditions)
-                            old["v156_postbuy_prev_rsi"]=rsi_values
-                            old["v156_postbuy_observations"]=observations+1
-                            # Tightened V15.6 deterioration confirmation:
-                            # require broader multi-factor degradation before an observation
-                            # can contribute to the 5-observation confirmation streak.
-                            flow_break = (buy < V156_POSTBUY_MIN_BUY and accel < V156_POSTBUY_MIN_ACCEL)
-                            price_break = (p10 < 0 and p60 < 0)
-                            structural_break = (pre < 35 and liq < 40)
-                            confirmed_deterioration = (
-                                severe >= 4
-                                or (severe >= 3 and price_break and (flow_break or structural_break))
-                                or (severe >= 3 and ex >= V156_POSTBUY_MAX_EXHAUSTION and flow_break)
-                            )
-                            if confirmed_deterioration:
-                                old["v156_postbuy_bad_streak"]=int(old.get("v156_postbuy_bad_streak",0))+1
-                            else:
-                                old["v156_postbuy_bad_streak"]=0
-
-                            was_confirmed_deterioration=(old.get("v156_postbuy_state")=="CONFIRMED_DETERIORATION")
-                            deterioration_confirmed=(old.get("v156_postbuy_bad_streak",0)>=V156_POSTBUY_CONFIRM_OBS)
-
-                            # Alert only on the transition into CONFIRMED_DETERIORATION.
-                            # Do not emit the same deterioration episode repeatedly.
-                            if deterioration_confirmed:
-                                old["v156_postbuy_state"]="CONFIRMED_DETERIORATION"
-                            elif old.get("v156_postbuy_bad_streak",0)>0:
-                                old["v156_postbuy_state"]="DETERIORATION_WATCH"
-                            else:
-                                old["v156_postbuy_state"]="MONITORING"
-
-                            if deterioration_confirmed and not was_confirmed_deterioration:
-                                old["v156_postbuy_last_alert"]=now
+                            result=v156_deterioration.observe(r["symbol"],r,time.time())
+                            if result and result.get("alert"):
                                 await telegram(
-                                    f"🔴 V15.6 CONFIRMED DETERIORATION | {s} | BUY setup degrading\\n"
-                                    f"Price: {r.get('price',0)} | 10s: {p10:+.2f}% | 60s: {p60:+.2f}%\\n"
-                                    f"Volume: {vol:.2f}x | Trade accel: {accel:.2f}x | Buy pressure: {buy*100:.1f}%\\n"
-                                    f"RS 5m: {rs5:+.2f}% | RSI 5m/30m/1H/4H: {rsi5:.1f}/{rsi30:.1f}/{rsi1h:.1f}/{rsi4h:.1f} | Exhaustion: {ex:.0f}/100 | Drawdown: {drawdown:+.2f}%\\n"
-                                    f"RSI deterioration: {rsi_bear_count}/4 bearish | Conditions: {severe}/11 | Confirmed after {old.get('v156_postbuy_bad_streak',0)} consecutive observations\\n"
-                                    "⚠️ Post-BUY monitoring alert — persistent deterioration detected."
+                                    f"🔴 V15.6 CONFIRMED DETERIORATION | {r['symbol']} | BUY episode {result['episode_id']} | BUY setup degrading\\n"
+                                    f"Price: {r.get('price',0)} | 10s: {result.get('price_10s',0):+.2f}% | 60s: {result.get('price_60s',0):+.2f}%\\n"
+                                    f"Volume: {result.get('volume_ratio',0):.2f}x | Trade accel: {result.get('trade_accel',0):.2f}x | Buy pressure: {result.get('buy_pressure',0)*100:.1f}%\\n"
+                                    f"RS 5m: {result.get('rs5',0):+.2f}% | RSI 5m/30m/1H/4H: {result.get('rsi5',0):.1f}/{result.get('rsi30',0):.1f}/{result.get('rsi1h',0):.1f}/{result.get('rsi4h',0):.1f} | Exhaustion: {result.get('exhaustion',0):.0f}/100 | Drawdown: {result.get('drawdown',0):+.2f}%\\n"
+                                    f"Breakdown families: {result.get('family_count',0)}/4 | Core breakdown: {result.get('core_family_count',0)}/3 | RSI bearish: {result.get('rsi_bear_count',0)}/4\\n"
+                                    f"Confirmed after {result.get('bad_streak',0)} time-separated observations | Episode age: {result.get('episode_age',0):.0f}s\\n"
+                                    "⚠️ Post-BUY monitoring alert — persistent multi-factor deterioration detected."
                                 )
                         exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
                         exhaustion_candidates=sorted(exhaustion_candidates,key=lambda r:(r.get("exhaustion_score",0),r.get("v15_score",0)),reverse=True)[:TOP_ALERTS]
