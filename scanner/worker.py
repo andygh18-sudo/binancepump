@@ -17,7 +17,7 @@ MOMENTUM_SYMBOLS=int(os.getenv("MOMENTUM_SYMBOLS","40"))
 LIQUID_SYMBOLS=int(os.getenv("LIQUID_SYMBOLS","80"))
 RUN_SECONDS=int(os.getenv("RUN_SECONDS","250"));INTERVAL=float(os.getenv("DECISION_INTERVAL","5"));IGNITION_HISTORY_SAMPLES=int(os.getenv("IGNITION_HISTORY_SAMPLES","60"))
 COOLDOWN=float(os.getenv("ALERT_COOLDOWN","60"));LIMIT=int(os.getenv("ORDERBOOK_LIMIT","1000"));HISTORY_SAMPLE_INTERVAL=float(os.getenv("HISTORY_SAMPLE_INTERVAL","300"))
-TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));BUY_ALERT_COOLDOWN=float(os.getenv("BUY_ALERT_COOLDOWN","1800"));BUY_ALERT_TOP=int(os.getenv("BUY_ALERT_TOP","3"));BUY_ALERT_MIN_QUALITY=float(os.getenv("BUY_ALERT_MIN_QUALITY","80"));BUY_ALERT_MIN_CONFIRMATION=float(os.getenv("BUY_ALERT_MIN_CONFIRMATION","70"));BUY_ALERT_MIN_OPPORTUNITY=float(os.getenv("BUY_ALERT_MIN_OPPORTUNITY","60"));BUY_ALERT_MIN_TV=float(os.getenv("BUY_ALERT_MIN_TV","70"));BUY_ALERT_MIN_BULL_TF=int(os.getenv("BUY_ALERT_MIN_BULL_TF","4"));BUY_ALERT_MAX_EXHAUSTION=float(os.getenv("BUY_ALERT_MAX_EXHAUSTION","58"));PUMP_MOMENTUM_ALERT_MIN=float(os.getenv("PUMP_MOMENTUM_ALERT_MIN","75"));PUMP_MOMENTUM_ALERT_EXTREME=float(os.getenv("PUMP_MOMENTUM_ALERT_EXTREME","90"));PUMP_MOMENTUM_ALERT_JUMP=float(os.getenv("PUMP_MOMENTUM_ALERT_JUMP","10"));PUMP_MOMENTUM_ALERT_COOLDOWN=float(os.getenv("PUMP_MOMENTUM_ALERT_COOLDOWN","300"));PUMP_MOMENTUM_ALERT_TOP=int(os.getenv("PUMP_MOMENTUM_ALERT_TOP","3"));FAST_PUMP_MIN_1M=float(os.getenv("FAST_PUMP_MIN_1M","0.15"));FAST_PUMP_MIN_5M=float(os.getenv("FAST_PUMP_MIN_5M","0.60"));FAST_PUMP_MIN_VOLUME=float(os.getenv("FAST_PUMP_MIN_VOLUME","2.00"));FAST_PUMP_MIN_ACCEL=float(os.getenv("FAST_PUMP_MIN_ACCEL","1.60"));FAST_PUMP_MIN_BUY=float(os.getenv("FAST_PUMP_MIN_BUY","0.65"));FAST_PUMP_MIN_RS5=float(os.getenv("FAST_PUMP_MIN_RS5","-0.10"));FAST_PUMP_MIN_SCORE=float(os.getenv("FAST_PUMP_MIN_SCORE","72"));FAST_PUMP_MAX_EXHAUSTION=float(os.getenv("FAST_PUMP_MAX_EXHAUSTION","35"));FAST_PUMP_ALERT_COOLDOWN=float(os.getenv("FAST_PUMP_ALERT_COOLDOWN","0"));FAST_PUMP_V15_PREFERENCE=float(os.getenv("FAST_PUMP_V15_PREFERENCE","60"));FAST_PUMP_MIN_ACCUMULATION=float(os.getenv("FAST_PUMP_MIN_ACCUMULATION","60"));FAST_PUMP_MIN_BULL_TF=int(os.getenv("FAST_PUMP_MIN_BULL_TF","2"));FAST_PUMP_LEADER_MARGIN=float(os.getenv("FAST_PUMP_LEADER_MARGIN","5"));FAST_PUMP_TOP_N=int(os.getenv("FAST_PUMP_TOP_N","2"));FAST_PUMP_ROLLING_WINDOW=float(os.getenv("FAST_PUMP_ROLLING_WINDOW","900"));FAST_PUMP_MIN_OBSERVATIONS=int(os.getenv("FAST_PUMP_MIN_OBSERVATIONS","2"));FAST_PUMP_MIN_SPAN_SECONDS=float(os.getenv("FAST_PUMP_MIN_SPAN_SECONDS","10"));FAST_PUMP_REPLACEMENT_MARGIN=float(os.getenv("FAST_PUMP_REPLACEMENT_MARGIN","5"));SUSTAINED_PUMP_ENABLED=os.getenv("SUSTAINED_PUMP_ENABLED","1")=="1";SUSTAINED_PUMP_MIN_SCORE=float(os.getenv("SUSTAINED_PUMP_MIN_SCORE","76"));SUSTAINED_PUMP_MIN_1M=float(os.getenv("SUSTAINED_PUMP_MIN_1M","0.10"));SUSTAINED_PUMP_MIN_5M=float(os.getenv("SUSTAINED_PUMP_MIN_5M","0.50"));SUSTAINED_PUMP_MIN_BUY=float(os.getenv("SUSTAINED_PUMP_MIN_BUY","0.53"));SUSTAINED_PUMP_MIN_ACCEL=float(os.getenv("SUSTAINED_PUMP_MIN_ACCEL","1.10"));SUSTAINED_PUMP_MIN_VOLUME=float(os.getenv("SUSTAINED_PUMP_MIN_VOLUME","1.10"));SUSTAINED_PUMP_MIN_CVD=float(os.getenv("SUSTAINED_PUMP_MIN_CVD","0.00"));SUSTAINED_PUMP_MIN_OBS=int(os.getenv("SUSTAINED_PUMP_MIN_OBS","2"));SUSTAINED_PUMP_MAX_EXHAUSTION=float(os.getenv("SUSTAINED_PUMP_MAX_EXHAUSTION","55"));SUSTAINED_PUMP_ALERT_COOLDOWN=float(os.getenv("SUSTAINED_PUMP_ALERT_COOLDOWN","300"));V158_EARLY_MOMENTUM_RECOVERY_ENABLED=os.getenv("V158_EARLY_MOMENTUM_RECOVERY_ENABLED","1")=="1";V158_RECOVERY_MIN_REGIME=float(os.getenv("V158_RECOVERY_MIN_REGIME","55"));V158_RECOVERY_MIN_INTENSITY=float(os.getenv("V158_RECOVERY_MIN_INTENSITY","1.5"));V158_RECOVERY_MIN_TRADE_SIZE=float(os.getenv("V158_RECOVERY_MIN_TRADE_SIZE","1.0"));V158_PARTICIPATION_IGNITION_ENABLED=os.getenv("V158_PARTICIPATION_IGNITION_ENABLED","1")=="1";V158_PARTICIPATION_MIN_TRADE_Z=float(os.getenv("V158_PARTICIPATION_MIN_TRADE_Z","2.0"));V158_PARTICIPATION_MIN_VOLUME_Z=float(os.getenv("V158_PARTICIPATION_MIN_VOLUME_Z","2.0"));V158_PARTICIPATION_MIN_BUY=float(os.getenv("V158_PARTICIPATION_MIN_BUY","0.60"));V158_PARTICIPATION_MIN_ACCEL=float(os.getenv("V158_PARTICIPATION_MIN_ACCEL","1.50"));V158_DIRECTIONAL_ACCELERATION_ENABLED=os.getenv("V158_DIRECTIONAL_ACCELERATION_ENABLED","1")=="1";V158_DIRECTIONAL_MIN_BUY_SLOPE=float(os.getenv("V158_DIRECTIONAL_MIN_BUY_SLOPE","0.025"));V158_DIRECTIONAL_MIN_PRICE_10S=float(os.getenv("V158_DIRECTIONAL_MIN_PRICE_10S","0.10"));V158_DIRECTIONAL_MIN_PRICE_60S=float(os.getenv("V158_DIRECTIONAL_MIN_PRICE_60S","0.00"));V158_DIRECTIONAL_MIN_CVD_Z=float(os.getenv("V158_DIRECTIONAL_MIN_CVD_Z","0.50"));V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z=float(os.getenv("V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z","2.50"));EARLY_MOMENTUM_MIN_SCORE=float(os.getenv("EARLY_MOMENTUM_MIN_SCORE","55"));EARLY_MOMENTUM_MIN_TRADES=int(os.getenv("EARLY_MOMENTUM_MIN_TRADES","3"));EARLY_MOMENTUM_MIN_BUY=float(os.getenv("EARLY_MOMENTUM_MIN_BUY","0.55"));EARLY_MOMENTUM_MIN_ACCEL=float(os.getenv("EARLY_MOMENTUM_MIN_ACCEL","1.15"));EARLY_MOMENTUM_MAX_SPREAD=float(os.getenv("EARLY_MOMENTUM_MAX_SPREAD","15"));FAST_PUMP_LEADERBOARD_FILE=os.getenv("FAST_PUMP_LEADERBOARD_FILE","data/v157_fastest_pump_leaderboard.json");V156_POSTBUY_WINDOW_SECONDS=float(os.getenv("V156_POSTBUY_WINDOW_SECONDS","3600"));V156_POSTBUY_GRACE_SECONDS=float(os.getenv("V156_POSTBUY_GRACE_SECONDS","10"));V156_POSTBUY_CONFIRM_OBS=int(os.getenv("V156_POSTBUY_CONFIRM_OBS","5"));V156_POSTBUY_MIN_BUY=float(os.getenv("V156_POSTBUY_MIN_BUY","0.55"));V156_POSTBUY_MIN_ACCEL=float(os.getenv("V156_POSTBUY_MIN_ACCEL","1.25"));V156_POSTBUY_MIN_VOLUME=float(os.getenv("V156_POSTBUY_MIN_VOLUME","1.00"));V156_POSTBUY_MAX_RS5=float(os.getenv("V156_POSTBUY_MAX_RS5","-0.10"));V156_POSTBUY_MAX_EXHAUSTION=float(os.getenv("V156_POSTBUY_MAX_EXHAUSTION","70"));V156_POSTBUY_CONFIRM_DROP=float(os.getenv("V156_POSTBUY_CONFIRM_DROP","20"));V156_POSTBUY_MAX_DRAWDOWN=float(os.getenv("V156_POSTBUY_MAX_DRAWDOWN","-0.80"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"));TRADINGVIEW_ENABLED=os.getenv("TRADINGVIEW_ENABLED","1")=="1";TRADINGVIEW_REFRESH_SECONDS=float(os.getenv("TRADINGVIEW_REFRESH_SECONDS","30"))
+TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_ALERT_SCORE","38"));ACCUM_ALERT_SCORE=int(os.getenv("ACCUM_ALERT_SCORE","60"));V4_ALERT_SCORE=int(os.getenv("V4_ALERT_SCORE","60"));V5_ALERT_SCORE=int(os.getenv("V5_ALERT_SCORE","65"));V5_MIN_PERSISTENCE=int(os.getenv("V5_MIN_PERSISTENCE","2"));V5_MIN_HIST_SAMPLES=int(os.getenv("V5_MIN_HIST_SAMPLES","5"));V5_MIN_HIST_RATE=float(os.getenv("V5_MIN_HIST_RATE","8"));V6_ALERT_SCORE=int(os.getenv("V6_ALERT_SCORE","65"));V6_MIN_PERSISTENCE=int(os.getenv("V6_MIN_PERSISTENCE","2"));V6_MIN_HIST_SAMPLES=int(os.getenv("V6_MIN_HIST_SAMPLES","20"));V6_MIN_HIST_RATE=float(os.getenv("V6_MIN_HIST_RATE","8"));V7_ALERT_SCORE=int(os.getenv("V7_ALERT_SCORE","65"));V7_MIN_PERSISTENCE=int(os.getenv("V7_MIN_PERSISTENCE","2"));V7_MIN_HIST_SAMPLES=int(os.getenv("V7_MIN_HIST_SAMPLES","20"));V7_MIN_HIST_RATE=float(os.getenv("V7_MIN_HIST_RATE","8"));V8_ALERT_SCORE=int(os.getenv("V8_ALERT_SCORE","58"));V8_MIN_PERSISTENCE=int(os.getenv("V8_MIN_PERSISTENCE","2"));V9_ALERT_SCORE=int(os.getenv("V9_ALERT_SCORE","58"));V9_MIN_PERSISTENCE=int(os.getenv("V9_MIN_PERSISTENCE","2"));V10_ALERT_SCORE=int(os.getenv("V10_ALERT_SCORE","60"));V10_MIN_PERSISTENCE=int(os.getenv("V10_MIN_PERSISTENCE","2"));V11_ALERT_SCORE=int(os.getenv("V11_ALERT_SCORE","65"));V11_CONFIRMED_SCORE=int(os.getenv("V11_CONFIRMED_SCORE","72"));V11_MIN_PERSISTENCE=int(os.getenv("V11_MIN_PERSISTENCE","2"));V12_ALERT_SCORE=int(os.getenv("V12_ALERT_SCORE","62"));V12_CONFIRMED_SCORE=int(os.getenv("V12_CONFIRMED_SCORE","70"));V12_MIN_PERSISTENCE=int(os.getenv("V12_MIN_PERSISTENCE","2"));BUY_ALERT_COOLDOWN=float(os.getenv("BUY_ALERT_COOLDOWN","1800"));BUY_ALERT_TOP=int(os.getenv("BUY_ALERT_TOP","3"));BUY_ALERT_MIN_QUALITY=float(os.getenv("BUY_ALERT_MIN_QUALITY","80"));BUY_ALERT_MIN_CONFIRMATION=float(os.getenv("BUY_ALERT_MIN_CONFIRMATION","70"));BUY_ALERT_MIN_OPPORTUNITY=float(os.getenv("BUY_ALERT_MIN_OPPORTUNITY","60"));BUY_ALERT_MIN_TV=float(os.getenv("BUY_ALERT_MIN_TV","70"));BUY_ALERT_MIN_BULL_TF=int(os.getenv("BUY_ALERT_MIN_BULL_TF","4"));BUY_ALERT_MAX_EXHAUSTION=float(os.getenv("BUY_ALERT_MAX_EXHAUSTION","58"));PUMP_MOMENTUM_ALERT_MIN=float(os.getenv("PUMP_MOMENTUM_ALERT_MIN","75"));PUMP_MOMENTUM_ALERT_EXTREME=float(os.getenv("PUMP_MOMENTUM_ALERT_EXTREME","90"));PUMP_MOMENTUM_ALERT_JUMP=float(os.getenv("PUMP_MOMENTUM_ALERT_JUMP","10"));PUMP_MOMENTUM_ALERT_COOLDOWN=float(os.getenv("PUMP_MOMENTUM_ALERT_COOLDOWN","300"));PUMP_MOMENTUM_ALERT_TOP=int(os.getenv("PUMP_MOMENTUM_ALERT_TOP","3"));FAST_PUMP_MIN_1M=float(os.getenv("FAST_PUMP_MIN_1M","0.15"));FAST_PUMP_MIN_5M=float(os.getenv("FAST_PUMP_MIN_5M","0.60"));FAST_PUMP_MIN_VOLUME=float(os.getenv("FAST_PUMP_MIN_VOLUME","2.00"));FAST_PUMP_MIN_ACCEL=float(os.getenv("FAST_PUMP_MIN_ACCEL","1.60"));FAST_PUMP_MIN_BUY=float(os.getenv("FAST_PUMP_MIN_BUY","0.65"));FAST_PUMP_MIN_RS5=float(os.getenv("FAST_PUMP_MIN_RS5","-0.10"));FAST_PUMP_MIN_SCORE=float(os.getenv("FAST_PUMP_MIN_SCORE","72"));FAST_PUMP_MAX_EXHAUSTION=float(os.getenv("FAST_PUMP_MAX_EXHAUSTION","35"));FAST_PUMP_ALERT_COOLDOWN=float(os.getenv("FAST_PUMP_ALERT_COOLDOWN","0"));FAST_PUMP_V15_PREFERENCE=float(os.getenv("FAST_PUMP_V15_PREFERENCE","60"));FAST_PUMP_MIN_ACCUMULATION=float(os.getenv("FAST_PUMP_MIN_ACCUMULATION","60"));FAST_PUMP_MIN_BULL_TF=int(os.getenv("FAST_PUMP_MIN_BULL_TF","2"));FAST_PUMP_LEADER_MARGIN=float(os.getenv("FAST_PUMP_LEADER_MARGIN","5"));FAST_PUMP_TOP_N=int(os.getenv("FAST_PUMP_TOP_N","2"));FAST_PUMP_ROLLING_WINDOW=float(os.getenv("FAST_PUMP_ROLLING_WINDOW","900"));FAST_PUMP_MIN_OBSERVATIONS=int(os.getenv("FAST_PUMP_MIN_OBSERVATIONS","2"));FAST_PUMP_MIN_SPAN_SECONDS=float(os.getenv("FAST_PUMP_MIN_SPAN_SECONDS","10"));FAST_PUMP_REPLACEMENT_MARGIN=float(os.getenv("FAST_PUMP_REPLACEMENT_MARGIN","5"));FAST_PUMP_EPISODE_GAP_SECONDS=float(os.getenv("FAST_PUMP_EPISODE_GAP_SECONDS","20"));FAST_PUMP_EPISODE_ALERT_COOLDOWN=float(os.getenv("FAST_PUMP_EPISODE_ALERT_COOLDOWN","300"));SUSTAINED_PUMP_ENABLED=os.getenv("SUSTAINED_PUMP_ENABLED","1")=="1";SUSTAINED_PUMP_MIN_SCORE=float(os.getenv("SUSTAINED_PUMP_MIN_SCORE","76"));SUSTAINED_PUMP_MIN_1M=float(os.getenv("SUSTAINED_PUMP_MIN_1M","0.10"));SUSTAINED_PUMP_MIN_5M=float(os.getenv("SUSTAINED_PUMP_MIN_5M","0.50"));SUSTAINED_PUMP_MIN_BUY=float(os.getenv("SUSTAINED_PUMP_MIN_BUY","0.53"));SUSTAINED_PUMP_MIN_ACCEL=float(os.getenv("SUSTAINED_PUMP_MIN_ACCEL","1.10"));SUSTAINED_PUMP_MIN_VOLUME=float(os.getenv("SUSTAINED_PUMP_MIN_VOLUME","1.10"));SUSTAINED_PUMP_MIN_CVD=float(os.getenv("SUSTAINED_PUMP_MIN_CVD","0.00"));SUSTAINED_PUMP_MIN_OBS=int(os.getenv("SUSTAINED_PUMP_MIN_OBS","2"));SUSTAINED_PUMP_MAX_EXHAUSTION=float(os.getenv("SUSTAINED_PUMP_MAX_EXHAUSTION","55"));SUSTAINED_PUMP_ALERT_COOLDOWN=float(os.getenv("SUSTAINED_PUMP_ALERT_COOLDOWN","300"));V158_EARLY_MOMENTUM_RECOVERY_ENABLED=os.getenv("V158_EARLY_MOMENTUM_RECOVERY_ENABLED","1")=="1";V158_RECOVERY_MIN_REGIME=float(os.getenv("V158_RECOVERY_MIN_REGIME","55"));V158_RECOVERY_MIN_INTENSITY=float(os.getenv("V158_RECOVERY_MIN_INTENSITY","1.5"));V158_RECOVERY_MIN_TRADE_SIZE=float(os.getenv("V158_RECOVERY_MIN_TRADE_SIZE","1.0"));V158_PARTICIPATION_IGNITION_ENABLED=os.getenv("V158_PARTICIPATION_IGNITION_ENABLED","1")=="1";V158_PARTICIPATION_MIN_TRADE_Z=float(os.getenv("V158_PARTICIPATION_MIN_TRADE_Z","2.0"));V158_PARTICIPATION_MIN_VOLUME_Z=float(os.getenv("V158_PARTICIPATION_MIN_VOLUME_Z","2.0"));V158_PARTICIPATION_MIN_BUY=float(os.getenv("V158_PARTICIPATION_MIN_BUY","0.60"));V158_PARTICIPATION_MIN_ACCEL=float(os.getenv("V158_PARTICIPATION_MIN_ACCEL","1.50"));V158_DIRECTIONAL_ACCELERATION_ENABLED=os.getenv("V158_DIRECTIONAL_ACCELERATION_ENABLED","1")=="1";V158_DIRECTIONAL_MIN_BUY_SLOPE=float(os.getenv("V158_DIRECTIONAL_MIN_BUY_SLOPE","0.025"));V158_DIRECTIONAL_MIN_PRICE_10S=float(os.getenv("V158_DIRECTIONAL_MIN_PRICE_10S","0.10"));V158_DIRECTIONAL_MIN_PRICE_60S=float(os.getenv("V158_DIRECTIONAL_MIN_PRICE_60S","0.00"));V158_DIRECTIONAL_MIN_CVD_Z=float(os.getenv("V158_DIRECTIONAL_MIN_CVD_Z","0.50"));V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z=float(os.getenv("V158_DIRECTIONAL_MAX_PRICE_IMPACT_Z","2.50"));EARLY_MOMENTUM_MIN_SCORE=float(os.getenv("EARLY_MOMENTUM_MIN_SCORE","55"));EARLY_MOMENTUM_MIN_TRADES=int(os.getenv("EARLY_MOMENTUM_MIN_TRADES","3"));EARLY_MOMENTUM_MIN_BUY=float(os.getenv("EARLY_MOMENTUM_MIN_BUY","0.55"));EARLY_MOMENTUM_MIN_ACCEL=float(os.getenv("EARLY_MOMENTUM_MIN_ACCEL","1.15"));EARLY_MOMENTUM_MAX_SPREAD=float(os.getenv("EARLY_MOMENTUM_MAX_SPREAD","15"));FAST_PUMP_LEADERBOARD_FILE=os.getenv("FAST_PUMP_LEADERBOARD_FILE","data/v157_fastest_pump_leaderboard.json");V156_POSTBUY_WINDOW_SECONDS=float(os.getenv("V156_POSTBUY_WINDOW_SECONDS","3600"));V156_POSTBUY_GRACE_SECONDS=float(os.getenv("V156_POSTBUY_GRACE_SECONDS","10"));V156_POSTBUY_CONFIRM_OBS=int(os.getenv("V156_POSTBUY_CONFIRM_OBS","5"));V156_POSTBUY_MIN_BUY=float(os.getenv("V156_POSTBUY_MIN_BUY","0.55"));V156_POSTBUY_MIN_ACCEL=float(os.getenv("V156_POSTBUY_MIN_ACCEL","1.25"));V156_POSTBUY_MIN_VOLUME=float(os.getenv("V156_POSTBUY_MIN_VOLUME","1.00"));V156_POSTBUY_MAX_RS5=float(os.getenv("V156_POSTBUY_MAX_RS5","-0.10"));V156_POSTBUY_MAX_EXHAUSTION=float(os.getenv("V156_POSTBUY_MAX_EXHAUSTION","70"));V156_POSTBUY_CONFIRM_DROP=float(os.getenv("V156_POSTBUY_CONFIRM_DROP","20"));V156_POSTBUY_MAX_DRAWDOWN=float(os.getenv("V156_POSTBUY_MAX_DRAWDOWN","-0.80"));EXHAUSTION_ALERT_SCORE=int(os.getenv("EXHAUSTION_ALERT_SCORE","72"));EXHAUSTION_MIN_EXTENSION=float(os.getenv("EXHAUSTION_MIN_EXTENSION","2.5"));EXHAUSTION_COOLDOWN=float(os.getenv("EXHAUSTION_COOLDOWN","120"));TRADINGVIEW_ENABLED=os.getenv("TRADINGVIEW_ENABLED","1")=="1";TRADINGVIEW_REFRESH_SECONDS=float(os.getenv("TRADINGVIEW_REFRESH_SECONDS","30"))
 V158_ENABLED=os.getenv("V158_ENABLED","1")=="1";V158_MAX_DYNAMIC=int(os.getenv("V158_MAX_DYNAMIC","20"));V158_MIN_QUOTE_VOLUME=float(os.getenv("V158_MIN_QUOTE_VOLUME","10000"));V158_PROMOTION_TTL=float(os.getenv("V158_PROMOTION_TTL","180"));V158_PROMOTION_SCORE=float(os.getenv("V158_PROMOTION_SCORE","55"));V158_XVENUE_ENABLED=os.getenv("V158_XVENUE_ENABLED","1")=="1";V158_XVENUE_INTERVAL=float(os.getenv("V158_XVENUE_INTERVAL","30"))
 symbols=[];books={};tv_cache={};tv_last_refresh=0.0;v158_xvenue_cache={};v158_xvenue_last=0.0
 v158_discovery=MarketDiscovery(max_promoted=V158_MAX_DYNAMIC,min_quote_volume=V158_MIN_QUOTE_VOLUME,ttl=V158_PROMOTION_TTL,min_score=V158_PROMOTION_SCORE);v158_dynamic_tasks={};v158_dynamic_until={};v158_core_symbols=set();v158_promoting=set()
@@ -1265,20 +1265,28 @@ def _fast_episode_score(samples):
 
 def update_fast_pump_leaderboard(candidates, now):
     """
-    Rolling episode leaderboard used only for Fastest-Pump Telegram selection.
-    The detector still produces all qualifying candidates; this layer suppresses
-    alert churn by comparing candidates across a rolling window before alerting.
+    Maintain the rolling Fastest-Pump leaderboard while alerting on fresh
+    qualifying pump episodes.
+
+    The leaderboard remains Top-N for ranking/visibility, but it is no longer
+    a hard Telegram gate. A symbol already in Top-N can alert again when a
+    genuinely new qualifying episode starts, subject to episode persistence
+    and a per-symbol anti-spam cooldown.
     """
     lb=state["__V156_FAST_PUMP__"].setdefault("leaderboard",load_fast_pump_leaderboard())
     symbols_lb=lb.setdefault("symbols",{})
     cutoff=now-FAST_PUMP_ROLLING_WINDOW
+
     for s,d in list(symbols_lb.items()):
         samples=[x for x in d.get("samples",[]) if float(x.get("ts",0) or 0)>=cutoff]
-        if samples:d["samples"]=samples
-        else:symbols_lb.pop(s,None)
+        if samples:
+            d["samples"]=samples
+        else:
+            symbols_lb.pop(s,None)
+
     for r in candidates:
         s=str(r.get("symbol","") or "")
-        if not s:continue
+        if not s: continue
         d=symbols_lb.setdefault(s,{"samples":[]})
         d["samples"]=[x for x in d.get("samples",[]) if float(x.get("ts",0) or 0)>=cutoff]
         d["samples"].append({
@@ -1299,55 +1307,102 @@ def update_fast_pump_leaderboard(candidates, now):
         d["last_seen"]=now
 
     ranked=[]
+    episode_alerts=[]
     for s,d in symbols_lb.items():
         samples=d.get("samples",[])
-        if not samples:continue
+        if not samples: continue
         last=float(samples[-1].get("ts",0) or 0)
-        if now-last>max(15.0,INTERVAL*3):continue
-        if len(samples)<FAST_PUMP_MIN_OBSERVATIONS:continue
-        if last-float(samples[0].get("ts",last) or last)<FAST_PUMP_MIN_SPAN_SECONDS:continue
-        ranked.append({"symbol":s,"episode_score":float(d.get("episode_score",0) or 0),"samples":len(samples)})
+        if now-last>max(15.0,INTERVAL*3): continue
+        if len(samples)<FAST_PUMP_MIN_OBSERVATIONS: continue
+
+        # Split the rolling history into the current qualifying episode.
+        # A gap means the previous pump episode has ended.
+        episode=list(reversed(samples))
+        current=[episode[0]]
+        for sample in episode[1:]:
+            if float(current[-1].get("ts",0) or 0)-float(sample.get("ts",0) or 0)>FAST_PUMP_EPISODE_GAP_SECONDS:
+                break
+            current.append(sample)
+        current=list(reversed(current))
+        if len(current)<FAST_PUMP_MIN_OBSERVATIONS: continue
+
+        first_ts=float(current[0].get("ts",last) or last)
+        span=last-first_ts
+        if span<FAST_PUMP_MIN_SPAN_SECONDS: continue
+
+        episode_score=_fast_episode_score(current)
+        ranked.append({"symbol":s,"episode_score":float(episode_score),"samples":len(current)})
+
+        episode_id=f"{int(first_ts)}:{len(current)}"
+        last_alert_episode=str(d.get("last_alert_episode","") or "")
+        last_alert_ts=float(d.get("last_alert_ts",0) or 0)
+
+        # Alert once per fresh episode. The episode is only considered fresh
+        # after the normal persistence requirements above have been satisfied.
+        if episode_id!=last_alert_episode and now-last_alert_ts>=FAST_PUMP_EPISODE_ALERT_COOLDOWN:
+            episode_alerts.append({
+                "symbol":s,
+                "episode_score":float(episode_score),
+                "samples":len(current),
+                "_episode_id":episode_id
+            })
+
     ranked.sort(key=lambda x:(x["episode_score"],x["samples"]),reverse=True)
     top=ranked[:FAST_PUMP_TOP_N]
 
+    # Preserve the rolling Top-N leaderboard for ranking/learning. It no longer
+    # decides whether a fresh episode is allowed to reach Telegram.
     previous=list(lb.get("top",[]))
     previous_by_symbol={str(x.get("symbol","")):x for x in previous if x.get("symbol")}
-    alerts=[]
     selected=list(previous_by_symbol.values())
     selected_symbols={str(x.get("symbol","")) for x in selected}
 
-    # Fill empty Top-2 slots from the strongest persistent candidates.
     for candidate in top:
-        if len(selected)>=FAST_PUMP_TOP_N:break
+        if len(selected)>=FAST_PUMP_TOP_N: break
         if candidate["symbol"] not in selected_symbols:
-            selected.append(candidate);selected_symbols.add(candidate["symbol"])
-            alerts.append(candidate)
+            selected.append(candidate)
+            selected_symbols.add(candidate["symbol"])
 
-    # Replace only when the new candidate is materially stronger than the
-    # weakest currently alerted member. This prevents constant rank flipping.
     while len(selected)>FAST_PUMP_TOP_N:
         selected.sort(key=lambda x:float(x.get("episode_score",0) or 0),reverse=True)
         selected.pop()
 
     for candidate in top:
         s=candidate["symbol"]
-        if s in selected_symbols:continue
+        if s in selected_symbols: continue
         if len(selected)<FAST_PUMP_TOP_N:
-            selected.append(candidate);selected_symbols.add(s);alerts.append(candidate);continue
+            selected.append(candidate)
+            selected_symbols.add(s)
+            continue
         selected.sort(key=lambda x:float(x.get("episode_score",0) or 0))
         weakest=selected[0]
         if candidate["episode_score"]-float(weakest.get("episode_score",0) or 0)>=FAST_PUMP_REPLACEMENT_MARGIN:
             selected_symbols.discard(str(weakest.get("symbol","")))
             selected[0]=candidate
             selected_symbols.add(s)
-            alerts.append(candidate)
 
     selected.sort(key=lambda x:float(x.get("episode_score",0) or 0),reverse=True)
     lb["top"]=selected[:FAST_PUMP_TOP_N]
     lb["updated"]=now
+
+    # Fresh episodes are independently alertable. Sort strongest first so if
+    # several pumps ignite in the same observation, Telegram gets the strongest
+    # episodes first rather than only whichever enters the Top-2 leaderboard.
+    episode_alerts.sort(key=lambda x:(x["episode_score"],x["samples"]),reverse=True)
+    alerts=[]
+    for candidate in episode_alerts:
+        s=candidate["symbol"]
+        d=symbols_lb.get(s,{})
+        d["last_alert_episode"]=candidate["_episode_id"]
+        d["last_alert_ts"]=now
+        alerts.append({k:v for k,v in candidate.items() if k!="_episode_id"})
+        if len(alerts)>=FAST_PUMP_TOP_N:
+            break
+
     try:
         os.makedirs(os.path.dirname(FAST_PUMP_LEADERBOARD_FILE) or ".",exist_ok=True)
-        with open(FAST_PUMP_LEADERBOARD_FILE,"w") as f:json.dump(lb,f,separators=(",",":"))
+        with open(FAST_PUMP_LEADERBOARD_FILE,"w") as f:
+            json.dump(lb,f,separators=(",",":"))
     except Exception:
         pass
     return top,alerts
