@@ -2165,7 +2165,17 @@ async def main():
                                         part<45 and directional<45]
                             severe=sum(bool(x) for x in conditions)
                             old["v156_postbuy_observations"]=observations+1
-                            confirmed_deterioration=severe>=3 or (severe>=2 and p10<0 and p60<0 and (buy<V156_POSTBUY_MIN_BUY or conf<=base_conf-V156_POSTBUY_CONFIRM_DROP))
+                            # Tightened V15.6 deterioration confirmation:
+                            # require broader multi-factor degradation before an observation
+                            # can contribute to the 5-observation confirmation streak.
+                            flow_break = (buy < V156_POSTBUY_MIN_BUY and accel < V156_POSTBUY_MIN_ACCEL)
+                            price_break = (p10 < 0 and p60 < 0)
+                            structural_break = (conf <= base_conf - V156_POSTBUY_CONFIRM_DROP or (pre < 35 and liq < 40))
+                            confirmed_deterioration = (
+                                severe >= 4
+                                or (severe >= 3 and price_break and (flow_break or structural_break))
+                                or (severe >= 3 and ex >= V156_POSTBUY_MAX_EXHAUSTION and flow_break)
+                            )
                             if confirmed_deterioration:
                                 old["v156_postbuy_bad_streak"]=int(old.get("v156_postbuy_bad_streak",0))+1
                             else:
