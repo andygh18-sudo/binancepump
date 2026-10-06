@@ -53,7 +53,7 @@ jobs:
       - name: Validate V15.7 scanner
         run: |
           set -e
-          python -m py_compile scanner/worker.py scanner/v157_learning.py scanner/v158.py scanner/orderbook.py scanner/tradingview.py scanner/v156.py run_scanner.py app.py
+          python -m py_compile scanner/worker.py scanner/v157_learning.py scanner/v158.py scanner/orderbook.py scanner/tradingview.py scanner/v156.py scanner/v156_deterioration.py run_scanner.py app.py
 
       - name: Validate worker bootstrap
         run: python scripts/validate_worker_bootstrap.py
@@ -67,6 +67,11 @@ jobs:
           V158_MIN_QUOTE_VOLUME: "10000"
           V158_PROMOTION_TTL: "180"
           V158_PROMOTION_SCORE: "55"
+          V158_EMERGENCY_MIN_QUOTE_VOLUME: "5000"
+          V158_EMERGENCY_SCORE: "35"
+          V158_EMERGENCY_VELOCITY: "0.05"
+          V158_EMERGENCY_TRADE_ANOMALY: "1.60"
+          V158_EMERGENCY_PCT: "3.0"
           V158_EARLY_MOMENTUM_RECOVERY_ENABLED: "1"
           V158_RECOVERY_MIN_REGIME: "55"
           V158_RECOVERY_MIN_INTENSITY: "1.5"
