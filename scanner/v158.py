@@ -326,11 +326,21 @@ def adaptive_book_features(state,books,symbol):
 class MarketDiscovery:
     """Lightweight all-market spot discovery using Binance !ticker@arr data."""
     def __init__(self, max_promoted=20, min_quote_volume=10000, ttl=180,
-                 min_score=55):
+                 min_score=55, emergency_min_quote_volume=5000,
+                 emergency_score=35, emergency_velocity=0.05,
+                 emergency_trade_anomaly=1.60, emergency_pct=3.0):
         self.max_promoted=int(max_promoted)
         self.min_quote_volume=float(min_quote_volume)
         self.ttl=float(ttl)
         self.min_score=float(min_score)
+        # Emergency route: deliberately independent of the normal discovery
+        # score so rapidly awakening markets can reach high-frequency capture
+        # before their 24h rank catches up.
+        self.emergency_min_quote_volume=float(emergency_min_quote_volume)
+        self.emergency_score=float(emergency_score)
+        self.emergency_velocity=float(emergency_velocity)
+        self.emergency_trade_anomaly=float(emergency_trade_anomaly)
+        self.emergency_pct=float(emergency_pct)
         self.items={}
         self.promoted={}
         self.events=0
@@ -388,11 +398,24 @@ class MarketDiscovery:
                        (float(item.get("cross_section_percentile",0.0))>=99.0 and
                         int(item.get("cross_section_rank",999999))<=max(20,self.max_promoted))) and
                       (velocity>=0.025 or trade_anomaly>=1.45 or pct>=2.0))
-            if eligible:
-                self.promoted[s]=max(now+self.ttl,self.promoted.get(s,0))
+            # Emergency pre-capture route. It watches the same all-market
+            # ticker feed but uses independent, lower-latency anomaly triggers.
+            # This route is intentionally advisory/routing-only: it never
+            # changes Fastest-Pump scoring or its hard gates.
+            emergency=(quote>=self.emergency_min_quote_volume and
+                       (velocity>=self.emergency_velocity or
+                        trade_anomaly>=self.emergency_trade_anomaly or
+                        (pct>=self.emergency_pct and range_pos>=0.75) or
+                        score>=self.emergency_score and (velocity>=0.025 or trade_anomaly>=1.25)))
+            if eligible or emergency:
+                ttl=self.ttl if eligible else min(self.ttl,120.0)
+                self.promoted[s]=max(now+ttl,self.promoted.get(s,0))
             self._trim(now)
-            if eligible:
-                return {"symbol":s,**item,"promotion_score":float(item.get("cross_section_route_score",score) or score)}
+            if eligible or emergency:
+                route_score=float(item.get("cross_section_route_score",score) or score)
+                if emergency:
+                    route_score=max(route_score,score+20.0,velocity/0.05*40.0,trade_anomaly/1.60*40.0)
+                return {"symbol":s,**item,"promotion_score":route_score,"emergency":bool(emergency),"emergency_route_score":round(route_score,1)}
         except Exception:
             return None
         return None
