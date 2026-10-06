@@ -1333,7 +1333,7 @@ def update_fast_pump_leaderboard(candidates, now):
         episode_score=_fast_episode_score(current)
         ranked.append({"symbol":s,"episode_score":float(episode_score),"samples":len(current)})
 
-        episode_id=f"{int(first_ts)}:{len(current)}"
+        episode_id=str(int(first_ts))
         last_alert_episode=str(d.get("last_alert_episode","") or "")
         last_alert_ts=float(d.get("last_alert_ts",0) or 0)
 
