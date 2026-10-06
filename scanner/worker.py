@@ -21,7 +21,7 @@ TOP_ALERTS=int(os.getenv("TOP_ALERTS","5"));MIN_ALERT_SCORE=int(os.getenv("MIN_A
 V158_ENABLED=os.getenv("V158_ENABLED","1")=="1";V158_MAX_DYNAMIC=int(os.getenv("V158_MAX_DYNAMIC","20"));V158_MIN_QUOTE_VOLUME=float(os.getenv("V158_MIN_QUOTE_VOLUME","10000"));V158_PROMOTION_TTL=float(os.getenv("V158_PROMOTION_TTL","180"));V158_PROMOTION_SCORE=float(os.getenv("V158_PROMOTION_SCORE","55"));V158_XVENUE_ENABLED=os.getenv("V158_XVENUE_ENABLED","1")=="1";V158_XVENUE_INTERVAL=float(os.getenv("V158_XVENUE_INTERVAL","30"))
 symbols=[];books={};tv_cache={};tv_last_refresh=0.0;v158_xvenue_cache={};v158_xvenue_last=0.0
 v158_discovery=MarketDiscovery(max_promoted=V158_MAX_DYNAMIC,min_quote_volume=V158_MIN_QUOTE_VOLUME,ttl=V158_PROMOTION_TTL,min_score=V158_PROMOTION_SCORE);v158_dynamic_tasks={};v158_dynamic_until={};v158_core_symbols=set();v158_promoting=set()
-state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"ignition_window":deque(maxlen=60),"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":"","last_buy_alert":0,"last_buy_decision":"","last_buy_quality":0.0,"last_pump_momentum_alert":0,"last_pump_momentum_score":0.0,"last_pump_momentum_label":"","last_top5_price_alert":0,"last_top5_price_rank":None,"last_top5_price_score":0.0,"last_fast_pump_alert":0,"last_fast_pump_score":0.0,"last_fast_pump_symbol":"","early_momentum_score":0.0,"early_momentum_stage":"MONITOR","early_momentum_last":0.0,"v156_postbuy_active":False,"v156_postbuy_started":0.0,"v156_postbuy_ready_at":0.0,"v156_postbuy_baseline_price":0.0,"v156_postbuy_baseline_confirmation":0.0,"v156_postbuy_price":0.0,"v156_postbuy_confirmation":0.0,"v156_postbuy_observations":0,"v156_postbuy_bad_streak":0,"v156_postbuy_last_alert":0.0,"v156_postbuy_state":"","reignition_armed_until":0,"reignition_armed_score":0.0,"last_reignition_alert":0,"last_reignition_stage":"","last_reignition_score":0.0,"v158_recovery_active":False,"v158_recovery_score":0.0,"v158_recovery_last":0.0,"v158_participation_active":False,"v158_participation_score":0.0,"v158_participation_last":0.0,"v158_directional_ignition_active":False,"v158_directional_ignition_score":0.0,"v158_directional_ignition_last":0.0,"sustained_pump_streak":0,"sustained_pump_score":0.0,"sustained_pump_last_alert":0.0,"sustained_pump_state":"MONITOR"})
+state=defaultdict(lambda:{"trades":deque(maxlen=12000),"price":None,"candle":None,"ignition_window":deque(maxlen=60),"last_alert":0,"last_alert_rank":None,"last_accum_alert":0,"last_accum_score":0.0,"v5_streak":0,"v5_last_bucket":-1,"v5_last_score":0.0,"v6_streak":0,"v6_last_bucket":-1,"v6_last_score":0.0,"v7_streak":0,"v7_last_bucket":-1,"v7_last_score":0.0,"v8_streak":0,"v8_last_bucket":-1,"v8_last_score":0.0,"v10_streak":0,"v10_last_bucket":-1,"v10_last_score":0.0,"v12_streak":0,"v12_last_bucket":-1,"v12_last_score":0.0,"last_exhaustion_alert":0,"last_exhaustion_score":0.0,"last_exhaustion_state":"","last_ignition_alert":0,"last_ignition_score":0.0,"last_ignition_stage":"","last_buy_alert":0,"last_buy_decision":"","last_buy_quality":0.0,"last_pump_momentum_alert":0,"last_pump_momentum_score":0.0,"last_pump_momentum_label":"","last_top5_price_alert":0,"last_top5_price_rank":None,"last_top5_price_score":0.0,"last_fast_pump_alert":0,"last_fast_pump_score":0.0,"last_fast_pump_symbol":"","early_momentum_score":0.0,"early_momentum_stage":"MONITOR","early_momentum_last":0.0,"v156_postbuy_active":False,"v156_postbuy_started":0.0,"v156_postbuy_ready_at":0.0,"v156_postbuy_baseline_price":0.0,"v156_postbuy_baseline_confirmation":0.0,"v156_postbuy_price":0.0,"v156_postbuy_confirmation":0.0,"v156_postbuy_observations":0,"v156_postbuy_bad_streak":0,"v156_postbuy_last_alert":0.0,"v156_postbuy_state":"","v156_postbuy_prev_rsi":{},"reignition_armed_until":0,"reignition_armed_score":0.0,"last_reignition_alert":0,"last_reignition_stage":"","last_reignition_score":0.0,"v158_recovery_active":False,"v158_recovery_score":0.0,"v158_recovery_last":0.0,"v158_participation_active":False,"v158_participation_score":0.0,"v158_participation_last":0.0,"v158_directional_ignition_active":False,"v158_directional_ignition_score":0.0,"v158_directional_ignition_last":0.0,"sustained_pump_streak":0,"sustained_pump_score":0.0,"sustained_pump_last_alert":0.0,"sustained_pump_state":"MONITOR"})
 
 async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
@@ -2191,7 +2191,19 @@ async def main():
                             part=float(r.get("v158_participation_score",0) or 0);directional=float(r.get("v158_directional_score",0) or 0)
                             # V15 confirmation is intentionally excluded from post-BUY deterioration analysis.
                             # Deterioration uses price, flow, momentum, exhaustion, drawdown,
-                            # and V15.8 structural/participation signals only.
+                            # V15.8 structural/participation signals, and multi-timeframe RSI.
+                            rsi5=float(r.get("tv_5m_rsi",0) or 0);rsi30=float(r.get("tv_30m_rsi",0) or 0)
+                            rsi1h=float(r.get("tv_1h_rsi",0) or 0);rsi4h=float(r.get("tv_4h_rsi",0) or 0)
+                            prev_rsi=old.get("v156_postbuy_prev_rsi",{}) or {}
+                            rsi_values={"5m":rsi5,"30m":rsi30,"1h":rsi1h,"4h":rsi4h}
+                            rsi_falling={}
+                            for _tf,_value in rsi_values.items():
+                                _prev=prev_rsi.get(_tf)
+                                rsi_falling[_tf]=(_prev is not None and _value>0 and _value < float(_prev)-0.5)
+                            rsi_bearish=[rsi5>0 and rsi5<45 and rsi_falling["5m"],rsi30>0 and rsi30<45 and rsi_falling["30m"],rsi1h>0 and rsi1h<50 and rsi_falling["1h"],rsi4h>0 and rsi4h<50 and rsi_falling["4h"]]
+                            rsi_bear_count=sum(bool(x) for x in rsi_bearish)
+                            rsi_confirmed=(rsi_bear_count>=2 or (rsi1h>0 and rsi4h>0 and rsi1h<50 and rsi4h<50 and (rsi_falling["1h"] or rsi_falling["4h"])))
+                            rsi_strong=(rsi1h>0 and rsi4h>0 and rsi1h<45 and rsi4h<45 and rsi_falling["1h"] and rsi_falling["4h"])
 
                             # Grace period: do not score deterioration immediately after BUY.
                             if now < ready_at:
@@ -2217,8 +2229,9 @@ async def main():
                                         ex>=V156_POSTBUY_MAX_EXHAUSTION and (buy<V156_POSTBUY_MIN_BUY or p60<=0),
                                         drawdown<=V156_POSTBUY_MAX_DRAWDOWN,
                                         pre<35 and liq<40,
-                                        part<45 and directional<45]
+                                        part<45 and directional<45,rsi_confirmed]
                             severe=sum(bool(x) for x in conditions)
+                            old["v156_postbuy_prev_rsi"]=rsi_values
                             old["v156_postbuy_observations"]=observations+1
                             # Tightened V15.6 deterioration confirmation:
                             # require broader multi-factor degradation before an observation
@@ -2254,8 +2267,8 @@ async def main():
                                     f"🔴 V15.6 CONFIRMED DETERIORATION | {s} | BUY setup degrading\\n"
                                     f"Price: {r.get('price',0)} | 10s: {p10:+.2f}% | 60s: {p60:+.2f}%\\n"
                                     f"Volume: {vol:.2f}x | Trade accel: {accel:.2f}x | Buy pressure: {buy*100:.1f}%\\n"
-                                    f"RS 5m: {rs5:+.2f}% | Exhaustion: {ex:.0f}/100 | Drawdown: {drawdown:+.2f}%\\n"
-                                    f"Deterioration conditions: {severe}/10 | Confirmed after {old.get('v156_postbuy_bad_streak',0)} consecutive observations\\n"
+                                    f"RS 5m: {rs5:+.2f}% | RSI 5m/30m/1H/4H: {rsi5:.1f}/{rsi30:.1f}/{rsi1h:.1f}/{rsi4h:.1f} | Exhaustion: {ex:.0f}/100 | Drawdown: {drawdown:+.2f}%\\n"
+                                    f"RSI deterioration: {rsi_bear_count}/4 bearish | Conditions: {severe}/11 | Confirmed after {old.get('v156_postbuy_bad_streak',0)} consecutive observations\\n"
                                     "⚠️ Post-BUY monitoring alert — persistent deterioration detected."
                                 )
                         exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
