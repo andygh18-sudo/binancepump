@@ -1241,6 +1241,47 @@ def score(s):
             "v158_liquidity_breakout_score":v158_liq.get("liquidity_breakout_score",0),"v158_data_quality":v158_quality.get("data_quality_score",0),
             "v158_trade_age_s":v158_quality.get("trade_age_s",999),"v158_book_age_s":v158_quality.get("book_age_s",999),"early_pump_score":eps["early_pump_score"],"early_pump_stage":eps["early_pump_stage"],"early_pump_quality":eps["early_pump_quality"],"relative_strength_5m":eps.get("relative_strength_5m"),"relative_strength_15m":eps.get("relative_strength_15m"),"btc_ret_5m":eps.get("btc_ret_5m"),"btc_ret_15m":eps.get("btc_ret_15m"),"false_positive_penalty":eps.get("false_positive_penalty",0),"accumulation_score":ac["accumulation_score"],"accumulation_stage":ac["accumulation_stage"],"accumulation_quality":ac["accumulation_quality"],"accum_buy_pressure":ac["accum_buy_pressure"],"accum_trade_accel":ac["accum_trade_accel"],"accum_volume_ratio":ac["accum_volume_ratio"],"accum_book_imbalance":ac["accum_book_imbalance"],"accum_price_10s":ac["accum_price_10s"],"accum_trades_10s":ac["accum_trades_10s"],**v4,**v5,**v6,**v7,**v8,**v9,**v10,**v11,**v12,"v15_model":"v15_1_early_ignition",**v156,"v15_alert":bool(v15 and (v15.get("v15_confirmed") or (v15.get("v15_early_candidate") and v15.get("v15_opportunity_score",0)>=55))),"v15_opportunity_score":v15.get("v15_opportunity_score",0) if v15 else 0,"v15_confirmation_score":v15.get("v15_confirmation_score",0) if v15 else 0,"v15_score":v15.get("v15_score",0) if v15 else 0,"v15_stage":v15.get("v15_stage","") if v15 else "","v15_early_candidate":v15.get("v15_early_candidate",False) if v15 else False,"v15_confirmed":v15.get("v15_confirmed",False) if v15 else False,"v15_streak":v15.get("v15_streak",0) if v15 else 0,"v15_btc_risk_off":v15.get("v15_btc_risk_off",False) if v15 else False,"v15_relative_strength_5m":v15.get("v15_relative_strength_5m",0) if v15 else 0,"v15_relative_strength_15m":v15.get("v15_relative_strength_15m",0) if v15 else 0,"v15_regime":v15.get("v15_regime","NO HIGH-TF CONFIRMATION") if v15 else "NO HIGH-TF CONFIRMATION","v15_reignition_score":v15.get("v15_reignition_score",0) if v15 else 0,"v15_reignition_watch":v15.get("v15_reignition_watch",False) if v15 else False,**reignition_bridge,**buy_quality,**buy_decision,**(exhaustion or {}),**(tv_cache.get(s,{}) or {}),"updated":time.time()}
 
+
+def v158_fast_pump_phase(r, n10=0, cvd10=0.0):
+    """Learning-only pump phase classifier. Never changes Fastest-Pump gates."""
+    p10=float(r.get("price_10s",0) or 0); p1=float(r.get("price_1m",0) or 0); p5=float(r.get("price_5m",0) or 0)
+    buy=float(r.get("buy_pressure",0) or 0); accel=float(r.get("trade_accel",0) or 0)
+    ex=float(r.get("exhaustion_score",0) or 0)
+    part=float(r.get("adaptive_participation_z",0) or 0); tz=float(r.get("adaptive_trade_z",0) or 0); vz=float(r.get("adaptive_volume_z",0) or 0)
+    if ex>=60 or (p10<0 and buy<0.50 and cvd10<0): return "EXHAUSTION"
+    if p10>=0.10 and cvd10>0 and buy>=0.55 and (tz>=1.0 or vz>=1.0):
+        return "FAST_PUMP" if accel>=1.60 and p1>=0.15 and p5>=0.60 else "ACCELERATION"
+    if p1>=0.10 and p5>=0.40 and (part>=0.75 or tz>=0.75 or vz>=0.75) and cvd10>=0: return "SUSTAINED_EXPANSION"
+    if (p10>=0.03 or p1>=0.05 or buy>=0.53) and (n10>=3 or tz>=0.5): return "IGNITION"
+    return "WATCH"
+
+def v158_price_lead_signature(r, cvd10=0.0, buy_slope=0.0, vol10_rate=0.0):
+    """Learning-only price -> participation -> flow sequence detector."""
+    p10=float(r.get("price_10s",0) or 0); p1=float(r.get("price_1m",0) or 0)
+    buy=float(r.get("buy_pressure",0) or 0); accel=float(r.get("trade_accel",0) or 0)
+    trade_z=float(r.get("adaptive_trade_z",0) or 0); vol_z=float(r.get("adaptive_volume_z",0) or 0)
+    price_lead=bool(p10>=0.05 or p1>=0.08)
+    participation_confirm=bool(accel>=1.05 or trade_z>=0.50 or vol10_rate>=1.05 or vol_z>=0.50)
+    flow_confirm=bool(cvd10>=0.03 and buy>=0.52 and buy_slope>=0.0)
+    sequence=int(price_lead)+int(participation_confirm)+int(flow_confirm)
+    stage="CONFIRMED_SEQUENCE" if sequence>=3 else "LEADING" if sequence==2 else "EARLY" if sequence==1 else "NONE"
+    return {"v158_price_lead_score":sequence*33.3,"v158_price_lead_stage":stage,"v158_price_lead":sequence>=2}
+
+def v158_fast_gate_reasons(r, n10=0, cvd10=0.0, buy_slope=0.0, accel=0.0):
+    """Research-only explanation of Fastest-Pump gate failures."""
+    reasons=[]
+    p1=float(r.get("price_1m",0) or 0); p5=float(r.get("price_5m",0) or 0)
+    p10s=float(r.get("price_10s",0) or 0); p60s=float(r.get("price_60s",0) or 0); buy=float(r.get("buy_pressure",0) or 0)
+    if n10<3: reasons.append("LOW_TRADES_10S")
+    if buy<0.57: reasons.append("LOW_BUY_PRESSURE")
+    if accel<1.25: reasons.append("LOW_TRADE_ACCEL")
+    if cvd10<0.08 and buy_slope<0.025: reasons.append("WEAK_CVD_OR_BUY_SLOPE")
+    if p1<0.05: reasons.append("LOW_1M_PRICE")
+    if p5<0.30: reasons.append("LOW_5M_PRICE")
+    if p10s<-0.75: reasons.append("NEGATIVE_10S_PRICE")
+    if p60s<-1.0: reasons.append("NEGATIVE_60S_PRICE")
+    return reasons
+
 def load_fast_pump_leaderboard():
     try:
         with open(FAST_PUMP_LEADERBOARD_FILE) as f:
@@ -1658,6 +1699,10 @@ async def main():
                             ob=books[r["symbol"]].metrics(20)
                             spread=float(ob.get("spread_bps",0) or 0)
                             imb=float(ob.get("imbalance",0) or 0)
+                            phase=v158_fast_pump_phase(r,n10=n10,cvd10=cvd10)
+                            lead=v158_price_lead_signature(r,cvd10=cvd10,buy_slope=buy_slope,vol10_rate=vol10_rate)
+                            gate_reasons=v158_fast_gate_reasons(r,n10=n10,cvd10=cvd10,buy_slope=buy_slope,accel=accel)
+                            r.update({**lead,"v158_fast_pump_phase":phase,"v158_fast_gate_reasons":gate_reasons})
 
                             if SUSTAINED_PUMP_ENABLED:
                                 sp=sustained_pump_signal(r,cvd10,ex,btc_off)
@@ -1786,6 +1831,11 @@ async def main():
                             rr["_fast_ask_replenishments"]=ask_repl
                             rr["_fast_bid_replenishments"]=bid_repl
                             rr["_fast_absorption_response"]=absorption_response
+                            rr["v158_fast_pump_phase"]=phase
+                            rr["v158_price_lead_score"]=lead.get("v158_price_lead_score",0)
+                            rr["v158_price_lead_stage"]=lead.get("v158_price_lead_stage","NONE")
+                            rr["v158_price_lead"]=lead.get("v158_price_lead",False)
+                            rr["v158_fast_gate_reasons"]=gate_reasons
                             rr["_fast_adaptive_regime"]=adaptive_fast.get("adaptive_regime_change",0)
                             rr["_fast_trade_z"]=adaptive_fast.get("adaptive_trade_z",0)
                             rr["_fast_volume_z"]=adaptive_fast.get("adaptive_volume_z",0)
