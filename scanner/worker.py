@@ -2189,10 +2189,11 @@ async def main():
                             drawdown=((price/base_price)-1.0)*100 if base_price>0 and price>0 else 0.0
                             pre=float(r.get("v158_pre_ignition_score",0) or 0);liq=float(r.get("v158_liquidity_state_score",0) or 0)
                             part=float(r.get("v158_participation_score",0) or 0);directional=float(r.get("v158_directional_score",0) or 0)
-                            base_conf=float(old.get("v156_postbuy_baseline_confirmation",old.get("v156_postbuy_confirmation",0)) or 0)
+                            # V15 confirmation is intentionally excluded from post-BUY deterioration analysis.
+                            # Deterioration uses price, flow, momentum, exhaustion, drawdown,
+                            # and V15.8 structural/participation signals only.
 
-                            # Grace period: do not score deterioration and do not
-                            # consume confirmation observations immediately after BUY.
+                            # Grace period: do not score deterioration immediately after BUY.
                             if now < ready_at:
                                 old["v156_postbuy_state"]="BUY_GRACE"
                                 old["v156_postbuy_bad_streak"]=0
@@ -2213,7 +2214,6 @@ async def main():
 
                             conditions=[p10<=0,p60<=0,buy<V156_POSTBUY_MIN_BUY,accel<V156_POSTBUY_MIN_ACCEL,
                                         vol<V156_POSTBUY_MIN_VOLUME,rs5<V156_POSTBUY_MAX_RS5,
-                                        base_conf-conf>=V156_POSTBUY_CONFIRM_DROP,
                                         ex>=V156_POSTBUY_MAX_EXHAUSTION and (buy<V156_POSTBUY_MIN_BUY or p60<=0),
                                         drawdown<=V156_POSTBUY_MAX_DRAWDOWN,
                                         pre<35 and liq<40,
@@ -2225,7 +2225,7 @@ async def main():
                             # can contribute to the 5-observation confirmation streak.
                             flow_break = (buy < V156_POSTBUY_MIN_BUY and accel < V156_POSTBUY_MIN_ACCEL)
                             price_break = (p10 < 0 and p60 < 0)
-                            structural_break = (conf <= base_conf - V156_POSTBUY_CONFIRM_DROP or (pre < 35 and liq < 40))
+                            structural_break = (pre < 35 and liq < 40)
                             confirmed_deterioration = (
                                 severe >= 4
                                 or (severe >= 3 and price_break and (flow_break or structural_break))
@@ -2254,8 +2254,8 @@ async def main():
                                     f"🔴 V15.6 CONFIRMED DETERIORATION | {s} | BUY setup degrading\\n"
                                     f"Price: {r.get('price',0)} | 10s: {p10:+.2f}% | 60s: {p60:+.2f}%\\n"
                                     f"Volume: {vol:.2f}x | Trade accel: {accel:.2f}x | Buy pressure: {buy*100:.1f}%\\n"
-                                    f"RS 5m: {rs5:+.2f}% | V15 confirmation: {conf:.0f}/100 (from {base_conf:.0f}) | Exhaustion: {ex:.0f}/100 | Drawdown: {drawdown:+.2f}%\\n"
-                                    f"Deterioration conditions: {severe}/11 | Confirmed after {old.get('v156_postbuy_bad_streak',0)} consecutive observations\\n"
+                                    f"RS 5m: {rs5:+.2f}% | Exhaustion: {ex:.0f}/100 | Drawdown: {drawdown:+.2f}%\\n"
+                                    f"Deterioration conditions: {severe}/10 | Confirmed after {old.get('v156_postbuy_bad_streak',0)} consecutive observations\\n"
                                     "⚠️ Post-BUY monitoring alert — persistent deterioration detected."
                                 )
                         exhaustion_candidates=[r for r in rows if r.get("exhaustion_alert") and r.get("exhaustion_score",0)>=EXHAUSTION_ALERT_SCORE and r.get("v15_score",0)>=55]
