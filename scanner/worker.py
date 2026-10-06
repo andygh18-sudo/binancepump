@@ -6,7 +6,8 @@ from .tradingview import fetch_tradingview_signals
 from .v157_learning import persist_v157_observations
 from .v158 import MarketDiscovery,trade_features,liquidity_features,data_quality,adaptive_micro_features,adaptive_book_features,queue_transition_imbalance_features,depth_sweep_features,replenishment_absorption_features,v158_pre_ignition_build_features,v158_liquidity_state_features,v158_temporal_reignition_memory
 from .v156 import evaluate as v156_evaluate
-from .v156_deterioration import V156DeteriorationMonitor\n# V15.6 deterioration redesign validation marker
+from .v156_deterioration import V156DeteriorationMonitor
+# V15.6 deterioration redesign validation marker
 
 load_dotenv()
 WS=os.getenv("BINANCE_WS_BASE","wss://data-stream.binance.vision/stream")
