@@ -36,8 +36,11 @@ class V156DeteriorationMonitor:
                             rec=json.loads(line)
                         except json.JSONDecodeError:
                             continue
-                        if rec.get("event")=="V156_POSTBUY_STATE" and isinstance(rec.get("episodes"),dict):
-                            self.episodes.update(rec["episodes"])
+                        if rec.get("event")=="V156_POSTBUY_STATE":
+                            if isinstance(rec.get("episode"),dict) and rec.get("symbol"):
+                                self.episodes[str(rec["symbol"]).upper()]=rec["episode"]
+                            elif isinstance(rec.get("episodes"),dict):
+                                self.episodes.update(rec["episodes"])
                 return
             payload=json.loads(self.path.read_text(encoding="utf-8"))
             if isinstance(payload,dict) and payload.get("version")==V156_STATE_VERSION and isinstance(payload.get("episodes"),dict):
@@ -45,10 +48,12 @@ class V156DeteriorationMonitor:
         except (FileNotFoundError,OSError,TypeError):
             self.episodes={}
 
-    def _save(self):
+    def _save(self,symbol=None):
         self.path.parent.mkdir(parents=True,exist_ok=True)
-        payload={"event":"V156_POSTBUY_STATE","v156_state_version":V156_STATE_VERSION,"ts":time.time(),"episodes":self.episodes}
         if self.path.suffix == ".jsonl":
+            if symbol is None or symbol not in self.episodes:
+                return
+            payload={"event":"V156_POSTBUY_STATE","v156_state_version":V156_STATE_VERSION,"ts":time.time(),"symbol":symbol,"episode":self.episodes[symbol]}
             with self.path.open("a",encoding="utf-8") as fh:
                 fh.write(json.dumps(payload,separators=(",",":"),allow_nan=False)+"\\n")
             return
@@ -77,14 +82,14 @@ class V156DeteriorationMonitor:
             "observations":0,"bad_streak":0,"last_observation_at":0.0,
             "prev_rsi":{},"state":"BUY_GRACE","alert_sent":False,"last_alert_at":0.0
         }
-        self._save()
+        self._save(symbol)
         return episode_id
 
-    def _finish(self,ep,state,now):
+    def _finish(self,symbol,ep,state,now):
         ep["active"]=False
         ep["state"]=state
         ep["closed_at"]=now
-        self._save()
+        self._save(symbol)
 
     def observe(self,symbol,row,ts=None):
         now=time.time() if ts is None else float(ts)
@@ -93,7 +98,7 @@ class V156DeteriorationMonitor:
         if not ep or not ep.get("active"):
             return None
         if now>float(ep.get("window_until",0) or 0):
-            self._finish(ep,"CLOSED",now)
+            self._finish(symbol,ep,"CLOSED",now)
             return None
         if now<float(ep.get("ready_at",0) or 0):
             ep["state"]="BUY_GRACE"
@@ -150,7 +155,7 @@ class V156DeteriorationMonitor:
             ep["baseline_price"]=price if price>0 else ep.get("baseline_price",0)
             ep["bad_streak"]=0
             ep["state"]="MONITORING"
-            self._save()
+            self._save(symbol)
             return None
 
         if confirmed_observation:
@@ -171,7 +176,7 @@ class V156DeteriorationMonitor:
         if ep["bad_streak"]>=V156_CONFIRM and not ep.get("alert_sent",False):
             ep["state"]="CONFIRMED_DETERIORATION";ep["alert_sent"]=True;ep["last_alert_at"]=now
             result["alert"]=True
-            self._save()
+            self._save(symbol)
             return result
-        self._save()
+        self._save(symbol)
         return result
