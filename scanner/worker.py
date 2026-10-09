@@ -1424,12 +1424,11 @@ async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
     msg=str(msg)
     # Production Telegram policy:
-    # - Normal V15.6 lane: only CONFIRMED-IGNITION / BUY is allowed.
-    # - Dedicated FASTEST-PUMP lane: explicitly allowed as its own independent alert lane.
-    # - V15.7 is the Fastest-Pump scoring engine but intentionally keeps the
-    #   V15.6 FASTEST-PUMP Telegram label for downstream compatibility.
-    # This keeps legacy V15/early alerts disabled without blocking Fastest-Pump.
-    allowed_confirmed=msg.startswith("V15.6 CONFIRMED-IGNITION / BUY")
+    # - V15.6 CONFIRMED-IGNITION / BUY Telegram alerts are disabled.
+    # - FASTEST-PUMP remains enabled as its own independent alert lane.
+    # - Confirmed deterioration alerts remain enabled.
+    # - Legacy V15/early alerts remain disabled.
+    allowed_confirmed=False
     allowed_fastest=msg.startswith("🚀 V15.6 FASTEST-PUMP")
     allowed_deterioration=msg.startswith("🔴 V15.6 CONFIRMED DETERIORATION")
     if not (allowed_confirmed or allowed_fastest or allowed_deterioration): return
