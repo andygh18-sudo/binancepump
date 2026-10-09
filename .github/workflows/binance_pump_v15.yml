@@ -139,12 +139,26 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
+          # Preserve the newest learning window and persistent discovery state,
+          # but never attempt to commit a GitHub-blocked >100 MB JSONL file.
           cp data/v157_observations.jsonl /tmp/v157_observations.jsonl 2>/dev/null || : > /tmp/v157_observations.jsonl
           cp data/v158_discovery.jsonl /tmp/v158_discovery.jsonl 2>/dev/null || : > /tmp/v158_discovery.jsonl
           cp data/v158_participation_ignition.json /tmp/v158_participation_ignition.json 2>/dev/null || true
           cp data/v158_directional_ignition.json /tmp/v158_directional_ignition.json 2>/dev/null || true
           cp data/latest.json /tmp/latest.json 2>/dev/null || true
           cp data/v157_fastest_pump_leaderboard.json /tmp/v157_fastest_pump_leaderboard.json 2>/dev/null || true
+          # Cap historical JSONL size while preserving recent observations.
+          if [ -f /tmp/v157_observations.jsonl ]; then
+            tail -c 80000000 /tmp/v157_observations.jsonl > /tmp/v157_observations.capped.jsonl
+            # Align to the first complete line after the byte cap.
+            sed -n '1,$p' /tmp/v157_observations.capped.jsonl | sed '1{/^[{]/!d;}' > /tmp/v157_observations.bounded.jsonl
+            mv /tmp/v157_observations.bounded.jsonl /tmp/v157_observations.jsonl
+          fi
+          if [ -f /tmp/v158_discovery.jsonl ]; then
+            tail -c 5000000 /tmp/v158_discovery.jsonl > /tmp/v158_discovery.capped.jsonl
+            sed -n '1,$p' /tmp/v158_discovery.capped.jsonl | sed '1{/^[{]/!d;}' > /tmp/v158_discovery.bounded.jsonl
+            mv /tmp/v158_discovery.bounded.jsonl /tmp/v158_discovery.jsonl
+          fi
           git reset --hard origin/main
           mkdir -p data
           cp /tmp/v157_observations.jsonl data/v157_observations.jsonl
