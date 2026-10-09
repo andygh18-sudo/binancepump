@@ -2023,6 +2023,9 @@ async def main():
                         # becoming eligible for an alert. This records eligibility, not delivery.
                         ranked_fast_symbols={str(x.get("symbol", "")) for x in fast_ranked}
                         alert_eligible_symbols={str(x.get("symbol", "")) for x in fast_alerts}
+                        fast_lb=state["__V156_FAST_PUMP__"].get("leaderboard", {})
+                        fast_lb_symbols=fast_lb.get("symbols", {}) if isinstance(fast_lb, dict) else {}
+                        audit_now=time.time()
                         for audit_row in fast_pump_audit_rows:
                             if audit_row.get("decision") != "QUALIFIED_FAST_PUMP":
                                 continue
@@ -2032,8 +2035,34 @@ async def main():
                             elif audit_symbol in ranked_fast_symbols:
                                 audit_row["decision"]="TOP_N_SELECTED_NO_NEW_ALERT"
                             else:
-                                audit_row["decision"]="QUALIFIED_NOT_TOP_N"
-                        persist_fast_pump_rejection_audit(fast_pump_audit_rows, time.time())
+                                # Distinguish a failed episode-persistence check from
+                                # a qualifying episode that simply ranked outside Top-N.
+                                symbol_data=fast_lb_symbols.get(audit_symbol, {})
+                                samples=[
+                                    x for x in symbol_data.get("samples", [])
+                                    if float(x.get("ts", 0) or 0)>=audit_now-FAST_PUMP_ROLLING_WINDOW
+                                ]
+                                persistence_reason=None
+                                if not samples or audit_now-float(samples[-1].get("ts", 0) or 0)>max(15.0, INTERVAL*3):
+                                    persistence_reason="PERSISTENCE_NO_RECENT_SAMPLE"
+                                else:
+                                    current=[samples[-1]]
+                                    for sample in reversed(samples[:-1]):
+                                        if float(current[-1].get("ts", 0) or 0)-float(sample.get("ts", 0) or 0)>FAST_PUMP_EPISODE_GAP_SECONDS:
+                                            break
+                                        current.append(sample)
+                                    current=list(reversed(current))
+                                    if len(current)<FAST_PUMP_MIN_OBSERVATIONS:
+                                        persistence_reason="PERSISTENCE_TOO_FEW_OBSERVATIONS"
+                                    elif float(current[-1].get("ts", 0) or 0)-float(current[0].get("ts", 0) or 0)<FAST_PUMP_MIN_SPAN_SECONDS:
+                                        persistence_reason="PERSISTENCE_SPAN_TOO_SHORT"
+                                if persistence_reason:
+                                    audit_row["decision"]="REJECTED_PERSISTENCE"
+                                    audit_row["rejection_reasons"]=[persistence_reason]
+                                else:
+                                    audit_row["decision"]="QUALIFIED_OUTSIDE_TOP_N"
+                                    audit_row["rejection_reasons"]=["OUTSIDE_TOP_N"]
+                        persist_fast_pump_rejection_audit(fast_pump_audit_rows, audit_now)
 
                         # Preserve all qualifying candidates for V15.7 learning; Telegram
                         # is now restricted to the rolling Top-2 selector above.
