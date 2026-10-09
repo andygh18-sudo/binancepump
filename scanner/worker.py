@@ -1309,13 +1309,9 @@ def _fast_episode_score(samples):
 
 def update_fast_pump_leaderboard(candidates, now):
     """
-    Maintain the rolling Fastest-Pump leaderboard while alerting on fresh
-    qualifying pump episodes.
-
-    The leaderboard remains Top-N for ranking/visibility, but it is no longer
-    a hard Telegram gate. A symbol already in Top-N can alert again when a
-    genuinely new qualifying episode starts, subject to episode persistence
-    and a per-symbol anti-spam cooldown.
+    Rank live qualifying episodes and alert only fresh episodes among the
+    exact current Top-N leaders for this scan. Previous leaders do not retain
+    eligibility when they fall outside the current ranking.
     """
     lb=state["__V156_FAST_PUMP__"].setdefault("leaderboard",load_fast_pump_leaderboard())
     symbols_lb=lb.setdefault("symbols",{})
@@ -1394,40 +1390,15 @@ def update_fast_pump_leaderboard(candidates, now):
     ranked.sort(key=lambda x:(x["episode_score"],x["samples"]),reverse=True)
     top=ranked[:FAST_PUMP_TOP_N]
 
-    # Maintain a rolling Top-N set, refresh retained leaders from the current
-    # scan, and drop symbols that no longer have a live qualifying episode.
-    ranked_by_symbol={str(x.get("symbol","")):x for x in ranked}
-    previous=list(lb.get("top",[]))
-    selected=[]
-    for prior in previous:
-        s=str(prior.get("symbol",""))
-        refreshed=ranked_by_symbol.get(s)
-        if refreshed and all(str(x.get("symbol",""))!=s for x in selected):
-            selected.append(refreshed)
-    selected_symbols={str(x.get("symbol","")) for x in selected}
-
-    for candidate in top:
-        s=candidate["symbol"]
-        if s in selected_symbols: continue
-        if len(selected)<FAST_PUMP_TOP_N:
-            selected.append(candidate)
-            selected_symbols.add(s)
-            continue
-        selected.sort(key=lambda x:float(x.get("episode_score",0) or 0))
-        weakest=selected[0]
-        if candidate["episode_score"]-float(weakest.get("episode_score",0) or 0)>=FAST_PUMP_REPLACEMENT_MARGIN:
-            selected_symbols.discard(str(weakest.get("symbol","")))
-            selected[0]=candidate
-            selected_symbols.add(s)
-
-    selected.sort(key=lambda x:float(x.get("episode_score",0) or 0),reverse=True)
-    selected=selected[:FAST_PUMP_TOP_N]
+    # Telegram eligibility is the exact current Top-N by episode score for
+    # this scan. Previous leaders do not retain eligibility if they fall
+    # outside the current ranking.
+    selected=list(top[:FAST_PUMP_TOP_N])
     selected_symbols={str(x.get("symbol","")) for x in selected}
     lb["top"]=selected
     lb["updated"]=now
 
-    # Telegram is strictly gated by the current rolling Top-N leaders. A fresh
-    # episode outside that set can alert later if it enters the leaderboard.
+    # Only fresh episodes belonging to the exact current Top-N can reach Telegram.
     episode_alerts.sort(key=lambda x:(x["episode_score"],x["samples"]),reverse=True)
     alerts=[]
     for candidate in episode_alerts:
