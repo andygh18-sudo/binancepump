@@ -128,6 +128,11 @@ jobs:
           V156_SIGNATURE_COOLDOWN: "240"
           V156_LEARNER_TARGET_PCT: "3.0"
           V156_LEARNER_HORIZON_SECONDS: "600"
+          FAST_PUMP_MIN_SCORE: "80"
+          FAST_PUMP_MIN_OBSERVATIONS: "3"
+          FAST_PUMP_MIN_SPAN_SECONDS: "20"
+          FAST_PUMP_EPISODE_ALERT_COOLDOWN: "900"
+          FAST_PUMP_TOP_N: "2"
         run: |
           set -e
           python run_scanner.py
