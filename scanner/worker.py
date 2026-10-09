@@ -1285,6 +1285,98 @@ def v158_fast_gate_reasons(r, n10=0, cvd10=0.0, buy_slope=0.0, accel=0.0):
     if p60s<-1.0: reasons.append("NEGATIVE_60S_PRICE")
     return reasons
 
+def fast_pump_audit_record(r, now, decision, reasons, n10=0, cvd10=0.0, buy_slope=0.0, accel_slope=0.0, vol10_rate=0.0, spread=0.0, dynamic_exhaustion=None, fast_score=None):
+    """Compact, research-only record for every symbol considered by Fastest-Pump."""
+    def number(key, default=0.0):
+        try:
+            return float(r.get(key, default) or 0.0)
+        except (TypeError, ValueError):
+            return float(default)
+    record={
+        "ts": round(float(now), 3),
+        "symbol": str(r.get("symbol", "") or ""),
+        "decision": str(decision),
+        "rejection_reasons": list(reasons or []),
+        "v15_stage": str(r.get("v15_stage", "") or ""),
+        "btc_risk_off": bool(r.get("v15_btc_risk_off", False)),
+        "metrics": {
+            "price": number("price"),
+            "price_10s": number("price_10s"),
+            "price_60s": number("price_60s"),
+            "price_1m": number("price_1m"),
+            "price_5m": number("price_5m"),
+            "buy_pressure": number("buy_pressure"),
+            "trade_accel": number("trade_accel"),
+            "volume_ratio": number("volume_ratio"),
+            "relative_strength_5m": number("v15_relative_strength_5m"),
+            "v15_score": number("v15_score"),
+            "accumulation_score": number("accumulation_score"),
+            "exhaustion_score": number("exhaustion_score"),
+            "trades_10s": int(n10 or 0),
+            "cvd_10s": round(float(cvd10 or 0.0), 5),
+            "buy_slope": round(float(buy_slope or 0.0), 5),
+            "accel_slope": round(float(accel_slope or 0.0), 5),
+            "volume_10s_rate": round(float(vol10_rate or 0.0), 5),
+            "spread_bps": round(float(spread or 0.0), 4),
+            "dynamic_exhaustion": None if dynamic_exhaustion is None else round(float(dynamic_exhaustion), 3),
+            "fast_score": None if fast_score is None else int(fast_score),
+            "early_momentum_score": number("early_momentum_score"),
+            "adaptive_trade_z": number("adaptive_trade_z"),
+            "adaptive_volume_z": number("adaptive_volume_z"),
+            "adaptive_cvd_z": number("adaptive_cvd_z"),
+        }
+    }
+    return record
+
+def persist_fast_pump_rejection_audit(scan_rows, now):
+    """Persist a bounded rolling audit, including rejected symbols, without changing signals."""
+    path="data/v158_fast_pump_rejection_audit.json"
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        try:
+            with open(path) as f:
+                previous=json.load(f)
+        except Exception:
+            previous={}
+        scans=previous.get("scans", []) if isinstance(previous, dict) else []
+        if not isinstance(scans, list):
+            scans=[]
+        counts=defaultdict(int)
+        for item in scan_rows:
+            counts[str(item.get("decision", "UNKNOWN"))]+=1
+        scans.append({
+            "ts": round(float(now), 3),
+            "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+            "symbol_count": len(scan_rows),
+            "decision_counts": dict(counts),
+            "thresholds": {
+                "min_trades_10s": 3,
+                "min_buy_pressure": 0.57,
+                "min_trade_accel": 1.25,
+                "min_cvd_or_buy_slope": {"cvd_10s": 0.08, "buy_slope": 0.025},
+                "min_price_1m_pct": 0.05,
+                "min_price_5m_pct": 0.30,
+                "min_price_10s_pct": -0.75,
+                "min_price_60s_pct": -1.0,
+                "max_dynamic_exhaustion": 65,
+                "min_fast_score": FAST_PUMP_MIN_SCORE,
+                "min_observations": FAST_PUMP_MIN_OBSERVATIONS,
+                "min_episode_span_seconds": FAST_PUMP_MIN_SPAN_SECONDS,
+                "episode_gap_seconds": FAST_PUMP_EPISODE_GAP_SECONDS,
+                "top_n": FAST_PUMP_TOP_N,
+            },
+            "symbols": scan_rows,
+        })
+        scans=scans[-30:]
+        payload={"schema_version": 1, "updated": round(float(now), 3), "retained_scans": len(scans), "scans": scans}
+        tmp=path+".tmp"
+        with open(tmp, "w") as f:
+            json.dump(payload, f, separators=(",", ":"))
+        os.replace(tmp, path)
+    except Exception:
+        # The audit is deliberately non-blocking; it must never interrupt scanning or alerts.
+        pass
+
 def load_fast_pump_leaderboard():
     try:
         with open(FAST_PUMP_LEADERBOARD_FILE) as f:
@@ -1613,6 +1705,7 @@ async def main():
                         #   - keep a PRE-PUMP WATCH state internally;
                         #   - retain TOP-1 leader selection and loop-to-loop episode memory.
                         fast_pump_candidates=[]
+                        fast_pump_audit_rows=[]
                         sustained_pump_candidates=[]
                         fast_alerted_symbol=""
                         for r in rows:
@@ -1649,6 +1742,12 @@ async def main():
                                 state[r["symbol"]]["early_momentum_stage"]=em["early_momentum_stage"]
                                 state[r["symbol"]]["early_momentum_last"]=time.time()
                             if btc_off or str(r.get("v15_stage","") or "")=="AVOID":
+                                precheck_reasons=[]
+                                if btc_off: precheck_reasons.append("BTC_RISK_OFF")
+                                if str(r.get("v15_stage","") or "")=="AVOID": precheck_reasons.append("V15_AVOID")
+                                fast_pump_audit_rows.append(fast_pump_audit_record(
+                                    r, time.time(), "REJECTED_PRECHECK", precheck_reasons
+                                ))
                                 continue
 
                             # Raw live microstructure windows. These are derived from
@@ -1692,17 +1791,12 @@ async def main():
                             # PRE-PUMP hard gates: require genuine participation and
                             # improving flow, but deliberately tolerate very small price
                             # movement so the lane can fire before a candle-sized pump.
-                            if n10<3:
-                                continue
-                            if buy<0.57:
-                                continue
-                            if accel<1.25:
-                                continue
-                            if cvd10<0.08 and buy_slope<0.025:
-                                continue
-                            if p1<0.05 or p5<0.30:
-                                continue
-                            if p10s<-0.75 or p60s<-1.0:
+                            if gate_reasons:
+                                fast_pump_audit_rows.append(fast_pump_audit_record(
+                                    r, time.time(), "REJECTED_HARD_GATE", gate_reasons,
+                                    n10=n10, cvd10=cvd10, buy_slope=buy_slope,
+                                    accel_slope=accel_slope, vol10_rate=vol10_rate, spread=spread
+                                ))
                                 continue
 
                             # Price is now a confirmation component, not the dominant one.
@@ -1763,6 +1857,12 @@ async def main():
                             dynamic_exhaustion=ex+extension
                             exhaustion_penalty=max(0.0,dynamic_exhaustion-20.0)*0.65
                             if dynamic_exhaustion>=65:
+                                fast_pump_audit_rows.append(fast_pump_audit_record(
+                                    r, time.time(), "REJECTED_EXHAUSTION", ["DYNAMIC_EXHAUSTION_LIMIT"],
+                                    n10=n10, cvd10=cvd10, buy_slope=buy_slope,
+                                    accel_slope=accel_slope, vol10_rate=vol10_rate, spread=spread,
+                                    dynamic_exhaustion=dynamic_exhaustion
+                                ))
                                 continue
 
                             fast_score=max(0,min(round(
@@ -1780,6 +1880,12 @@ async def main():
                             pre_pump_stage="PRE-PUMP WATCH" if pre_pump_score<FAST_PUMP_MIN_SCORE else "FAST-PUMP"
 
                             if fast_score<FAST_PUMP_MIN_SCORE:
+                                fast_pump_audit_rows.append(fast_pump_audit_record(
+                                    r, time.time(), "REJECTED_SCORE", ["FAST_SCORE_BELOW_MIN"],
+                                    n10=n10, cvd10=cvd10, buy_slope=buy_slope,
+                                    accel_slope=accel_slope, vol10_rate=vol10_rate, spread=spread,
+                                    dynamic_exhaustion=dynamic_exhaustion, fast_score=fast_score
+                                ))
                                 continue
                             rr=dict(r)
                             rr["_fast_pump_score"]=fast_score
@@ -1814,6 +1920,12 @@ async def main():
                             rr["_fast_intensity_z"]=adaptive_fast.get("adaptive_intensity_z",0)
                             rr["_fast_volume_10s_rate"]=vol10_rate
                             fast_pump_candidates.append(rr)
+                            fast_pump_audit_rows.append(fast_pump_audit_record(
+                                rr, time.time(), "QUALIFIED_FAST_PUMP", [],
+                                n10=n10, cvd10=cvd10, buy_slope=buy_slope,
+                                accel_slope=accel_slope, vol10_rate=vol10_rate, spread=spread,
+                                dynamic_exhaustion=dynamic_exhaustion, fast_score=fast_score
+                            ))
 
                         # V15.8 Tier-1 Strong Early-Momentum recovery lane.
                         # Advisory only; it never changes V15.7 hard gates and sends no Telegram alert.
@@ -1907,6 +2019,22 @@ async def main():
                                 f"Persistence: {int(candidate.get('samples',0))} obs"
                             )
                             fast_alerted_symbol=s
+                        # Distinguish passing the gates from winning Top-N selection and
+                        # becoming eligible for an alert. This records eligibility, not delivery.
+                        ranked_fast_symbols={str(x.get("symbol", "")) for x in fast_ranked}
+                        alert_eligible_symbols={str(x.get("symbol", "")) for x in fast_alerts}
+                        for audit_row in fast_pump_audit_rows:
+                            if audit_row.get("decision") != "QUALIFIED_FAST_PUMP":
+                                continue
+                            audit_symbol=str(audit_row.get("symbol", ""))
+                            if audit_symbol in alert_eligible_symbols:
+                                audit_row["decision"]="FAST_ALERT_ELIGIBLE"
+                            elif audit_symbol in ranked_fast_symbols:
+                                audit_row["decision"]="TOP_N_SELECTED_NO_NEW_ALERT"
+                            else:
+                                audit_row["decision"]="QUALIFIED_NOT_TOP_N"
+                        persist_fast_pump_rejection_audit(fast_pump_audit_rows, time.time())
+
                         # Preserve all qualifying candidates for V15.7 learning; Telegram
                         # is now restricted to the rolling Top-2 selector above.
 
