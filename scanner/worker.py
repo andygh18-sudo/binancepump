@@ -1524,7 +1524,13 @@ async def telegram(msg):
     allowed_confirmed=False
     allowed_fastest=msg.startswith("🚀 V15.6 FASTEST-PUMP")
     allowed_deterioration=msg.startswith("🔴 V15.6 CONFIRMED DETERIORATION")
-    allowed_persistence=msg.startswith(("🟢 V15.8 SUSTAINED-PUMP CONFIRMED", "🟠 V15.8 CONFIRMED-PUMP DETERIORATION"))
+    allowed_persistence=msg.startswith((
+        "🟢 V15.8 SUSTAINED-PUMP CONFIRMED",
+        "🟠 V15.8 CONFIRMED-PUMP DETERIORATION",
+        "🟢 V15.8 30M OUTCOME | SUSTAINED PUMP",
+        "🔴 V15.8 30M OUTCOME | FAILED BURST",
+        "⚪ V15.8 30M OUTCOME | NO CLEAR PUMP",
+    ))
     if not (allowed_confirmed or allowed_fastest or allowed_deterioration or allowed_persistence): return
     if not token or not chat:return
     # Normalize all scanner alerts to one Telegram line.
@@ -1997,6 +2003,26 @@ async def main():
                                     f"Entry {pa.get('entry_price',0):.8g} USDT | Current {pa.get('price',0):.8g} USDT | "
                                     f"Return {pa.get('return_pct',0):+.2f}% | Peak pullback {pa.get('peak_drawdown_pct',0):+.2f}% | "
                                     f"Observed {pa.get('elapsed_minutes',0):.1f}m | 30-minute monitor"
+                                )
+                            elif pa.get("type")=="OUTCOME":
+                                outcome=str(pa.get("outcome","NO_CLEAR_PUMP"))
+                                outcome_labels={
+                                    "SUSTAINED_PUMP": ("🟢 V15.8 30M OUTCOME | SUSTAINED PUMP", "Follow-through held"),
+                                    "FAILED_BURST": ("🔴 V15.8 30M OUTCOME | FAILED BURST", "Initial burst faded"),
+                                    "NO_CLEAR_PUMP": ("⚪ V15.8 30M OUTCOME | NO CLEAR PUMP", "No decisive sustained move"),
+                                }
+                                prefix, description=outcome_labels.get(
+                                    outcome, outcome_labels["NO_CLEAR_PUMP"]
+                                )
+                                await telegram(
+                                    f"{prefix} | {pa['symbol']} | {description} | "
+                                    f"Entry {pa.get('entry_price',0):.8g} USDT | Final {pa.get('price',0):.8g} USDT | "
+                                    f"Final return {pa.get('final_return_pct',0):+.2f}% | "
+                                    f"Max return {pa.get('max_return_pct',0):+.2f}% | "
+                                    f"Peak drawdown {pa.get('peak_drawdown_pct',0):+.2f}% | "
+                                    f"Observed {pa.get('elapsed_minutes',0):.1f}/30m | "
+                                    f"Samples {pa.get('sample_count',0)} | "
+                                    f"Early confirmation: {'YES' if pa.get('confirmed') else 'NO'}"
                                 )
 
                         # New sustained-expansion alert lane; Fastest-Pump remains unchanged.
