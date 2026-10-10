@@ -172,7 +172,13 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
 
         # Confirm only after a full 5-minute observation, with price progress
         # plus at least 3 of the 5 supporting conditions (4 of 6 total).
-        if not ep.get("confirmed") and elapsed >= 300:
+        sample_span = (
+            _num(ep["samples"][-1], "ts") - _num(ep["samples"][0], "ts")
+            if len(ep.get("samples", [])) >= 2 else 0.0
+        )
+        # Require repeated observations across the window, not a single stale
+        # candidate reappearing after a long gap.
+        if not ep.get("confirmed") and elapsed >= 300 and len(ep.get("samples", [])) >= 5 and sample_span >= 240:
             checks, ret, peak_dd = _confirmation_checks(ep, sample)
             passed = sum(bool(v) for v in checks.values())
             if ret >= 0.50 and passed >= 4:
