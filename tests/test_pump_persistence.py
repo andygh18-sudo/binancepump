@@ -55,16 +55,39 @@ class PumpPersistenceTests(unittest.TestCase):
         alerts2 = update_monitor([drop], [], self.state, 1320, self.path)
         self.assertEqual(alerts2, [])
 
-    def test_state_survives_reload_and_completes_after_thirty_minutes(self):
+    def test_state_survives_reload_and_emits_sustained_outcome_after_thirty_minutes(self):
         row = self.row(1.0)
         update_monitor([row], [row], self.state, 1000, self.path)
         restored = load_state(self.path)
         self.assertIn("MAGICUSDT", restored["active"])
         row2 = self.row(1.04)
-        update_monitor([row2], [row2], restored, 2800, self.path)
+        alerts = update_monitor([row2], [row2], restored, 2800, self.path)
         self.assertNotIn("MAGICUSDT", restored["active"])
         self.assertEqual(restored["completed"][-1]["outcome"], "SUSTAINED_PUMP")
         self.assertEqual(restored["completed"][-1]["sample_count"], 2)
+        outcome_alerts = [a for a in alerts if a.get("type") == "OUTCOME"]
+        self.assertEqual(len(outcome_alerts), 1)
+        self.assertEqual(outcome_alerts[0]["outcome"], "SUSTAINED_PUMP")
+        self.assertEqual(outcome_alerts[0]["elapsed_minutes"], 30.0)
+
+    def test_failed_burst_and_no_clear_pump_each_emit_one_final_outcome(self):
+        scenarios = [
+            ("FAILED_BURST", [(1000, 1.0), (1600, 1.02), (2800, 1.001)]),
+            ("NO_CLEAR_PUMP", [(1000, 1.0), (1600, 1.002), (2800, 1.001)]),
+        ]
+        for expected, points in scenarios:
+            with self.subTest(outcome=expected):
+                state = load_state(self.path)
+                for idx, (ts, price) in enumerate(points):
+                    row = self.row(price)
+                    alerts = update_monitor([row], [row], state, ts, self.path)
+                    if idx < len(points) - 1:
+                        self.assertFalse(any(a.get("type") == "OUTCOME" for a in alerts))
+                outcome_alerts = [a for a in alerts if a.get("type") == "OUTCOME"]
+                self.assertEqual(len(outcome_alerts), 1)
+                self.assertEqual(outcome_alerts[0]["outcome"], expected)
+                self.assertNotIn("MAGICUSDT", state["active"])
+                self.assertEqual(state["completed"][-1]["outcome"], expected)
 
 
 if __name__ == "__main__":
