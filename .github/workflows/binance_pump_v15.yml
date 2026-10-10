@@ -57,6 +57,7 @@ jobs:
         run: |
           set -e
           python -m py_compile scanner/worker.py scanner/v157_learning.py scanner/v158.py scanner/pump_persistence.py scanner/orderbook.py scanner/tradingview.py scanner/v156.py scanner/v156_deterioration.py run_scanner.py app.py
+          python -m unittest discover -s tests -p 'test_pump_persistence.py'
 
       - name: Validate worker bootstrap
         run: python scripts/validate_worker_bootstrap.py
