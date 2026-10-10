@@ -159,15 +159,48 @@ jobs:
           cp data/v157_fastest_pump_leaderboard.json /tmp/v157_fastest_pump_leaderboard.json 2>/dev/null || true
           cp data/v158_fast_pump_rejection_audit.json /tmp/v158_fast_pump_rejection_audit.json 2>/dev/null || true
           cp data/v158_pump_persistence_30m.json /tmp/v158_pump_persistence_30m.json 2>/dev/null || true
-          # Cap historical JSONL size while preserving recent observations.
-          if [ -f /tmp/v157_observations.jsonl ]; then
-            tail -n 250000 /tmp/v157_observations.jsonl > /tmp/v157_observations.bounded.jsonl
-            mv /tmp/v157_observations.bounded.jsonl /tmp/v157_observations.jsonl
-          fi
-          if [ -f /tmp/v158_discovery.jsonl ]; then
-            tail -n 50000 /tmp/v158_discovery.jsonl > /tmp/v158_discovery.bounded.jsonl
-            mv /tmp/v158_discovery.bounded.jsonl /tmp/v158_discovery.jsonl
-          fi
+          # Bound JSONL history by bytes, not lines: record sizes vary and GitHub
+          # rejects any individual file >=100 MB. Keep generous headroom at 80 MB.
+          trim_jsonl_to_bytes() {
+            file="$1"
+            max_bytes="$2"
+            [ -f "$file" ] || return 0
+            size=$(wc -c < "$file")
+            if [ "$size" -gt "$max_bytes" ]; then
+              echo "Trimming $file from $size bytes to newest complete records <= $max_bytes bytes"
+              python - "$file" "$max_bytes" <<'PY'
+          import os
+          import sys
+
+          path, limit = sys.argv[1], int(sys.argv[2])
+          with open(path, "rb") as source:
+              source.seek(0, os.SEEK_END)
+              size = source.tell()
+              source.seek(max(0, size - limit))
+              # Discard a potentially partial first record.
+              source.readline()
+              data = source.read(limit)
+          # Keep only complete newline-terminated records and preserve valid JSONL.
+          data = data[:data.rfind(b"\\n") + 1] if b"\\n" in data else b""
+          tmp = path + ".bounded"
+          with open(tmp, "wb") as out:
+              out.write(data)
+          os.replace(tmp, path)
+          print(f"Retained {os.path.getsize(path)} bytes")
+          PY
+            fi
+          }
+          trim_jsonl_to_bytes /tmp/v157_observations.jsonl $((80 * 1024 * 1024))
+          trim_jsonl_to_bytes /tmp/v158_discovery.jsonl $((20 * 1024 * 1024))
+          # Defensive hard stop before staging: never let an oversized history file
+          # make the entire live monitoring cycle fail at git push.
+          for file in /tmp/v157_observations.jsonl /tmp/v158_discovery.jsonl; do
+            size=$(wc -c < "$file")
+            if [ "$size" -ge $((90 * 1024 * 1024)) ]; then
+              echo "::error::Refusing to publish oversized learning file: $file ($size bytes)"
+              exit 1
+            fi
+          done
           git reset --hard origin/main
           mkdir -p data
           cp /tmp/v157_observations.jsonl data/v157_observations.jsonl
