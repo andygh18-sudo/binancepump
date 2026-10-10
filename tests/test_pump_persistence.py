@@ -35,20 +35,20 @@ class PumpPersistenceTests(unittest.TestCase):
         self.assertFalse(row["pump_persistence_confirmed"])
 
     def test_confirms_after_five_minutes_with_persistent_price_and_flow(self):
-        row = self.row(1.0)
-        update_monitor([row], [row], self.state, 1000, self.path)
-        row2 = self.row(1.012)
-        alerts = update_monitor([row2], [row2], self.state, 1300, self.path)
+        alerts = []
+        for i in range(6):
+            price = 1.0 + 0.012 * (i / 5.0)
+            row = self.row(price)
+            alerts = update_monitor([row], [row], self.state, 1000 + 60 * i, self.path)
         self.assertEqual(len(alerts), 1)
         self.assertEqual(alerts[0]["type"], "CONFIRMED")
         self.assertAlmostEqual(alerts[0]["return_pct"], 1.2, places=2)
-        self.assertTrue(row2["pump_persistence_confirmed"])
+        self.assertTrue(row["pump_persistence_confirmed"])
 
     def test_confirmed_episode_emits_deterioration_once(self):
-        row = self.row(1.0)
-        update_monitor([row], [row], self.state, 1000, self.path)
-        confirm = self.row(1.012)
-        update_monitor([confirm], [confirm], self.state, 1300, self.path)
+        for i in range(6):
+            confirm = self.row(1.0 + 0.012 * (i / 5.0))
+            update_monitor([confirm], [confirm], self.state, 1000 + 60 * i, self.path)
         drop = self.row(0.985, buy=0.42, volume=0.6, accel=0.6, cvd=-0.3)
         alerts = update_monitor([drop], [], self.state, 1310, self.path)
         self.assertEqual([a["type"] for a in alerts], ["DETERIORATED"])
