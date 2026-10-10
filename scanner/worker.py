@@ -7,6 +7,7 @@ from .v157_learning import persist_v157_observations
 from .v158 import MarketDiscovery,trade_features,liquidity_features,data_quality,adaptive_micro_features,adaptive_book_features,queue_transition_imbalance_features,depth_sweep_features,replenishment_absorption_features,v158_pre_ignition_build_features,v158_liquidity_state_features,v158_temporal_reignition_memory
 from .v156 import evaluate as v156_evaluate
 from .v156_deterioration import V156DeteriorationMonitor
+from .pump_persistence import load_state as load_pump_persistence_state, update_monitor as update_pump_persistence_monitor
 # V15.6 deterioration redesign validation marker
 
 load_dotenv()
@@ -1523,7 +1524,8 @@ async def telegram(msg):
     allowed_confirmed=False
     allowed_fastest=msg.startswith("🚀 V15.6 FASTEST-PUMP")
     allowed_deterioration=msg.startswith("🔴 V15.6 CONFIRMED DETERIORATION")
-    if not (allowed_confirmed or allowed_fastest or allowed_deterioration): return
+    allowed_persistence=msg.startswith(("🟢 V15.8 SUSTAINED-PUMP CONFIRMED", "🟠 V15.8 CONFIRMED-PUMP DETERIORATION"))
+    if not (allowed_confirmed or allowed_fastest or allowed_deterioration or allowed_persistence): return
     if not token or not chat:return
     # Normalize all scanner alerts to one Telegram line.
     # This prevents literal \\n / \\ artifacts from reaching Telegram.
@@ -1644,7 +1646,7 @@ async def resync_unready_books(http):
 
 async def main():
     global symbols,books,tv_cache,tv_last_refresh,v158_core_symbols
-    os.makedirs("data",exist_ok=True);start=time.time();timeout=aiohttp.ClientTimeout(total=20)
+    os.makedirs("data",exist_ok=True);pump_persistence_state=load_pump_persistence_state();start=time.time();timeout=aiohttp.ClientTimeout(total=20)
     async with aiohttp.ClientSession(timeout=timeout) as http:
         symbols=await discover(http);v158_core_symbols=set(symbols);books={s:LocalOrderBook(s,REST,LIMIT) for s in symbols};state["__V156_FAST_PUMP__"]["leaderboard"]=load_fast_pump_leaderboard();streams=[];history_last_write=0.0;micro_history_last_write=0.0
         for s in symbols:
@@ -1972,6 +1974,30 @@ async def main():
                             ),
                             reverse=True
                         )
+
+                        # Additive 30-minute persistence monitor. It observes existing
+                        # Fastest-Pump candidates but does not change their scoring/gates.
+                        persistence_alerts=update_pump_persistence_monitor(
+                            rows, fast_pump_candidates, pump_persistence_state, time.time()
+                        )
+                        for pa in persistence_alerts:
+                            if pa.get("type")=="CONFIRMED":
+                                await telegram(
+                                    f"🟢 V15.8 SUSTAINED-PUMP CONFIRMED | {pa['symbol']} | "
+                                    f"Entry {pa.get('entry_price',0):.8g} USDT | Current {pa.get('price',0):.8g} USDT | "
+                                    f"Return {pa.get('return_pct',0):+.2f}% | Peak pullback {pa.get('peak_drawdown_pct',0):+.2f}% | "
+                                    f"Observed {pa.get('elapsed_minutes',0):.1f}m | "
+                                    f"Checks {pa.get('checks_passed',0)}/{pa.get('checks_total',0)} | "
+                                    f"Fastest-Pump score {pa.get('score',0):.0f}/100 | "
+                                    f"30-minute follow-through monitoring continues."
+                                )
+                            elif pa.get("type")=="DETERIORATED":
+                                await telegram(
+                                    f"🟠 V15.8 CONFIRMED-PUMP DETERIORATION | {pa['symbol']} | "
+                                    f"Entry {pa.get('entry_price',0):.8g} USDT | Current {pa.get('price',0):.8g} USDT | "
+                                    f"Return {pa.get('return_pct',0):+.2f}% | Peak pullback {pa.get('peak_drawdown_pct',0):+.2f}% | "
+                                    f"Observed {pa.get('elapsed_minutes',0):.1f}m | 30-minute monitor"
+                                )
 
                         # New sustained-expansion alert lane; Fastest-Pump remains unchanged.
                         if sustained_pump_candidates:
