@@ -8,6 +8,7 @@ on:
       - "scanner/worker.py"
       - "scanner/v157_learning.py"
       - "scanner/v158.py"
+      - "scanner/pump_persistence.py"
       - "scanner/orderbook.py"
       - "scanner/tradingview.py"
       - "scanner/v156.py"
@@ -50,11 +51,12 @@ jobs:
           touch data/v157_observations.jsonl
           touch data/v158_discovery.jsonl
           touch data/v158_fast_pump_rejection_audit.json
+          test -f data/v158_pump_persistence_30m.json || printf '%s\n' '{"schema_version":1,"updated":0,"active":{},"completed":[]}' > data/v158_pump_persistence_30m.json
 
       - name: Validate V15.7 scanner
         run: |
           set -e
-          python -m py_compile scanner/worker.py scanner/v157_learning.py scanner/v158.py scanner/orderbook.py scanner/tradingview.py scanner/v156.py scanner/v156_deterioration.py run_scanner.py app.py
+          python -m py_compile scanner/worker.py scanner/v157_learning.py scanner/v158.py scanner/pump_persistence.py scanner/orderbook.py scanner/tradingview.py scanner/v156.py scanner/v156_deterioration.py run_scanner.py app.py
 
       - name: Validate worker bootstrap
         run: python scripts/validate_worker_bootstrap.py
@@ -154,6 +156,7 @@ jobs:
           cp data/latest.json /tmp/latest.json 2>/dev/null || true
           cp data/v157_fastest_pump_leaderboard.json /tmp/v157_fastest_pump_leaderboard.json 2>/dev/null || true
           cp data/v158_fast_pump_rejection_audit.json /tmp/v158_fast_pump_rejection_audit.json 2>/dev/null || true
+          cp data/v158_pump_persistence_30m.json /tmp/v158_pump_persistence_30m.json 2>/dev/null || true
           # Cap historical JSONL size while preserving recent observations.
           if [ -f /tmp/v157_observations.jsonl ]; then
             tail -n 250000 /tmp/v157_observations.jsonl > /tmp/v157_observations.bounded.jsonl
@@ -172,7 +175,8 @@ jobs:
           if [ -f /tmp/latest.json ]; then cp /tmp/latest.json data/latest.json; fi
           if [ -f /tmp/v157_fastest_pump_leaderboard.json ]; then cp /tmp/v157_fastest_pump_leaderboard.json data/v157_fastest_pump_leaderboard.json; fi
           if [ -f /tmp/v158_fast_pump_rejection_audit.json ]; then cp /tmp/v158_fast_pump_rejection_audit.json data/v158_fast_pump_rejection_audit.json; fi
-          git add -f data/v157_observations.jsonl data/v158_discovery.jsonl data/v158_participation_ignition.json data/v158_directional_ignition.json data/latest.json data/v157_fastest_pump_leaderboard.json data/v158_fast_pump_rejection_audit.json
+          if [ -f /tmp/v158_pump_persistence_30m.json ]; then cp /tmp/v158_pump_persistence_30m.json data/v158_pump_persistence_30m.json; fi
+          git add -f data/v157_observations.jsonl data/v158_discovery.jsonl data/v158_participation_ignition.json data/v158_directional_ignition.json data/latest.json data/v157_fastest_pump_leaderboard.json data/v158_fast_pump_rejection_audit.json data/v158_pump_persistence_30m.json
           if git diff --cached --quiet; then
             echo "No new V15.7 data to publish."
             exit 0
