@@ -236,6 +236,21 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
             })
             state["completed"].append(completed)
             state["completed"] = state["completed"][-MAX_COMPLETED:]
+            # Emit exactly one final 30-minute outcome alert per completed episode.
+            # This is separate from the early confirmation/deterioration alerts.
+            alerts.append({
+                "type": "OUTCOME",
+                "outcome": outcome,
+                "symbol": symbol,
+                "entry_price": entry,
+                "price": price,
+                "final_return_pct": round(ret, 4),
+                "max_return_pct": round(max_ret, 4),
+                "peak_drawdown_pct": round(peak_dd, 4),
+                "elapsed_minutes": round(elapsed / 60.0, 1),
+                "sample_count": len(ep.get("samples", [])),
+                "confirmed": bool(ep.get("confirmed")),
+            })
             state["active"].pop(symbol, None)
 
     # Expose monitor status to the dashboard's latest.json rows.
