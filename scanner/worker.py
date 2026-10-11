@@ -8,6 +8,7 @@ from .v158 import MarketDiscovery,trade_features,liquidity_features,data_quality
 from .v156 import evaluate as v156_evaluate
 from .v156_deterioration import V156DeteriorationMonitor
 from .pump_persistence import load_state as load_pump_persistence_state, update_monitor as update_pump_persistence_monitor
+from .v158_sustained_selector import update_global_top2
 # V15.6 deterioration redesign validation marker
 
 load_dotenv()
@@ -2023,22 +2024,26 @@ async def main():
                                     f"Early confirmation: {'YES' if pa.get('confirmed') else 'NO'}"
                                 )
 
-                        # New sustained-expansion alert lane; Fastest-Pump remains unchanged.
-                        if sustained_pump_candidates:
-                            sustained_pump_candidates.sort(key=lambda x: float(x.get("_sustained_pump_score",0) or 0), reverse=True)
-                            for candidate in sustained_pump_candidates[:2]:
-                                s=candidate["symbol"]; st=state[s]; now=time.time()
-                                if now-float(st.get("sustained_pump_last_alert",0) or 0)<SUSTAINED_PUMP_ALERT_COOLDOWN: continue
-                                st["sustained_pump_last_alert"]=now
-                                await telegram(
-                                    f"📈 SUSTAINED-PUMP | {s} | Expansion Lane | Score {float(candidate.get('_sustained_pump_score',0) or 0):.0f}/100 | "
-                                    f"1m {candidate.get('price_1m',0):+.2f}% | 5m {candidate.get('price_5m',0):+.2f}% | "
-                                    f"10m {candidate.get('price_10m',0):+.2f}% | 15m {candidate.get('price_15m',0):+.2f}% | "
-                                    f"Volume {candidate.get('volume_ratio',0):.2f}x | Trade accel {candidate.get('trade_accel',0):.2f}x | "
-                                    f"Buy {candidate.get('buy_pressure',0)*100:.1f}% | CVD {candidate.get('cvd',0):+.2f} | "
-                                    f"Participation Z {candidate.get('participation_z',0):+.2f} | Exhaustion {candidate.get('exhaustion_score',0):.1f}"
-                                )
-                        # Rolling Top-2 Fastest-Pump Telegram selector.
+                        # V15.8 global leaderboard compares sustained candidates across scan cycles.
+                        sustained_alerts, sustained_ranked = update_global_top2(
+                            sustained_pump_candidates,
+                            observed_symbols=[rr.get("symbol", "") for rr in rows],
+                            now=time.time(),
+                        )
+                        for candidate in sustained_alerts[:2]:
+                            s = candidate["symbol"]
+                            await telegram(
+                                f"📈 V15.8 GLOBAL TOP-2 SUSTAINED-PUMP | {s} | "
+                                f"Rank score {float(candidate.get('global_rank_score', 0) or 0):.1f}/100 | "
+                                f"Signal score {float(candidate.get('_sustained_pump_score', 0) or 0):.0f}/100 | "
+                                f"1m {candidate.get('price_1m', 0):+.2f}% | 5m {candidate.get('price_5m', 0):+.2f}% | "
+                                f"10m {candidate.get('price_10m', 0):+.2f}% | 15m {candidate.get('price_15m', 0):+.2f}% | "
+                                f"Volume {candidate.get('volume_ratio', 0):.2f}x | Trade accel {candidate.get('trade_accel', 0):.2f}x | "
+                                f"Buy {candidate.get('buy_pressure', 0)*100:.1f}% | CVD {candidate.get('cvd', 0):+.2f} | "
+                                f"Exhaustion {candidate.get('exhaustion_score', 0):.1f} | "
+                                "Global comparison: strongest active sustained-pump candidates."
+                            )
+# Rolling Top-2 Fastest-Pump Telegram selector.
 
                         # The underlying V15.7 detector remains unchanged: all qualifying
                         # candidates are retained for learning, while Telegram compares
