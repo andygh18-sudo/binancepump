@@ -1521,12 +1521,13 @@ async def telegram(msg):
     # - V15.6 CONFIRMED-IGNITION / BUY Telegram alerts are disabled.
     # - V15.6 FASTEST-PUMP Telegram alerts are disabled; candidate tracking/learning
     #   can continue internally without sending this alert lane.
-    # - Confirmed deterioration alerts remain enabled.
+    # - V15.6 CONFIRMED DETERIORATION Telegram alerts are disabled; monitoring can
+    #   continue internally without sending this alert lane.
     # - V15.8 sustained-pump alerts remain governed by their allow-list below.
     # - Legacy V15/early alerts remain disabled.
     allowed_confirmed=False
     allowed_fastest=False
-    allowed_deterioration=msg.startswith("🔴 V15.6 CONFIRMED DETERIORATION")
+    allowed_deterioration=False
     allowed_persistence=msg.startswith((
         "🟢 V15.8 SUSTAINED-PUMP CONFIRMED",
         "🟠 V15.8 CONFIRMED-PUMP DETERIORATION",
