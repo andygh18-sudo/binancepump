@@ -51,7 +51,8 @@ def update_global_top2(candidates, observed_symbols=None, now=None, path=None):
     for r in leaders:
         sym=r["symbol"]; score=_f(r,"global_rank_score")
         new=sym not in prior and (len(prior)<2 or score>=weakest+margin)
-        improved=now-_f(r,"last_alert_at")>=300 and score>=_f(r,"last_alert_score")+step
+        last_alert_at=_f(r,"last_alert_at")
+        improved=last_alert_at>0 and now-last_alert_at>=300 and score>=_f(r,"last_alert_score")+step
         if new or improved:
             alerts.append(r); r["last_alert_score"]=score; r["last_alert_at"]=now
     # Do not mark a replacement as notified until an alert is actually emitted.
