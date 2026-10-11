@@ -1528,8 +1528,6 @@ async def telegram(msg):
         "🟢 V15.8 SUSTAINED-PUMP CONFIRMED",
         "🟠 V15.8 CONFIRMED-PUMP DETERIORATION",
         "🟢 V15.8 30M OUTCOME | SUSTAINED PUMP",
-        "🔴 V15.8 30M OUTCOME | FAILED BURST",
-        "⚪ V15.8 30M OUTCOME | NO CLEAR PUMP",
     ))
     if not (allowed_confirmed or allowed_fastest or allowed_deterioration or allowed_persistence): return
     if not token or not chat:return
