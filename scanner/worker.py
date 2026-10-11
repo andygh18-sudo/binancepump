@@ -2038,15 +2038,12 @@ async def main():
                         )
                         # Explicit, secret-free diagnostics make live ranking and
                         # alert decisions auditable in GitHub Actions logs.
-                        logger.info(
-                            "V15.8 GLOBAL TOP-2 selector: eligible=%d pool=%d leaders=%s alert_symbols=%s",
-                            len(sustained_pump_candidates),
-                            len(sustained_ranked),
-                            [
-                                f"{c.get('symbol')}:{float(c.get('global_rank_score', 0) or 0):.1f}"
-                                for c in sustained_ranked[:2]
-                            ],
-                            [str(c.get("symbol", "")) for c in sustained_alerts[:2]],
+                        print(
+                            "V15.8 GLOBAL TOP-2 selector: "
+                            f"eligible={len(sustained_pump_candidates)} pool={len(sustained_ranked)} "
+                            f"leaders={[str(c.get('symbol', '')) + ':' + format(float(c.get('global_rank_score', 0) or 0), '.1f') for c in sustained_ranked[:2]]} "
+                            f"alert_symbols={[str(c.get('symbol', '')) for c in sustained_alerts[:2]]}",
+                            flush=True,
                         )
                         for candidate in sustained_alerts[:2]:
                             s = candidate["symbol"]
