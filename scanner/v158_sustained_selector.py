@@ -27,7 +27,7 @@ def update_global_top2(candidates, observed_symbols=None, now=None, path=None):
     try:
         with open(path,encoding="utf-8") as f: old=json.load(f)
         pool=old.get("pool",{}) if isinstance(old,dict) else {}
-        prior=set(str(s).upper() for s in old.get("top2",[])) if isinstance(old,dict) else set()
+        prior=set(str(s).upper() for s in old.get("alerted_top2",old.get("top2",[]))) if isinstance(old,dict) else set()
     except (OSError,ValueError,TypeError):
         pool={}; prior=set()
     if not isinstance(pool,dict): pool={}
@@ -54,8 +54,12 @@ def update_global_top2(candidates, observed_symbols=None, now=None, path=None):
         improved=now-_f(r,"last_alert_at")>=300 and score>=_f(r,"last_alert_score")+step
         if new or improved:
             alerts.append(r); r["last_alert_score"]=score; r["last_alert_at"]=now
+    # Do not mark a replacement as notified until an alert is actually emitted.
+    # Otherwise a candidate that misses the replacement margin once could be
+    # promoted to top2 silently and never trigger an alert on later cycles.
+    alerted_top2=([r["symbol"] for r in leaders] if alerts else sorted(prior))
     payload={"updated":now,"selector":"V15.8_GLOBAL_SUSTAINED_PUMP_TOP2","pool_ttl_seconds":ttl,
-      "top2":[r["symbol"] for r in leaders],"pool":pool,
+      "top2":[r["symbol"] for r in leaders],"alerted_top2":alerted_top2,"pool":pool,
       "leaderboard":[{k:r.get(k,0) for k in ("symbol","global_rank_score","_sustained_pump_score","price_5m","price_10m","price_15m","buy_pressure","volume_ratio","trade_accel","exhaustion_score")} for r in ranked[:20]]}
     tmp=path+".tmp"
     with open(tmp,"w",encoding="utf-8") as f: json.dump(payload,f,indent=2)
