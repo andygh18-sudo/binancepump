@@ -35,9 +35,9 @@ class TestV156Deterioration(unittest.TestCase):
             m.start_episode("TESTUSDT", 100, 90, 0)
             self.assertIsNone(m.observe("TESTUSDT", bad_row(), 31))
             self.assertIsNone(m.observe("TESTUSDT", bad_row(), 60))
-            self.assertFalse(m.observe("TESTUSDT", bad_row(), 90)["alert"])
-            self.assertFalse(m.observe("TESTUSDT", bad_row(), 150)["alert"])
-            self.assertTrue(m.observe("TESTUSDT", bad_row(), 210)["alert"])
+            self.assertFalse(m.observe("TESTUSDT", bad_row(), 120)["alert"])
+            self.assertFalse(m.observe("TESTUSDT", bad_row(), 180)["alert"])
+            self.assertTrue(m.observe("TESTUSDT", bad_row(), 240)["alert"])
 
     def test_state_survives_reload(self):
         with tempfile.TemporaryDirectory() as d:
