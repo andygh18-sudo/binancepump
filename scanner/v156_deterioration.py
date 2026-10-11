@@ -55,7 +55,7 @@ class V156DeteriorationMonitor:
                 return
             payload={"event":"V156_POSTBUY_STATE","v156_state_version":V156_STATE_VERSION,"ts":time.time(),"symbol":symbol,"episode":self.episodes[symbol]}
             with self.path.open("a",encoding="utf-8") as fh:
-                fh.write(json.dumps(payload,separators=(",",":"),allow_nan=False)+"\\n")
+                fh.write(json.dumps(payload,separators=(",",":"),allow_nan=False)+"\n")
             return
         tmp=self.path.with_suffix(self.path.suffix+".tmp")
         tmp.write_text(json.dumps({"version":V156_STATE_VERSION,"updated":time.time(),"episodes":self.episodes},separators=(",",":"),allow_nan=False),encoding="utf-8")
