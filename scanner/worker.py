@@ -1533,7 +1533,10 @@ async def telegram(msg):
         "🟠 V15.8 CONFIRMED-PUMP DETERIORATION",
         "🟢 V15.8 30M OUTCOME | SUSTAINED PUMP",
     ))
-    if not (allowed_confirmed or allowed_fastest or allowed_deterioration or allowed_persistence): return
+    # The global Top-2 lane is intentionally enabled independently of legacy
+    # V15.6/fastest-pump/deterioration alert lanes.
+    allowed_global_top2=msg.startswith("📈 V15.8 GLOBAL TOP-2 SUSTAINED-PUMP")
+    if not (allowed_confirmed or allowed_fastest or allowed_deterioration or allowed_persistence or allowed_global_top2): return
     if not token or not chat:return
     # Normalize all scanner alerts to one Telegram line.
     # This prevents literal \\n / \\ artifacts from reaching Telegram.
@@ -2032,6 +2035,18 @@ async def main():
                             sustained_pump_candidates,
                             observed_symbols=[rr.get("symbol", "") for rr in rows],
                             now=time.time(),
+                        )
+                        # Explicit, secret-free diagnostics make live ranking and
+                        # alert decisions auditable in GitHub Actions logs.
+                        logger.info(
+                            "V15.8 GLOBAL TOP-2 selector: eligible=%d pool=%d leaders=%s alert_symbols=%s",
+                            len(sustained_pump_candidates),
+                            len(sustained_ranked),
+                            [
+                                f"{c.get('symbol')}:{float(c.get('global_rank_score', 0) or 0):.1f}"
+                                for c in sustained_ranked[:2]
+                            ],
+                            [str(c.get("symbol", "")) for c in sustained_alerts[:2]],
                         )
                         for candidate in sustained_alerts[:2]:
                             s = candidate["symbol"]
