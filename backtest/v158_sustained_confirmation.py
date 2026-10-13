@@ -8,9 +8,10 @@ production replay: historical exhaustion, historical L2, and BTC regime inputs
 are not available in aggTrades.
 """
 from __future__ import annotations
-import argparse, json, math
+import argparse, json, math, sys
 from collections import defaultdict, deque
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scanner.pump_persistence import load_state, update_monitor
 
 def number(v, d=0.0):
