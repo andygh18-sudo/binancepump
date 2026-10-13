@@ -98,16 +98,21 @@ class PumpPersistenceTests(unittest.TestCase):
 
     def test_failed_burst_and_no_clear_pump_each_emit_one_final_outcome(self):
         scenarios = [
-            ("FAILED_BURST", [(1000, 1.0), (1600, 1.02), (2800, 1.001)]),
-            ("NO_CLEAR_PUMP", [(1000, 1.0), (1600, 1.002), (2800, 1.001)]),
+            ("FAILED_BURST", lambda elapsed: 1.02 if 300 <= elapsed < 600 else (
+                1.0 + 0.02 * (elapsed / 300.0) if elapsed < 300 else
+                1.02 - 0.019 * ((elapsed - 600) / 1200.0)
+            )),
+            ("NO_CLEAR_PUMP", lambda elapsed: 1.002),
         ]
-        for expected, points in scenarios:
+        for expected, price_at in scenarios:
             with self.subTest(outcome=expected):
                 state = load_state(self.path)
-                for idx, (ts, price) in enumerate(points):
+                alerts = []
+                for ts in range(1000, 2801, 60):
+                    price = price_at(ts - 1000)
                     row = self.row(price)
                     alerts = update_monitor([row], [row], state, ts, self.path)
-                    if idx < len(points) - 1:
+                    if ts < 2800:
                         self.assertFalse(any(a.get("type") == "OUTCOME" for a in alerts))
                 outcome_alerts = [a for a in alerts if a.get("type") == "OUTCOME"]
                 self.assertEqual(len(outcome_alerts), 1)
