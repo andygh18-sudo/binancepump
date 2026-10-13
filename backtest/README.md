@@ -55,3 +55,7 @@ Signals are generated sequentially from information available at the replay time
 ## Data requirement
 
 Binance publishes historical Spot aggTrades through Binance Public Data. Full V15.8 microstructure replay also requires genuine historical L2/depth events; missing depth must not be fabricated.
+
+## Historical proxy workflow
+
+The repository workflow `.github/workflows/v158_historical_proxy.yml` downloads Binance Spot aggregate trades for a fixed symbol/date window and compares V15.7 with V15.8 advisory profiles plus the Tier-1 replay. Its output is a **historical aggTrade proxy**, not a full production replay: exhaustion, historical L2 depth, TradingView/BTC regime, and live cross-sectional routing are unavailable. Results are published as the `v158-historical-proxy-results` workflow artifact. The default window is 2026-10-01 through 2026-10-03 for the configured 14-symbol watchlist.
