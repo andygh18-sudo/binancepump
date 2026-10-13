@@ -1,0 +1,60 @@
+name: V15.8 Sustained-Pump Confirmation Backtest
+
+on:
+  push:
+    paths:
+      - "backtest/v158_sustained_confirmation.py"
+      - ".github/workflows/v158_sustained_confirmation.yml"
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated Binance Spot symbols"
+        required: true
+        default: "ONEUSDT,GLMRUSDT,SANDUSDT,NIGHTUSDT,MOVRUSDT,CELOUSDT,GRTUSDT,SYRUPUSDT,RAREUSDT,AMPUSDT,HBARUSDT,ZECUSDT,ZENUSDT,ZROUSDT"
+        type: string
+      start:
+        description: "UTC start date"
+        required: true
+        default: "2026-10-01"
+        type: string
+      end:
+        description: "UTC end date"
+        required: true
+        default: "2026-10-03"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sustained-confirmation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download historical Binance aggTrades
+        env:
+          SYMBOLS: ${{ inputs.symbols || 'ONEUSDT,GLMRUSDT,SANDUSDT,NIGHTUSDT,MOVRUSDT,CELOUSDT,GRTUSDT,SYRUPUSDT,RAREUSDT,AMPUSDT,HBARUSDT,ZECUSDT,ZENUSDT,ZROUSDT' }}
+          START: ${{ inputs.start || '2026-10-01' }}
+          END: ${{ inputs.end || '2026-10-03' }}
+        run: python backtest/download_binance_aggtrades.py --symbols "$SYMBOLS" --start "$START" --end "$END" --out data/replay/sustained_aggtrades
+      - name: Replay exact V15.8 persistence confirmation state machine
+        run: python backtest/v158_sustained_confirmation.py --input data/replay/sustained_aggtrades --output data/v158_sustained_confirmation_results/results.json
+      - name: Validate result schema
+        run: |
+          python - <<'PY'
+          import json
+          p='data/v158_sustained_confirmation_results/results.json'
+          d=json.load(open(p))
+          s=d['summary']
+          required=['confirmed_count','confirmed_with_full_30m_forward_window','outcome_counts','post_confirmation_avg']
+          assert all(k in s for k in required), s
+          print('Result schema OK; confirmed=', s['confirmed_count'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v158-sustained-confirmation-results
+          path: data/v158_sustained_confirmation_results/
