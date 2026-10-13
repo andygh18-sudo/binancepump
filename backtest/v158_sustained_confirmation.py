@@ -61,7 +61,7 @@ def main():
                 hist[s].append(xs[i]); i+=1
             idx[s]=i
             h=hist[s]
-            while h and h[0][0]<t-300: h.popleft()
+            while h and h[0][0]<t-360: h.popleft()
             if not h: continue
             p=h[-1][1]; last_price[s]=p
             h10=[z for z in h if z[0]>=t-10]
@@ -89,7 +89,7 @@ def main():
             if (len(h10)>=3 and pressure>=.57 and accel>=1.25
                 and (cvd>=.08 or pressure-pressure60>=.025)
                 and price1>=.05 and price5>=.30
-                and (p/next((z[1] for z in reversed(h) if z[0]>=t-10),p)-1)*100>=-.75
+                and (p/next((z[1] for z in h if z[0]>=t-10),p)-1)*100>=-.75
                 and (p/old1-1)*100>=-1.0):
                 row["_fast_pump_score"]=75
                 candidates.append(row)
