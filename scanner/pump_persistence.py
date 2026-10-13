@@ -87,53 +87,151 @@ def _confirmation_checks(ep, sample):
     return checks, ret, peak_drawdown
 
 
+def _finish_episode(state, symbol, ep, now, outcome, stale_age=None):
+    """Close an episode once, using only the last observed market price."""
+    entry = _num(ep, "entry_price")
+    price = _num(ep, "last_price", entry)
+    peak = _num(ep, "peak_price", entry)
+    ret = _ret_pct(price, entry)
+    peak_dd = _ret_pct(price, peak)
+    completed = {
+        k: v for k, v in ep.items()
+        if k not in ("samples", "_candidate_sample")
+    }
+    completed.update({
+        "end_ts": float(now),
+        "final_return_pct": round(ret, 4),
+        "max_return_pct": round(_ret_pct(peak, entry), 4),
+        "outcome": outcome,
+        "sample_count": len(ep.get("samples", [])),
+    })
+    if stale_age is not None:
+        completed["stale_seconds"] = round(float(stale_age), 1)
+    state["completed"].append(completed)
+    state["completed"] = state["completed"][-MAX_COMPLETED:]
+    state["active"].pop(symbol, None)
+    if outcome == "STALE_SYMBOL":
+        return None
+    return {
+        "type": "OUTCOME",
+        "outcome": outcome,
+        "symbol": symbol,
+        "entry_price": entry,
+        "price": price,
+        "final_return_pct": round(ret, 4),
+        "max_return_pct": round(_ret_pct(peak, entry), 4),
+        "peak_drawdown_pct": round(peak_dd, 4),
+        "elapsed_minutes": round(max(0.0, now - _num(ep, "start_ts", now)) / 60.0, 1),
+        "sample_count": len(ep.get("samples", [])),
+        "confirmed": bool(ep.get("confirmed")),
+    }
+
+
+def _new_episode(symbol, sample, now):
+    price = _num(sample, "price")
+    return {
+        "symbol": symbol,
+        "start_ts": float(now),
+        "entry_price": price,
+        "peak_price": price,
+        "trough_price": price,
+        "last_ts": float(now),
+        "last_price": price,
+        "confirmed": False,
+        "failure_alerted": False,
+        "checkpoints_seen": [],
+        "samples": [],
+        "stage": "MONITORING",
+    }
+
+
 def update_monitor(rows, candidates, state, now, path=STATE_PATH):
-    """Update episodes from the current scan. Returns newly triggered alerts."""
+    """Update episodes, expiring them by wall-clock and closing stale symbols."""
     now = float(now)
     state.setdefault("active", {})
     state.setdefault("completed", [])
     rows_by_symbol = {
-        str(r.get("symbol", "")).upper(): r
+        str(r.get("symbol", "")).strip().upper(): r
         for r in (rows or [])
         if isinstance(r, dict) and r.get("symbol")
     }
     candidate_by_symbol = {
-        str(r.get("symbol", "")).upper(): r
+        str(r.get("symbol", "")).strip().upper(): r
         for r in (candidates or [])
         if isinstance(r, dict) and r.get("symbol")
     }
     alerts = []
 
-    # Arm only from the existing Fastest-Pump qualifying candidate set.
+    # A symbol that disappears from the scan is not allowed to keep an episode
+    # alive indefinitely. Two minutes is long enough for brief universe rotation,
+    # while still preventing stale observations from being treated as current.
+    stale_seconds = max(30, int(os.getenv("PUMP_PERSISTENCE_STALE_SECONDS", "120")))
+
+    # Arm from the existing qualifying candidate set only.
     for symbol, row in candidate_by_symbol.items():
         sample = _sample(row, now)
         ep = state["active"].get(symbol)
         if ep is None:
             if sample["price"] <= 0:
                 continue
-            ep = {
-                "symbol": symbol,
-                "start_ts": now,
-                "entry_price": sample["price"],
-                "peak_price": sample["price"],
-                "trough_price": sample["price"],
-                "last_ts": now,
-                "last_price": sample["price"],
-                "confirmed": False,
-                "failure_alerted": False,
-                "checkpoints_seen": [],
-                "samples": [],
-                "stage": "MONITORING",
-            }
-            state["active"][symbol] = ep
-        # Candidate values are preferred for the current loop because they
-        # include the full Fastest-Pump microstructure features.
+            state["active"][symbol] = _new_episode(symbol, sample, now)
+            ep = state["active"][symbol]
         ep["_candidate_sample"] = sample
 
     for symbol, ep in list(state["active"].items()):
         row = rows_by_symbol.get(symbol)
         candidate_sample = ep.pop("_candidate_sample", None)
-        if row is None and candidate_sample is None:
+        current_row_exists = row is not None or candidate_sample is not None
+        start_ts = _num(ep, "start_ts", now)
+        elapsed = max(0.0, now - start_ts)
+        last_ts = _num(ep, "last_ts", start_ts)
+        stale_age = max(0.0, now - last_ts)
+
+        # Expiry is checked even if the symbol is absent from today's scan.
+        # Use its last genuine observation; never manufacture a sample at expiry.
+        if elapsed >= WINDOW_SECONDS and not current_row_exists:
+            entry = _num(ep, "entry_price")
+            price = _num(ep, "last_price", entry)
+            peak = _num(ep, "peak_price", entry)
+            ret = _ret_pct(price, entry)
+            peak_dd = _ret_pct(price, peak)
+            max_ret = _ret_pct(peak, entry)
+            if max_ret >= 3.0 and ret >= 1.0:
+                outcome = "SUSTAINED_PUMP"
+            elif max_ret >= 1.0 and (ret < 0.25 or peak_dd <= -2.0):
+                outcome = "FAILED_BURST"
+            else:
+                outcome = "NO_CLEAR_PUMP"
+            alert = _finish_episode(state, symbol, ep, now, outcome, stale_age=stale_age)
+            if alert:
+                alert["price"] = price
+                alert["peak_drawdown_pct"] = round(peak_dd, 4)
+                alert["final_sample_age_seconds"] = round(stale_age, 1)
+                alerts.append(alert)
+            continue
+
+        # Close episodes whose symbol has vanished for too long. If it reappears
+        # after a long gap, close the old episode first and start a fresh one
+        # from the current qualifying candidate (if any); gaps cannot confirm a pump.
+        if stale_age >= stale_seconds:
+            entry = _num(ep, "entry_price")
+            price = _num(ep, "last_price", entry)
+            peak = _num(ep, "peak_price", entry)
+            ret = _ret_pct(price, entry)
+            peak_dd = _ret_pct(price, peak)
+            max_ret = _ret_pct(peak, entry)
+            if not current_row_exists:
+                _finish_episode(state, symbol, ep, now, "STALE_SYMBOL", stale_age=stale_age)
+                continue
+            # The old episode is stale despite the symbol returning.
+            _finish_episode(state, symbol, ep, now, "STALE_SYMBOL", stale_age=stale_age)
+            if candidate_sample is not None and _num(candidate_sample, "price") > 0:
+                ep = _new_episode(symbol, candidate_sample, now)
+                state["active"][symbol] = ep
+            else:
+                continue
+
+        if not current_row_exists:
             continue
         sample = candidate_sample or _sample(row, now)
         price = _num(sample, "price")
@@ -145,8 +243,7 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
         ep["last_price"] = price
         ep["peak_price"] = max(_num(ep, "peak_price", entry), price)
         ep["trough_price"] = min(_num(ep, "trough_price", entry), price)
-        ep["samples"].append(sample)
-        # Keep a bounded per-episode sample list; checkpoints/outcome stats remain.
+        ep.setdefault("samples", []).append(sample)
         if len(ep["samples"]) > 400:
             ep["samples"] = ep["samples"][-400:]
 
@@ -170,15 +267,12 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
                     "cvd": round(_num(sample, "cvd"), 4),
                 }
 
-        # Confirm only after a full 5-minute observation, with price progress
-        # plus at least 3 of the 5 supporting conditions (4 of 6 total).
         sample_span = (
             _num(ep["samples"][-1], "ts") - _num(ep["samples"][0], "ts")
             if len(ep.get("samples", [])) >= 2 else 0.0
         )
-        # Require repeated observations across the window, not a single stale
-        # candidate reappearing after a long gap.
-        if not ep.get("confirmed") and elapsed >= 300 and len(ep.get("samples", [])) >= 5 and sample_span >= 240:
+        if (not ep.get("confirmed") and elapsed >= 300
+                and len(ep.get("samples", [])) >= 5 and sample_span >= 240):
             checks, ret, peak_dd = _confirmation_checks(ep, sample)
             passed = sum(bool(v) for v in checks.values())
             if ret >= 0.50 and passed >= 4:
@@ -187,30 +281,22 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
                 ep["confirmed_ts"] = now
                 ep["confirmation_checks"] = checks
                 alerts.append({
-                    "type": "CONFIRMED",
-                    "symbol": symbol,
-                    "entry_price": entry,
-                    "price": price,
-                    "return_pct": ret,
-                    "peak_drawdown_pct": peak_dd,
+                    "type": "CONFIRMED", "symbol": symbol,
+                    "entry_price": entry, "price": price,
+                    "return_pct": ret, "peak_drawdown_pct": peak_dd,
                     "elapsed_minutes": round(elapsed / 60.0, 1),
-                    "checks_passed": passed,
-                    "checks_total": len(checks),
+                    "checks_passed": passed, "checks_total": len(checks),
                     "score": _num(sample, "fast_score"),
                 })
 
-        # Only send a failure alert after a confirmed sustained move breaks down.
         if ep.get("confirmed") and not ep.get("failure_alerted"):
             if ret <= -1.50 or peak_dd <= -2.50:
                 ep["failure_alerted"] = True
                 ep["stage"] = "CONFIRMED_PUMP_DETERIORATED"
                 alerts.append({
-                    "type": "DETERIORATED",
-                    "symbol": symbol,
-                    "entry_price": entry,
-                    "price": price,
-                    "return_pct": ret,
-                    "peak_drawdown_pct": peak_dd,
+                    "type": "DETERIORATED", "symbol": symbol,
+                    "entry_price": entry, "price": price,
+                    "return_pct": ret, "peak_drawdown_pct": peak_dd,
                     "elapsed_minutes": round(elapsed / 60.0, 1),
                     "score": _num(sample, "fast_score"),
                 })
@@ -223,37 +309,12 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
                 outcome = "FAILED_BURST"
             else:
                 outcome = "NO_CLEAR_PUMP"
-            completed = {
-                k: v for k, v in ep.items()
-                if k not in ("samples", "_candidate_sample")
-            }
-            completed.update({
-                "end_ts": now,
-                "final_return_pct": round(ret, 4),
-                "max_return_pct": round(max_ret, 4),
-                "outcome": outcome,
-                "sample_count": len(ep.get("samples", [])),
-            })
-            state["completed"].append(completed)
-            state["completed"] = state["completed"][-MAX_COMPLETED:]
-            # Emit exactly one final 30-minute outcome alert per completed episode.
-            # This is separate from the early confirmation/deterioration alerts.
-            alerts.append({
-                "type": "OUTCOME",
-                "outcome": outcome,
-                "symbol": symbol,
-                "entry_price": entry,
-                "price": price,
-                "final_return_pct": round(ret, 4),
-                "max_return_pct": round(max_ret, 4),
-                "peak_drawdown_pct": round(peak_dd, 4),
-                "elapsed_minutes": round(elapsed / 60.0, 1),
-                "sample_count": len(ep.get("samples", [])),
-                "confirmed": bool(ep.get("confirmed")),
-            })
-            state["active"].pop(symbol, None)
+            alert = _finish_episode(state, symbol, ep, now, outcome)
+            if alert:
+                alert["peak_drawdown_pct"] = round(peak_dd, 4)
+                alerts.append(alert)
 
-    # Expose monitor status to the dashboard's latest.json rows.
+    # Surface state only for rows that are present in this scan.
     for symbol, row in rows_by_symbol.items():
         ep = state["active"].get(symbol)
         if ep:
