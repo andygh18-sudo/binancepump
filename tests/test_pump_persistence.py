@@ -60,15 +60,41 @@ class PumpPersistenceTests(unittest.TestCase):
         update_monitor([row], [row], self.state, 1000, self.path)
         restored = load_state(self.path)
         self.assertIn("MAGICUSDT", restored["active"])
-        row2 = self.row(1.04)
-        alerts = update_monitor([row2], [row2], restored, 2800, self.path)
+        alerts = []
+        # Keep observations fresh across the full episode, as the live monitor does.
+        for ts in range(1060, 2801, 60):
+            row2 = self.row(1.04)
+            alerts = update_monitor([row2], [row2], restored, ts, self.path)
         self.assertNotIn("MAGICUSDT", restored["active"])
         self.assertEqual(restored["completed"][-1]["outcome"], "SUSTAINED_PUMP")
-        self.assertEqual(restored["completed"][-1]["sample_count"], 2)
+        self.assertEqual(restored["completed"][-1]["sample_count"], 31)
         outcome_alerts = [a for a in alerts if a.get("type") == "OUTCOME"]
         self.assertEqual(len(outcome_alerts), 1)
         self.assertEqual(outcome_alerts[0]["outcome"], "SUSTAINED_PUMP")
         self.assertEqual(outcome_alerts[0]["elapsed_minutes"], 30.0)
+
+    def test_missing_symbol_expires_as_stale_instead_of_remaining_active(self):
+        row = self.row(1.0)
+        update_monitor([row], [row], self.state, 1000, self.path)
+        alerts = update_monitor([], [], self.state, 1121, self.path)
+        self.assertEqual(alerts, [])
+        self.assertNotIn("MAGICUSDT", self.state["active"])
+        completed = self.state["completed"][-1]
+        self.assertEqual(completed["outcome"], "STALE_SYMBOL")
+        self.assertEqual(completed["sample_count"], 1)
+        self.assertGreaterEqual(completed["stale_seconds"], 120)
+
+    def test_episode_expires_after_thirty_minutes_even_when_symbol_is_missing(self):
+        row = self.row(1.0)
+        update_monitor([row], [row], self.state, 1000, self.path)
+        alerts = update_monitor([], [], self.state, 2800, self.path)
+        self.assertNotIn("MAGICUSDT", self.state["active"])
+        self.assertEqual(self.state["completed"][-1]["outcome"], "NO_CLEAR_PUMP")
+        self.assertEqual(self.state["completed"][-1]["sample_count"], 1)
+        outcomes = [a for a in alerts if a.get("type") == "OUTCOME"]
+        self.assertEqual(len(outcomes), 1)
+        self.assertEqual(outcomes[0]["outcome"], "NO_CLEAR_PUMP")
+        self.assertEqual(outcomes[0]["final_sample_age_seconds"], 1800.0)
 
     def test_failed_burst_and_no_clear_pump_each_emit_one_final_outcome(self):
         scenarios = [
