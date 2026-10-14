@@ -45,8 +45,8 @@ def main():
     a=ap.parse_args()
     trades=load_trades(a.input)
     if not trades: raise SystemExit("No usable aggTrades found")
-    start=min(v[0] for xs in trades.values() for v in xs)
-    end=max(v[-1][0] for xs in trades.values() for v in xs)
+    start=min(trade[0] for symbol_trades in trades.values() for trade in symbol_trades)
+    end=max(trade[0] for symbol_trades in trades.values() for trade in symbol_trades)
     # Minute observations emulate the persistence worker's repeated snapshots.
     # Rolling trade metrics are computed strictly from trades available at that timestamp.
     idx={s:0 for s in trades}; hist={s:deque() for s in trades}; last_price={}
