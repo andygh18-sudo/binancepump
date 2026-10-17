@@ -162,9 +162,9 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
     }
     alerts = []
 
-    # A symbol that disappears from the scan is not allowed to keep an episode
-    # alive indefinitely. Two minutes is long enough for brief universe rotation,
-    # while still preventing stale observations from being treated as current.
+    # Active episodes are pinned until the 30-minute window has elapsed.
+    # Missing symbols are price-polled by the worker; a brief data/API outage
+    # records a gap but must not silently truncate an episode at 120 seconds.
     stale_seconds = max(30, int(os.getenv("PUMP_PERSISTENCE_STALE_SECONDS", "120")))
 
     # Arm from the existing qualifying candidate set only.
@@ -187,52 +187,17 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
         last_ts = _num(ep, "last_ts", start_ts)
         stale_age = max(0.0, now - last_ts)
 
-        # Expiry is checked even if the symbol is absent from today's scan.
-        # Use its last genuine observation; never manufacture a sample at expiry.
-        if elapsed >= WINDOW_SECONDS and not current_row_exists:
-            entry = _num(ep, "entry_price")
-            price = _num(ep, "last_price", entry)
-            peak = _num(ep, "peak_price", entry)
-            ret = _ret_pct(price, entry)
-            peak_dd = _ret_pct(price, peak)
-            max_ret = _ret_pct(peak, entry)
-            if max_ret >= 3.0 and ret >= 1.0:
-                outcome = "SUSTAINED_PUMP"
-            elif max_ret >= 1.0 and (ret < 0.25 or peak_dd <= -2.0):
-                outcome = "FAILED_BURST"
-            else:
-                outcome = "NO_CLEAR_PUMP"
-            alert = _finish_episode(state, symbol, ep, now, outcome, stale_age=stale_age)
-            if alert:
-                alert["price"] = price
-                alert["peak_drawdown_pct"] = round(peak_dd, 4)
-                alert["final_sample_age_seconds"] = round(stale_age, 1)
-                alerts.append(alert)
-            continue
-
-        # Close episodes whose symbol has vanished for too long. If it reappears
-        # after a long gap, close the old episode first and start a fresh one
-        # from the current qualifying candidate (if any); gaps cannot confirm a pump.
-        if stale_age >= stale_seconds:
-            entry = _num(ep, "entry_price")
-            price = _num(ep, "last_price", entry)
-            peak = _num(ep, "peak_price", entry)
-            ret = _ret_pct(price, entry)
-            peak_dd = _ret_pct(price, peak)
-            max_ret = _ret_pct(peak, entry)
-            if not current_row_exists:
-                _finish_episode(state, symbol, ep, now, "STALE_SYMBOL", stale_age=stale_age)
-                continue
-            # The old episode is stale despite the symbol returning.
-            _finish_episode(state, symbol, ep, now, "STALE_SYMBOL", stale_age=stale_age)
-            if candidate_sample is not None and _num(candidate_sample, "price") > 0:
-                ep = _new_episode(symbol, candidate_sample, now)
-                state["active"][symbol] = ep
-            else:
-                continue
-
+        # A missing symbol stays pinned. The worker attempts a direct ticker-price
+        # request for it; if that request also fails, preserve the episode and wait
+        # for the next cycle instead of mislabelling it STALE_SYMBOL.
         if not current_row_exists:
+            ep["data_gap_since"] = ep.get("data_gap_since", last_ts)
+            ep["data_gap_seconds"] = round(max(0.0, now - _num(ep, "data_gap_since", last_ts)), 1)
+            if elapsed >= WINDOW_SECONDS:
+                # Never publish a nominal 30-minute outcome using an old price.
+                ep["stage"] = "AWAITING_FINAL_PRICE"
             continue
+
         sample = candidate_sample or _sample(row, now)
         price = _num(sample, "price")
         if price <= 0:
@@ -241,6 +206,8 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
         entry = _num(ep, "entry_price")
         ep["last_ts"] = now
         ep["last_price"] = price
+        ep.pop("data_gap_since", None)
+        ep.pop("data_gap_seconds", None)
         ep["peak_price"] = max(_num(ep, "peak_price", entry), price)
         ep["trough_price"] = min(_num(ep, "trough_price", entry), price)
         ep.setdefault("samples", []).append(sample)
@@ -271,8 +238,13 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
             _num(ep["samples"][-1], "ts") - _num(ep["samples"][0], "ts")
             if len(ep.get("samples", [])) >= 2 else 0.0
         )
-        if (not ep.get("confirmed") and elapsed >= 300
-                and len(ep.get("samples", [])) >= 5 and sample_span >= 240):
+        metric_samples = [s for s in ep.get("samples", []) if not s.get("price_only")]
+        metric_span = (
+            _num(metric_samples[-1], "ts") - _num(metric_samples[0], "ts")
+            if len(metric_samples) >= 2 else 0.0
+        )
+        if (not sample.get("price_only") and not ep.get("confirmed") and elapsed >= 300
+                and len(metric_samples) >= 5 and metric_span >= 240):
             checks, ret, peak_dd = _confirmation_checks(ep, sample)
             passed = sum(bool(v) for v in checks.values())
             if ret >= 0.50 and passed >= 4:
