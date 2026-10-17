@@ -58,7 +58,7 @@ class SustainedSelectorTests(unittest.TestCase):
             path = os.path.join(d, "top2.json")
             old = os.environ.get("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS")
             old_gap = os.environ.get("SUSTAINED_PUMP_OBSERVATION_GAP_SECONDS")
-            os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = "1200"
+            os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = "1800"
             os.environ["SUSTAINED_PUMP_OBSERVATION_GAP_SECONDS"] = "2000"
             try:
                 candidates = [candidate("AAAUSDT")]
@@ -67,11 +67,11 @@ class SustainedSelectorTests(unittest.TestCase):
                 )
                 self.assertEqual(first, [])
                 second, _ = update_global_top2(
-                    candidates, observed_symbols=["AAAUSDT"], now=2199, path=path
+                    candidates, observed_symbols=["AAAUSDT"], now=2799, path=path
                 )
                 self.assertEqual(second, [])
                 third, _ = update_global_top2(
-                    candidates, observed_symbols=["AAAUSDT"], now=2201, path=path
+                    candidates, observed_symbols=["AAAUSDT"], now=2801, path=path
                 )
                 self.assertEqual([r["symbol"] for r in third], ["AAAUSDT"])
             finally:
@@ -88,7 +88,7 @@ class SustainedSelectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "top2.json")
             old = os.environ.get("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS")
-            os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = "1200"
+            os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = "1800"
             try:
                 update_global_top2([candidate("AAAUSDT")], observed_symbols=["AAAUSDT"], now=1000, path=path)
                 alerts, _ = update_global_top2(
