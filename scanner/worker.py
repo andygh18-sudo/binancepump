@@ -1,4 +1,4 @@
-import asyncio,aiohttp,json,os,time,math
+import asyncio,aiohttp,json,os,time,math,re
 from collections import defaultdict,deque
 from dotenv import load_dotenv
 from .orderbook import LocalOrderBook
@@ -1537,6 +1537,23 @@ async def telegram(msg):
     # V15.6/fastest-pump/deterioration alert lanes.
     allowed_global_top2=msg.startswith("📈 V15.8 GLOBAL TOP-2 SUSTAINED-PUMP")
     if not (allowed_confirmed or allowed_fastest or allowed_deterioration or allowed_persistence or allowed_global_top2): return
+    # Enforce the 20-minute observation floor on every enabled V15.8 Telegram lane.
+    # The selector persists first_seen/last_seen across workflow cycles.
+    if allowed_persistence:
+        match=re.search(r"\\b([A-Z0-9]{2,}USDT)\\b",msg.upper())
+        if not match:return
+        symbol=match.group(1)
+        try:
+            with open("data/v158_sustained_pump_top2.json",encoding="utf-8") as f:
+                observation_state=json.load(f).get("observations",{})
+            observed=observation_state.get(symbol,{})
+            observed_seconds=max(0.0,time.time()-float(observed.get("first_seen",time.time()) or time.time()))
+        except (OSError,ValueError,TypeError,AttributeError):
+            observed_seconds=0.0
+        min_observed=float(os.getenv("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS","1200"))
+        if observed_seconds < min_observed:
+            print(f"Telegram suppressed: {symbol} observed {observed_seconds/60:.1f}m; requires {min_observed/60:.0f}m",flush=True)
+            return
     if not token or not chat:return
     # Normalize all scanner alerts to one Telegram line.
     # This prevents literal \\n / \\ artifacts from reaching Telegram.
