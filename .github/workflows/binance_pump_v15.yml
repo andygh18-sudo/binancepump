@@ -197,13 +197,14 @@ jobs:
           PY
             fi
           }
-          trim_jsonl_to_bytes /tmp/v157_observations.jsonl $((80 * 1024 * 1024))
-          trim_jsonl_to_bytes /tmp/v158_discovery.jsonl $((20 * 1024 * 1024))
-          # Defensive hard stop before staging: never let an oversized history file
-          # make the entire live monitoring cycle fail at git push.
+          # Keep tracked JSONL below GitHub's 50 MB recommended per-file limit,
+          # reducing clone, diff, and publish time on every monitoring cycle.
+          trim_jsonl_to_bytes /tmp/v157_observations.jsonl $((45 * 1024 * 1024))
+          trim_jsonl_to_bytes /tmp/v158_discovery.jsonl $((15 * 1024 * 1024))
+          # Defensive hard stop before staging, with headroom below GitHub's limit.
           for file in /tmp/v157_observations.jsonl /tmp/v158_discovery.jsonl; do
             size=$(wc -c < "$file")
-            if [ "$size" -ge $((90 * 1024 * 1024)) ]; then
+            if [ "$size" -ge $((48 * 1024 * 1024)) ]; then
               echo "::error::Refusing to publish oversized learning file: $file ($size bytes)"
               exit 1
             fi
