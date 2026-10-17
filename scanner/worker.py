@@ -1544,7 +1544,8 @@ async def telegram(msg):
     #   can continue internally without sending this alert lane.
     # - V15.6 CONFIRMED DETERIORATION Telegram alerts are disabled; monitoring can
     #   continue internally without sending this alert lane.
-    # - V15.8 sustained-pump alerts remain governed by their allow-list below.
+    # - V15.8 sustained-pump alerts remain governed by their own monitor/selector.
+    # - Failed-burst and no-clear-pump outcomes are intentionally not sent.
     # - Legacy V15/early alerts remain disabled.
     allowed_confirmed=False
     allowed_fastest=False
@@ -1554,36 +1555,32 @@ async def telegram(msg):
         "🟠 V15.8 CONFIRMED-PUMP DETERIORATION",
         "🟢 V15.8 30M OUTCOME | SUSTAINED PUMP",
     ))
-    # The global Top-2 lane is intentionally enabled independently of legacy
-    # V15.6/fastest-pump/deterioration alert lanes.
+    # The global selector already enforces its own 20-minute observation floor.
+    # Do not apply that unrelated clock to the independent persistence episode:
+    # doing so suppressed valid 5-minute confirmations and 30-minute outcomes.
     allowed_global_top2=msg.startswith("📈 V15.8 GLOBAL TOP-2 SUSTAINED-PUMP")
     if not (allowed_confirmed or allowed_fastest or allowed_deterioration or allowed_persistence or allowed_global_top2): return
-    # Enforce the 20-minute observation floor on every enabled V15.8 Telegram lane.
-    # The selector persists first_seen/last_seen across workflow cycles.
-    if allowed_persistence:
-        match=re.search(r"\b([A-Z0-9]{2,}USDT)\b",msg.upper())
-        if not match:return
-        symbol=match.group(1)
-        try:
-            with open("data/v158_sustained_pump_top2.json",encoding="utf-8") as f:
-                observation_state=json.load(f).get("observations",{})
-            observed=observation_state.get(symbol,{})
-            observed_seconds=max(0.0,time.time()-float(observed.get("first_seen",time.time()) or time.time()))
-        except (OSError,ValueError,TypeError,AttributeError):
-            observed_seconds=0.0
-        min_observed=float(os.getenv("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS","1200"))
-        if observed_seconds < min_observed:
-            print(f"Telegram suppressed: {symbol} observed {observed_seconds/60:.1f}m; requires {min_observed/60:.0f}m",flush=True)
-            return
-    if not token or not chat:return
+    if not token or not chat:
+        print("Telegram not sent: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.", flush=True)
+        return
     # Normalize all scanner alerts to one Telegram line.
-    # This prevents literal \\n / \\ artifacts from reaching Telegram.
     msg=str(msg).replace("\\\\n"," | ").replace("\\r"," | ").replace("\\n"," | ").replace("\\\\","")
     msg=msg.replace("\r"," | ").replace("\n"," | ").replace("\\","")
     try:
         async with aiohttp.ClientSession() as s:
-            await s.post(f"https://api.telegram.org/bot{token}/sendMessage",json={"chat_id":chat,"text":msg},timeout=8)
-    except Exception:pass
+            async with s.post(f"https://api.telegram.org/bot{token}/sendMessage",json={"chat_id":chat,"text":msg},timeout=8) as response:
+                body=await response.text()
+                if response.status < 200 or response.status >= 300:
+                    print(f"Telegram API error: HTTP {response.status}: {body[:300]}", flush=True)
+                else:
+                    try:
+                        payload=json.loads(body)
+                    except (ValueError,TypeError):
+                        payload={}
+                    if not payload.get("ok", False):
+                        print(f"Telegram API rejected message: {str(payload)[:300]}", flush=True)
+    except Exception as exc:
+        print(f"Telegram send failed: {type(exc).__name__}: {exc}", flush=True)
 
 
 async def refresh_v158_cross_exchange(http, market_symbols):
