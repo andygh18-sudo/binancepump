@@ -32,25 +32,57 @@ async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
         r.raise_for_status();return await r.json()
 
+# Avoid repeatedly hammering Binance after HTTP 418/429 or transient outages.
+_pinned_retry_after = 0.0
+_pinned_failures = 0
+_pinned_last_error = ""
+
 async def fetch_pinned_monitor_rows(http, rows, persistence_state):
-    """Fetch fresh prices for active monitor episodes outside the rotating scan."""
+    """Fetch fresh prices for active episodes, with a shared retry cooldown."""
+    global _pinned_retry_after, _pinned_failures, _pinned_last_error
     present = {str(r.get("symbol", "")).upper() for r in (rows or []) if isinstance(r, dict) and r.get("symbol")}
     missing = sorted(set((persistence_state.get("active", {}) or {}).keys()) - present)
-    if not missing:
+    if not missing or time.monotonic() < _pinned_retry_after:
         return rows
     try:
-        payload = await get_json(http, REST + "/api/v3/ticker/price", params={"symbols": json.dumps(missing, separators=(",", ":"))})
-        if isinstance(payload, dict): payload = [payload]
+        payload = await get_json(
+            http, REST + "/api/v3/ticker/price",
+            params={"symbols": json.dumps(missing, separators=(",", ":"))},
+        )
+        if isinstance(payload, dict):
+            payload = [payload]
         pinned = []
         for item in payload if isinstance(payload, list) else []:
             symbol = str(item.get("symbol", "")).upper()
-            try: price = float(item.get("price", 0) or 0)
-            except (TypeError, ValueError): price = 0.0
+            try:
+                price = float(item.get("price", 0) or 0)
+            except (TypeError, ValueError):
+                price = 0.0
             if symbol in missing and price > 0:
                 pinned.append({"symbol": symbol, "price": price, "_persistence_price_only": True})
+        _pinned_failures = 0
+        _pinned_retry_after = 0.0
+        _pinned_last_error = ""
         return list(rows or []) + pinned
     except Exception as exc:
-        print(f"V15.8 pinned ticker refresh failed: {type(exc).__name__}: {exc}", flush=True)
+        _pinned_failures = min(_pinned_failures + 1, 6)
+        status = getattr(exc, "status", None)
+        # Respect Retry-After when supplied; otherwise use exponential backoff.
+        headers = getattr(exc, "headers", None) or {}
+        retry_after = headers.get("Retry-After") if hasattr(headers, "get") else None
+        try:
+            delay = max(1.0, float(retry_after)) if retry_after else min(15.0 * (2 ** (_pinned_failures - 1)), 300.0)
+        except (TypeError, ValueError):
+            delay = min(15.0 * (2 ** (_pinned_failures - 1)), 300.0)
+        _pinned_retry_after = time.monotonic() + delay
+        error_key = f"{status or type(exc).__name__}:{exc}"
+        if error_key != _pinned_last_error or _pinned_failures in (1, 3, 6):
+            print(
+                f"V15.8 pinned ticker refresh failed ({error_key}); retrying in {delay:.0f}s "
+                f"(failure {_pinned_failures}). Active episodes remain open until a fresh price arrives.",
+                flush=True,
+            )
+        _pinned_last_error = error_key
         return rows
 
 async def discover(s):
