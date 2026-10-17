@@ -53,6 +53,51 @@ class SustainedSelectorTests(unittest.TestCase):
                 state = json.load(f)
             self.assertEqual(set(state["alerted_top2"]), {"AAAUSDT", "BBBUSDT"})
 
+    def test_alert_waits_until_symbol_has_been_observed_for_minimum_age(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "top2.json")
+            old = os.environ.get("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS")
+            os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = "1200"
+            try:
+                candidates = [candidate("AAAUSDT")]
+                first, _ = update_global_top2(
+                    candidates, observed_symbols=["AAAUSDT"], now=1000, path=path
+                )
+                self.assertEqual(first, [])
+                second, _ = update_global_top2(
+                    candidates, observed_symbols=["AAAUSDT"], now=2199, path=path
+                )
+                self.assertEqual(second, [])
+                third, _ = update_global_top2(
+                    candidates, observed_symbols=["AAAUSDT"], now=2201, path=path
+                )
+                self.assertEqual([r["symbol"] for r in third], ["AAAUSDT"])
+            finally:
+                if old is None:
+                    os.environ.pop("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS", None)
+                else:
+                    os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = old
+
+    def test_observation_age_resets_after_long_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "top2.json")
+            old = os.environ.get("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS")
+            os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = "1200"
+            try:
+                update_global_top2([candidate("AAAUSDT")], observed_symbols=["AAAUSDT"], now=1000, path=path)
+                alerts, _ = update_global_top2(
+                    [candidate("AAAUSDT")], observed_symbols=["AAAUSDT"], now=1400, path=path
+                )
+                self.assertEqual(alerts, [])
+                with open(path, encoding="utf-8") as f:
+                    state = json.load(f)
+                self.assertEqual(state["observations"]["AAAUSDT"]["first_seen"], 1400)
+            finally:
+                if old is None:
+                    os.environ.pop("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS", None)
+                else:
+                    os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = old
+
     def test_expired_candidates_are_removed(self):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "top2.json")
