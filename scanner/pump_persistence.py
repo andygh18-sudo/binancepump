@@ -63,6 +63,7 @@ def _sample(row, now):
         "trade_accel": _num(row, "trade_accel"),
         "cvd": _num(row, "_fast_cvd", _num(row, "cvd")),
         "exhaustion": _num(row, "_fast_dynamic_exhaustion", _num(row, "exhaustion_score")),
+        "price_only": bool(row.get("_persistence_price_only", False)),
     }
 
 
@@ -228,10 +229,10 @@ def update_monitor(rows, candidates, state, now, path=STATE_PATH):
                 ep.setdefault("checkpoint_results", {})[str(checkpoint // 60)] = {
                     "return_pct": round(ret, 4),
                     "peak_drawdown_pct": round(peak_dd, 4),
-                    "buy_pressure": round(_num(sample, "buy_pressure"), 4),
-                    "volume_ratio": round(_num(sample, "volume_ratio"), 4),
-                    "trade_accel": round(_num(sample, "trade_accel"), 4),
-                    "cvd": round(_num(sample, "cvd"), 4),
+                    "buy_pressure": None if sample.get("price_only") else round(_num(sample, "buy_pressure"), 4),
+                    "volume_ratio": None if sample.get("price_only") else round(_num(sample, "volume_ratio"), 4),
+                    "trade_accel": None if sample.get("price_only") else round(_num(sample, "trade_accel"), 4),
+                    "cvd": None if sample.get("price_only") else round(_num(sample, "cvd"), 4),
                 }
 
         sample_span = (
