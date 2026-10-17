@@ -1540,7 +1540,7 @@ async def telegram(msg):
     # Enforce the 20-minute observation floor on every enabled V15.8 Telegram lane.
     # The selector persists first_seen/last_seen across workflow cycles.
     if allowed_persistence:
-        match=re.search(r"\\b([A-Z0-9]{2,}USDT)\\b",msg.upper())
+        match=re.search(r"\b([A-Z0-9]{2,}USDT)\b",msg.upper())
         if not match:return
         symbol=match.group(1)
         try:
