@@ -32,6 +32,27 @@ async def get_json(s,url,params=None):
     async with s.get(url,params=params,timeout=12) as r:
         r.raise_for_status();return await r.json()
 
+async def fetch_pinned_monitor_rows(http, rows, persistence_state):
+    """Fetch fresh prices for active monitor episodes outside the rotating scan."""
+    present = {str(r.get("symbol", "")).upper() for r in (rows or []) if isinstance(r, dict) and r.get("symbol")}
+    missing = sorted(set((persistence_state.get("active", {}) or {}).keys()) - present)
+    if not missing:
+        return rows
+    try:
+        payload = await get_json(http, REST + "/api/v3/ticker/price", params={"symbols": json.dumps(missing, separators=(",", ":"))})
+        if isinstance(payload, dict): payload = [payload]
+        pinned = []
+        for item in payload if isinstance(payload, list) else []:
+            symbol = str(item.get("symbol", "")).upper()
+            try: price = float(item.get("price", 0) or 0)
+            except (TypeError, ValueError): price = 0.0
+            if symbol in missing and price > 0:
+                pinned.append({"symbol": symbol, "price": price, "_persistence_price_only": True})
+        return list(rows or []) + pinned
+    except Exception as exc:
+        print(f"V15.8 pinned ticker refresh failed: {type(exc).__name__}: {exc}", flush=True)
+        return rows
+
 async def discover(s):
     """
     Build a wider pump-detection universe instead of selecting only the
@@ -2005,8 +2026,9 @@ async def main():
 
                         # Additive 30-minute persistence monitor. It observes existing
                         # Fastest-Pump candidates but does not change their scoring/gates.
+                        persistence_rows = await fetch_pinned_monitor_rows(http, rows, pump_persistence_state)
                         persistence_alerts=update_pump_persistence_monitor(
-                            rows, fast_pump_candidates, pump_persistence_state, time.time()
+                            persistence_rows, fast_pump_candidates, pump_persistence_state, time.time()
                         )
                         for pa in persistence_alerts:
                             if pa.get("type")=="CONFIRMED":
