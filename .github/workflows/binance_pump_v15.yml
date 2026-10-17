@@ -142,6 +142,8 @@ jobs:
           FAST_PUMP_MIN_SPAN_SECONDS: "20"
           FAST_PUMP_EPISODE_ALERT_COOLDOWN: "900"
           FAST_PUMP_TOP_N: "2"
+          SUSTAINED_PUMP_MIN_OBSERVED_SECONDS: "1200"
+          SUSTAINED_PUMP_OBSERVATION_GAP_SECONDS: "180"
         run: |
           set -e
           python run_scanner.py
