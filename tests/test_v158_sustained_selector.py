@@ -57,7 +57,9 @@ class SustainedSelectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "top2.json")
             old = os.environ.get("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS")
+            old_gap = os.environ.get("SUSTAINED_PUMP_OBSERVATION_GAP_SECONDS")
             os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = "1200"
+            os.environ["SUSTAINED_PUMP_OBSERVATION_GAP_SECONDS"] = "2000"
             try:
                 candidates = [candidate("AAAUSDT")]
                 first, _ = update_global_top2(
@@ -77,6 +79,10 @@ class SustainedSelectorTests(unittest.TestCase):
                     os.environ.pop("SUSTAINED_PUMP_MIN_OBSERVED_SECONDS", None)
                 else:
                     os.environ["SUSTAINED_PUMP_MIN_OBSERVED_SECONDS"] = old
+                if old_gap is None:
+                    os.environ.pop("SUSTAINED_PUMP_OBSERVATION_GAP_SECONDS", None)
+                else:
+                    os.environ["SUSTAINED_PUMP_OBSERVATION_GAP_SECONDS"] = old_gap
 
     def test_observation_age_resets_after_long_gap(self):
         with tempfile.TemporaryDirectory() as d:
