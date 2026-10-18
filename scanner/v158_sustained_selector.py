@@ -38,6 +38,9 @@ def _load(path):
     # Only successfully delivered alerts count as notified. Legacy top2 is ranking
     # state, not evidence that a Telegram notification was delivered.
     state["alerted_top2"] = sorted({str(s).upper() for s in state.get("alerted_top2", [])})
+    state["alerted_scores"] = state.get("alerted_scores") if isinstance(state.get("alerted_scores"), dict) else {}
+    for symbol in state["alerted_top2"]:
+        state["alerted_scores"].setdefault(symbol, _f(state["pool"].get(symbol, {}), "last_alert_score"))
     return state
 
 
@@ -111,7 +114,8 @@ def update_global_top2(candidates, observed_symbols=None, now=None, path=None):
         _f(row, "global_rank_score"), _f(row, "_sustained_pump_score"), _f(row, "price_15m")
     ), reverse=True)
     leaders = ranked[:2]
-    weakest = min((_f(pool.get(symbol, {}), "global_rank_score") for symbol in prior if symbol in pool), default=0)
+    alerted_scores = state["alerted_scores"]
+    weakest = min((_f(alerted_scores, symbol, _f(pool.get(symbol, {}), "global_rank_score")) for symbol in prior), default=0)
     alerts = []
     for row in leaders:
         symbol = row["symbol"]
@@ -142,7 +146,8 @@ def update_global_top2(candidates, observed_symbols=None, now=None, path=None):
         "min_observed_seconds": min_observed,
         "observation_gap_seconds": observation_gap,
         "top2": [row["symbol"] for row in leaders],
-        "alerted_top2": sorted(prior & set(pool)),
+        "alerted_top2": sorted(prior),
+        "alerted_scores": alerted_scores,
         "observations": observations,
         "pending_alerts": pending,
         "pool": pool,
@@ -170,5 +175,6 @@ def acknowledge_global_top2(symbol, score, delivered, now=None, path=None):
         item["last_alert_at"] = now
         state["pool"][symbol] = item
         state["alerted_top2"] = sorted(set(state["alerted_top2"]) | {symbol})
+        state["alerted_scores"][symbol] = float(score or 0)
     state["updated"] = now
     _save(state, path)
