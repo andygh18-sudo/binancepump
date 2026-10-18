@@ -100,6 +100,10 @@ def update_global_top2(candidates, observed_symbols=None, now=None, path=None):
             pool.pop(symbol, None)
             pending.pop(symbol.upper(), None)
 
+    # A previous notification only occupies a current Top-2 slot while its pool entry is active.
+    # Expired/disqualified leaders must not block fresh candidates forever.
+    prior.intersection_update(pool.keys())
+
     for row in clean_candidates:
         symbol = row["symbol"]
         item = dict(row)
