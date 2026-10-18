@@ -136,7 +136,7 @@ class SustainedSelectorTests(unittest.TestCase):
                 acknowledge_global_top2(row["symbol"], row["global_rank_score"], True, now=1001, path=path)
             # A weak new symbol enters the top two but cannot clear the replacement margin.
             alerts, ranked = update_global_top2(
-                [candidate("AAAUSDT", signal=95), candidate("CCCUSDT", signal=70)],
+                [candidate("AAAUSDT", signal=95), candidate("BBBUSDT", signal=60), candidate("CCCUSDT", signal=65)],
                 observed_symbols=["AAAUSDT", "BBBUSDT", "CCCUSDT"],
                 now=1010, path=path,
             )
