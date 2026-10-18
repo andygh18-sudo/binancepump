@@ -8,7 +8,7 @@ from .v158 import MarketDiscovery,trade_features,liquidity_features,data_quality
 from .v156 import evaluate as v156_evaluate
 from .v156_deterioration import V156DeteriorationMonitor
 from .pump_persistence import load_state as load_pump_persistence_state, update_monitor as update_pump_persistence_monitor
-from .v158_sustained_selector import update_global_top2
+from .v158_sustained_selector import update_global_top2, acknowledge_global_top2
 # V15.6 deterioration redesign validation marker
 
 load_dotenv()
@@ -36,39 +36,100 @@ async def get_json(s,url,params=None):
 _pinned_retry_after = 0.0
 _pinned_failures = 0
 _pinned_last_error = ""
+_PINNED_SYMBOL_RE = re.compile(r"^[A-Z0-9]{3,30}USDT$")
+
 
 async def fetch_pinned_monitor_rows(http, rows, persistence_state):
-    """Fetch fresh prices for active episodes, with a shared retry cooldown."""
+    """Fetch fresh prices for active episodes without letting one bad symbol poison the batch."""
     global _pinned_retry_after, _pinned_failures, _pinned_last_error
-    present = {str(r.get("symbol", "")).upper() for r in (rows or []) if isinstance(r, dict) and r.get("symbol")}
-    missing = sorted(set((persistence_state.get("active", {}) or {}).keys()) - present)
+    active = persistence_state.get("active", {}) or {}
+    present = {str(row.get("symbol", "")).upper() for row in (rows or [])
+               if isinstance(row, dict) and row.get("symbol")}
+    missing_all = sorted(set(active) - present)
+    if not missing_all:
+        return rows
+
+    # Invalid/non-ASCII symbols previously caused a whole multi-symbol Binance
+    # request to return HTTP 400. Retire those corrupted episodes and never send
+    # them to the exchange endpoint.
+    invalid = [symbol for symbol in missing_all
+               if not symbol.isascii() or not _PINNED_SYMBOL_RE.fullmatch(symbol)]
+    for symbol in invalid:
+        episode = active.pop(symbol, {})
+        episode["outcome"] = "INVALID_SYMBOL"
+        episode["end_ts"] = time.time()
+        episode["invalid_symbol_reason"] = "Not a valid USDT market symbol"
+        persistence_state.setdefault("completed", []).append(episode)
+        print(f"V15.8 pinned ticker skipped invalid symbol: {symbol!r}; episode retired.", flush=True)
+    if invalid:
+        persistence_state["completed"] = persistence_state["completed"][-500:]
+        try:
+            from .pump_persistence import save_state
+            save_state(persistence_state)
+        except Exception as exc:
+            print(f"V15.8 invalid-symbol state save failed: {type(exc).__name__}: {exc}", flush=True)
+
+    missing = [symbol for symbol in missing_all if symbol not in invalid]
     if not missing or time.monotonic() < _pinned_retry_after:
         return rows
-    try:
+
+    async def fetch_batch(symbols):
         payload = await get_json(
             http, REST + "/api/v3/ticker/price",
-            params={"symbols": json.dumps(missing, separators=(",", ":"))},
+            params={"symbols": json.dumps(symbols, separators=(",", ":"))},
         )
         if isinstance(payload, dict):
             payload = [payload]
-        pinned = []
+        prices = []
         for item in payload if isinstance(payload, list) else []:
             symbol = str(item.get("symbol", "")).upper()
             try:
                 price = float(item.get("price", 0) or 0)
             except (TypeError, ValueError):
                 price = 0.0
-            if symbol in missing and price > 0:
-                pinned.append({"symbol": symbol, "price": price, "_persistence_price_only": True})
+            if symbol in symbols and price > 0:
+                prices.append({"symbol": symbol, "price": price, "_persistence_price_only": True})
+        return prices
+
+    pinned = []
+    try:
+        # Keep requests small and isolate a single invalid/delisted symbol.
+        for start in range(0, len(missing), 50):
+            batch = missing[start:start + 50]
+            try:
+                pinned.extend(await fetch_batch(batch))
+            except aiohttp.ClientResponseError as exc:
+                if exc.status != 400:
+                    raise
+                print(f"V15.8 pinned ticker batch rejected (HTTP 400); isolating {len(batch)} symbols.", flush=True)
+                for symbol in batch:
+                    try:
+                        pinned.extend(await fetch_batch([symbol]))
+                    except aiohttp.ClientResponseError as one_exc:
+                        if one_exc.status == 400:
+                            active.pop(symbol, None)
+                            persistence_state.setdefault("completed", []).append({
+                                "symbol": symbol, "outcome": "INVALID_SYMBOL",
+                                "end_ts": time.time(), "invalid_symbol_reason": "Binance rejected ticker symbol",
+                            })
+                            print(f"V15.8 pinned ticker retired Binance-rejected symbol: {symbol}.", flush=True)
+                        else:
+                            raise
         _pinned_failures = 0
         _pinned_retry_after = 0.0
         _pinned_last_error = ""
+        if invalid or len(persistence_state.get("completed", [])) > 500:
+            persistence_state["completed"] = persistence_state["completed"][-500:]
+            try:
+                from .pump_persistence import save_state
+                save_state(persistence_state)
+            except Exception:
+                pass
         return list(rows or []) + pinned
     except Exception as exc:
         _pinned_failures = min(_pinned_failures + 1, 6)
         status = getattr(exc, "status", None)
-        # Respect Retry-After when supplied; otherwise use exponential backoff.
-        headers = getattr(exc, "headers", None) or {}
+        headers = getattr(getattr(exc, "request_info", None), "headers", None) or {}
         retry_after = headers.get("Retry-After") if hasattr(headers, "get") else None
         try:
             delay = max(1.0, float(retry_after)) if retry_after else min(15.0 * (2 ** (_pinned_failures - 1)), 300.0)
@@ -83,7 +144,7 @@ async def fetch_pinned_monitor_rows(http, rows, persistence_state):
                 flush=True,
             )
         _pinned_last_error = error_key
-        return rows
+        return list(rows or []) + pinned
 
 async def discover(s):
     """
@@ -1570,15 +1631,7 @@ def update_fast_pump_leaderboard(candidates, now):
 async def telegram(msg):
     token=os.getenv("TELEGRAM_BOT_TOKEN");chat=os.getenv("TELEGRAM_CHAT_ID")
     msg=str(msg)
-    # Production Telegram policy:
-    # - V15.6 CONFIRMED-IGNITION / BUY Telegram alerts are disabled.
-    # - V15.6 FASTEST-PUMP Telegram alerts are disabled; candidate tracking/learning
-    #   can continue internally without sending this alert lane.
-    # - V15.6 CONFIRMED DETERIORATION Telegram alerts are disabled; monitoring can
-    #   continue internally without sending this alert lane.
-    # - V15.8 sustained-pump alerts remain governed by their own monitor/selector.
-    # - Failed-burst and no-clear-pump outcomes are intentionally not sent.
-    # - Legacy V15/early alerts remain disabled.
+    # V15.6 legacy lanes remain disabled; V15.8 sustained-pump lanes use their own gates.
     allowed_confirmed=False
     allowed_fastest=False
     allowed_deterioration=False
@@ -1587,32 +1640,32 @@ async def telegram(msg):
         "🟠 V15.8 CONFIRMED-PUMP DETERIORATION",
         "🟢 V15.8 30M OUTCOME | SUSTAINED PUMP",
     ))
-    # The global selector already enforces its own 20-minute observation floor.
-    # Do not apply that unrelated clock to the independent persistence episode:
-    # doing so suppressed valid 5-minute confirmations and 30-minute outcomes.
     allowed_global_top2=msg.startswith("📈 V15.8 GLOBAL TOP-2 SUSTAINED-PUMP")
-    if not (allowed_confirmed or allowed_fastest or allowed_deterioration or allowed_persistence or allowed_global_top2): return
+    if not (allowed_confirmed or allowed_fastest or allowed_deterioration or allowed_persistence or allowed_global_top2):
+        return False
     if not token or not chat:
         print("Telegram not sent: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.", flush=True)
-        return
-    # Normalize all scanner alerts to one Telegram line.
+        return False
     msg=str(msg).replace("\\\\n"," | ").replace("\\r"," | ").replace("\\n"," | ").replace("\\\\","")
     msg=msg.replace("\r"," | ").replace("\n"," | ").replace("\\","")
     try:
-        async with aiohttp.ClientSession() as s:
-            async with s.post(f"https://api.telegram.org/bot{token}/sendMessage",json={"chat_id":chat,"text":msg},timeout=8) as response:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(f"https://api.telegram.org/bot{token}/sendMessage",json={"chat_id":chat,"text":msg},timeout=8) as response:
                 body=await response.text()
                 if response.status < 200 or response.status >= 300:
                     print(f"Telegram API error: HTTP {response.status}: {body[:300]}", flush=True)
-                else:
-                    try:
-                        payload=json.loads(body)
-                    except (ValueError,TypeError):
-                        payload={}
-                    if not payload.get("ok", False):
-                        print(f"Telegram API rejected message: {str(payload)[:300]}", flush=True)
+                    return False
+                try:
+                    payload=json.loads(body)
+                except (ValueError,TypeError):
+                    payload={}
+                if not payload.get("ok", False):
+                    print(f"Telegram API rejected message: {str(payload)[:300]}", flush=True)
+                    return False
+                return True
     except Exception as exc:
         print(f"Telegram send failed: {type(exc).__name__}: {exc}", flush=True)
+        return False
 
 
 async def refresh_v158_cross_exchange(http, market_symbols):
@@ -2104,18 +2157,16 @@ async def main():
                             observed_symbols=[rr.get("symbol", "") for rr in rows],
                             now=time.time(),
                         )
-                        # Explicit, secret-free diagnostics make live ranking and
-                        # alert decisions auditable in GitHub Actions logs.
                         print(
                             "V15.8 GLOBAL TOP-2 selector: "
                             f"eligible={len(sustained_pump_candidates)} pool={len(sustained_ranked)} "
-                            f"leaders={[str(c.get('symbol', '')) + ':' + format(float(c.get('global_rank_score', 0) or 0), '.1f') for c in sustained_ranked[:2]]} "
+                            f"leaders={[str(c.get('symbol', '')) + ':' + format(float(c.get('global_rank_score', 0) or 0), '.1f') + ':' + str(c.get('observed_seconds', 0)) + 's:' + str(c.get('alert_block_reason', 'not_top2')) for c in sustained_ranked[:2]]} "
                             f"alert_symbols={[str(c.get('symbol', '')) for c in sustained_alerts[:2]]}",
                             flush=True,
                         )
                         for candidate in sustained_alerts[:2]:
                             s = candidate["symbol"]
-                            await telegram(
+                            delivered = await telegram(
                                 f"📈 V15.8 GLOBAL TOP-2 SUSTAINED-PUMP | {s} | "
                                 f"Rank score {float(candidate.get('global_rank_score', 0) or 0):.1f}/100 | "
                                 f"Signal score {float(candidate.get('_sustained_pump_score', 0) or 0):.0f}/100 | "
@@ -2124,8 +2175,11 @@ async def main():
                                 f"Volume {candidate.get('volume_ratio', 0):.2f}x | Trade accel {candidate.get('trade_accel', 0):.2f}x | "
                                 f"Buy {candidate.get('buy_pressure', 0)*100:.1f}% | CVD {candidate.get('cvd', 0):+.2f} | "
                                 f"Exhaustion {candidate.get('exhaustion_score', 0):.1f} | "
+                                f"Observed {candidate.get('observed_seconds', 0)/60:.1f}/30m | "
                                 "Global comparison: strongest active sustained-pump candidates."
                             )
+                            acknowledge_global_top2(s, candidate.get("global_rank_score", 0), delivered, now=time.time())
+
 # Rolling Top-2 Fastest-Pump Telegram selector.
 
                         # The underlying V15.7 detector remains unchanged: all qualifying
