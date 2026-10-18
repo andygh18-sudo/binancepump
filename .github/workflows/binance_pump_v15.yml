@@ -33,7 +33,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 75
 
     steps:
       - name: Checkout
@@ -103,8 +103,8 @@ jobs:
           DISCOVERY_MIN_QUOTE_VOLUME: "50000"
           LIQUID_SYMBOLS: "80"
           MOMENTUM_SYMBOLS: "40"
-          # Keep the scanner alive long enough to observe candidates for 30 minutes in one run.
-          RUN_SECONDS: "2400"
+          # One-hour scan lets candidates appearing during the first 30 minutes complete their full observation window.
+          RUN_SECONDS: "3600"
           DECISION_INTERVAL: "5"
           IGNITION_HISTORY_SAMPLES: "60"
           HISTORY_SAMPLE_INTERVAL: "300"
