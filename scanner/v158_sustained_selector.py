@@ -35,8 +35,17 @@ def _load(path):
     state["pool"] = state.get("pool") if isinstance(state.get("pool"), dict) else {}
     state["observations"] = state.get("observations") if isinstance(state.get("observations"), dict) else {}
     state["pending_alerts"] = state.get("pending_alerts") if isinstance(state.get("pending_alerts"), dict) else {}
-    # Only successfully delivered alerts count as notified. Legacy top2 is ranking
-    # state, not evidence that a Telegram notification was delivered.
+    # Older versions marked leaders as alerted before checking Telegram's response.
+    # Migrate once: clear unverified delivery history so a live leader can notify again.
+    if state.get("delivery_state_version") != 2:
+        state["alerted_top2"] = []
+        state["alerted_scores"] = {}
+        state["pending_alerts"] = {}
+        for item in state["pool"].values():
+            if isinstance(item, dict):
+                item["last_alert_at"] = 0
+                item["last_alert_score"] = 0
+        state["delivery_state_version"] = 2
     state["alerted_top2"] = sorted({str(s).upper() for s in state.get("alerted_top2", [])})
     state["alerted_scores"] = state.get("alerted_scores") if isinstance(state.get("alerted_scores"), dict) else {}
     for symbol in state["alerted_top2"]:
@@ -145,6 +154,7 @@ def update_global_top2(candidates, observed_symbols=None, now=None, path=None):
 
     state.update({
         "updated": now,
+        "delivery_state_version": 2,
         "selector": "V15.8_GLOBAL_SUSTAINED_PUMP_TOP2",
         "pool_ttl_seconds": ttl,
         "min_observed_seconds": min_observed,
