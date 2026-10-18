@@ -168,8 +168,8 @@ def acknowledge_global_top2(symbol, score, delivered, now=None, path=None):
     symbol = str(symbol or "").strip().upper()
     if not symbol:
         return
-    state["pending_alerts"].pop(symbol, None)
     if delivered:
+        state["pending_alerts"].pop(symbol, None)
         item = state["pool"].get(symbol, {})
         item["last_alert_score"] = float(score or 0)
         item["last_alert_at"] = now
