@@ -188,5 +188,30 @@ class SustainedSelectorTests(unittest.TestCase):
             self.assertEqual(alerts, [])
             self.assertEqual(ranked, [])
 
+
+    def test_legacy_unverified_alert_history_is_migrated(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "top2.json")
+            legacy = {
+                "top2": ["AAAUSDT"],
+                "alerted_top2": ["AAAUSDT"],
+                "pool": {"AAAUSDT": {
+                    **candidate("AAAUSDT"),
+                    "last_seen": 1000,
+                    "last_alert_score": 95,
+                    "last_alert_at": 1000,
+                }},
+                "observations": {"AAAUSDT": {"first_seen": 1000, "last_seen": 1000}},
+            }
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(legacy, f)
+            alerts, _ = update_global_top2(
+                [candidate("AAAUSDT")], observed_symbols=["AAAUSDT"], now=1001, path=path
+            )
+            self.assertEqual([row["symbol"] for row in alerts], ["AAAUSDT"])
+            with open(path, encoding="utf-8") as f:
+                state = json.load(f)
+            self.assertEqual(state["delivery_state_version"], 2)
+
 if __name__ == "__main__":
     unittest.main()
