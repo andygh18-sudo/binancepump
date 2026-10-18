@@ -129,7 +129,7 @@ async def fetch_pinned_monitor_rows(http, rows, persistence_state):
     except Exception as exc:
         _pinned_failures = min(_pinned_failures + 1, 6)
         status = getattr(exc, "status", None)
-        headers = getattr(getattr(exc, "request_info", None), "headers", None) or {}
+        headers = getattr(exc, "headers", None) or {}
         retry_after = headers.get("Retry-After") if hasattr(headers, "get") else None
         try:
             delay = max(1.0, float(retry_after)) if retry_after else min(15.0 * (2 ** (_pinned_failures - 1)), 300.0)
