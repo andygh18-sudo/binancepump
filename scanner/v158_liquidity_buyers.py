@@ -32,7 +32,7 @@ def rank_liquidity_buyers(rows, quote_volumes=None, limit=10, min_quote_volume=1
         bid_depth = _num(row, "bid_depth_usdt")
         ask_depth = _num(row, "ask_depth_usdt")
         depth = bid_depth + ask_depth
-        if trades < 3 or spread <= 0 or spread > 25 or depth <= 0:
+        if trades < 3 or buy < 0.50 or spread <= 0 or spread > 25 or depth <= 0:
             continue
         cvd_z = _num(row, "adaptive_cvd_z")
         activity_z = _num(row, "adaptive_trade_z")
