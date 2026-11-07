@@ -306,6 +306,16 @@ tv_coverage = int(pd.to_numeric(df.get("tv_score", pd.Series(index=df.index)), e
 st.success(f"V15 scanner data loaded: {len(df)} symbols • source: {data_source} • top V15 score: {df['v15_score'].max():.0f}")
 st.caption(f"📺 TradingView confirmation: **{tv_coverage}/{len(df)} symbols** • 30m / 1h / 4h / 1D / 1W / 1M technical layer • Binance remains the primary live feed")
 
+st.subheader("💧 Top-10 Liquidity & Aggressive Buyers")
+liquidity_rows = d.get("liquidity_buyer_top10", [])
+if liquidity_rows:
+    liquidity_df = pd.DataFrame(liquidity_rows)
+    liquidity_cols = [c for c in ["liquidity_buyer_rank","symbol","price","liquidity_buyer_combined_score","liquidity_buyer_liquidity_score","liquidity_buyer_flow_score","liquidity_buyer_quote_volume_24h","liquidity_buyer_depth_usdt","liquidity_buyer_spread_bps","liquidity_buyer_ratio","liquidity_buyer_trades_10s","trade_accel","adaptive_cvd_z"] if c in liquidity_df.columns]
+    st.caption("Ranks eligible Binance USDT markets by 24h turnover, live order-book depth/spread, aggressive-buy ratio, trade acceleration and CVD/activity proxies. Unique buyer identities are not available from public aggregate trade feeds.")
+    st.dataframe(liquidity_df[liquidity_cols], use_container_width=True, hide_index=True)
+else:
+    st.info("No markets currently meet the liquidity, order-book readiness, spread and live-trade activity filters.")
+
 st.subheader("📡 Live Scanner Snapshot")
 st.dataframe(df.head(20), use_container_width=True, hide_index=True)
 
