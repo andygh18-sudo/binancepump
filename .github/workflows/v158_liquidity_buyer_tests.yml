@@ -1,0 +1,27 @@
+name: V15.8 Liquidity Buyer Monitor Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scanner/v158_liquidity_buyers.py"
+      - "tests/test_v158_liquidity_buyers.py"
+      - ".github/workflows/v158_liquidity_buyer_tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile monitor
+        run: python -m py_compile scanner/v158_liquidity_buyers.py
+      - name: Run monitor unit tests
+        run: python -m unittest discover -s tests -p "test_v158_liquidity_buyers.py" -v
